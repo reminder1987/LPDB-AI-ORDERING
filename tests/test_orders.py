@@ -135,3 +135,75 @@ def test_update_order():
     assert data["order"]["customer_name"] == "Update Test"
     assert data["order"]["product"] == "Hamburguesa"
     assert data["order"]["quantity"] == 3
+
+def test_get_order_not_found():
+    response = client.get("/orders/9999")
+
+    assert response.status_code == 404
+
+def test_update_order_not_found():
+    response = client.put(
+        "/orders/9999",
+        json={
+            "customer_name": "Carolina",
+            "product": "Pizza",
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 404
+
+def test_delete_order_not_found():
+    response = client.delete("/orders/9999")
+
+    assert response.status_code == 404
+
+def test_create_order_invalid_quantity_zero():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Carolina",
+            "product": "Pizza",
+            "quantity": 0,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_order_invalid_quantity_negative():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Carolina",
+            "product": "Pizza",
+            "quantity": -1,
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_order_invalid_empty_customer():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "",
+            "product": "Pizza",
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 422
+
+def test_create_order_invalid_empty_product():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Carolina",
+            "product": "",
+            "quantity": 2,
+        },
+    )
+
+    assert response.status_code == 422

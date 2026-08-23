@@ -1,12 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.models.order import Order
 from app.services.order_service import (
     create_order,
     get_orders,
     get_order_by_id,
-    delete_order,
     update_order,
+    delete_order,
 )
 
 
@@ -48,10 +48,10 @@ def get_order_endpoint(order_id: int):
     order = get_order_by_id(order_id)
 
     if order is None:
-        return {
-            "status": "error",
-            "message": "Pedido no encontrado",
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido no encontrado",
+        )
 
     return {
         "status": "ok",
@@ -64,10 +64,10 @@ def update_order_endpoint(order_id: int, order: Order):
     updated_order = update_order(order_id, order)
 
     if updated_order is None:
-        return {
-            "status": "error",
-            "message": "Pedido no encontrado",
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido no encontrado",
+        )
 
     return {
         "status": "ok",
@@ -81,10 +81,10 @@ def delete_order_endpoint(order_id: int):
     deleted = delete_order(order_id)
 
     if not deleted:
-        return {
-            "status": "error",
-            "message": "Pedido no encontrado",
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido no encontrado",
+        )
 
     return {
         "status": "ok",
