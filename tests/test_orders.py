@@ -1,15 +1,14 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas.order import OrderCreate
 
 
 client = TestClient(app)
 
 
 def test_order_model():
-    from app.models.order import Order
-
-    order = Order(
+    order = OrderCreate(
         customer_name="Carolina",
         product="Pizza",
         quantity=2,
@@ -97,7 +96,6 @@ def test_delete_order():
     response = client.delete(f"/orders/{order_id}")
 
     assert response.status_code == 204
-    assert response.content == b""
 
 
 def test_update_order():

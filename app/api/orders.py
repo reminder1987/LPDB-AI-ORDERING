@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, Response
 
-from app.models.order import Order
+from app.schemas.order import (
+    OrderCreate,
+    OrderCreateResponse,
+    OrderListResponse,
+    OrderResponseWrapper,
+    MessageResponse,
+)
 from app.services.order_service import (
     create_order,
     get_orders,
@@ -16,7 +22,7 @@ router = APIRouter(
 )
 
 
-@router.get("/test")
+@router.get("/test", response_model=MessageResponse)
 def test_orders():
     return {
         "status": "ok",
@@ -24,8 +30,12 @@ def test_orders():
     }
 
 
-@router.post("/", status_code=201)
-def create_order_endpoint(order: Order):
+@router.post(
+    "/",
+    status_code=201,
+    response_model=OrderCreateResponse,
+)
+def create_order_endpoint(order: OrderCreate):
     saved_order = create_order(order)
 
     return {
@@ -35,7 +45,10 @@ def create_order_endpoint(order: Order):
     }
 
 
-@router.get("/")
+@router.get(
+    "/",
+    response_model=OrderListResponse,
+)
 def get_orders_endpoint():
     return {
         "status": "ok",
@@ -43,7 +56,10 @@ def get_orders_endpoint():
     }
 
 
-@router.get("/{order_id}")
+@router.get(
+    "/{order_id}",
+    response_model=OrderResponseWrapper,
+)
 def get_order_endpoint(order_id: int):
     order = get_order_by_id(order_id)
 
@@ -59,8 +75,14 @@ def get_order_endpoint(order_id: int):
     }
 
 
-@router.put("/{order_id}")
-def update_order_endpoint(order_id: int, order: Order):
+@router.put(
+    "/{order_id}",
+    response_model=OrderCreateResponse,
+)
+def update_order_endpoint(
+    order_id: int,
+    order: OrderCreate,
+):
     updated_order = update_order(order_id, order)
 
     if updated_order is None:
@@ -76,7 +98,10 @@ def update_order_endpoint(order_id: int, order: Order):
     }
 
 
-@router.delete("/{order_id}", status_code=204)
+@router.delete(
+    "/{order_id}",
+    status_code=204,
+)
 def delete_order_endpoint(order_id: int):
     deleted = delete_order(order_id)
 

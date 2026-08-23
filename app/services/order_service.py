@@ -1,9 +1,9 @@
 from app.core.database import SessionLocal
-from app.models.order import Order
+from app.schemas.order import OrderCreate
 from app.models.order_db import OrderDB
 
 
-def create_order(order: Order):
+def create_order(order: OrderCreate):
     db = SessionLocal()
 
     try:
@@ -94,7 +94,7 @@ def delete_order(order_id: int):
         db.close()
 
 
-def update_order(order_id: int, order: Order):
+def update_order(order_id: int, order: OrderCreate):
     db = SessionLocal()
 
     try:
