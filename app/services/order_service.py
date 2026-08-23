@@ -46,3 +46,27 @@ def get_orders():
 
     finally:
         db.close()
+
+
+def get_order_by_id(order_id: int):
+    db = SessionLocal()
+
+    try:
+        order = (
+            db.query(OrderDB)
+            .filter(OrderDB.id == order_id)
+            .first()
+        )
+
+        if order is None:
+            return None
+
+        return {
+            "id": order.id,
+            "customer_name": order.customer_name,
+            "product": order.product,
+            "quantity": order.quantity,
+        }
+
+    finally:
+        db.close()

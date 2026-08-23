@@ -50,3 +50,31 @@ def test_get_orders_endpoint():
     assert data["status"] == "ok"
     assert "orders" in data
     assert isinstance(data["orders"], list)
+
+
+def test_get_order_by_id():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Carolina",
+            "product": "Pizza",
+            "quantity": 2,
+        },
+    )
+
+    assert create_response.status_code == 200
+
+    created_order = create_response.json()["order"]
+    order_id = created_order["id"]
+
+    response = client.get(f"/orders/{order_id}")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["customer_name"] == "Carolina"
+    assert data["order"]["product"] == "Pizza"
+    assert data["order"]["quantity"] == 2
