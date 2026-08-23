@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 from app.models.order import Order
 from app.services.order_service import (
@@ -76,7 +76,7 @@ def update_order_endpoint(order_id: int, order: Order):
     }
 
 
-@router.delete("/{order_id}")
+@router.delete("/{order_id}", status_code=204)
 def delete_order_endpoint(order_id: int):
     deleted = delete_order(order_id)
 
@@ -86,7 +86,4 @@ def delete_order_endpoint(order_id: int):
             detail="Pedido no encontrado",
         )
 
-    return {
-        "status": "ok",
-        "message": "Pedido eliminado correctamente",
-    }
+    return Response(status_code=204)

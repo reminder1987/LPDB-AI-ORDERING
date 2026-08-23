@@ -96,11 +96,8 @@ def test_delete_order():
 
     response = client.delete(f"/orders/{order_id}")
 
-    assert response.status_code == 200
-
-    data = response.json()
-
-    assert data["status"] == "ok"
+    assert response.status_code == 204
+    assert response.content == b""
 
 
 def test_update_order():
