@@ -70,3 +70,25 @@ def get_order_by_id(order_id: int):
 
     finally:
         db.close()
+
+
+def delete_order(order_id: int):
+    db = SessionLocal()
+
+    try:
+        order = (
+            db.query(OrderDB)
+            .filter(OrderDB.id == order_id)
+            .first()
+        )
+
+        if order is None:
+            return False
+
+        db.delete(order)
+        db.commit()
+
+        return True
+
+    finally:
+        db.close()

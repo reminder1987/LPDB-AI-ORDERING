@@ -78,3 +78,26 @@ def test_get_order_by_id():
     assert data["order"]["customer_name"] == "Carolina"
     assert data["order"]["product"] == "Pizza"
     assert data["order"]["quantity"] == 2
+
+
+def test_delete_order():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Delete Test",
+            "product": "Pizza",
+            "quantity": 1,
+        },
+    )
+
+    assert create_response.status_code == 200
+
+    order_id = create_response.json()["order"]["id"]
+
+    response = client.delete(f"/orders/{order_id}")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"

@@ -1,11 +1,17 @@
 from fastapi import APIRouter
+
 from app.models.order import Order
-from app.services.order_service import create_order, get_orders, get_order_by_id
+from app.services.order_service import (
+    create_order,
+    get_orders,
+    get_order_by_id,
+    delete_order,
+)
 
 
 router = APIRouter(
     prefix="/orders",
-    tags=["Orders"]
+    tags=["Orders"],
 )
 
 
@@ -13,7 +19,7 @@ router = APIRouter(
 def test_orders():
     return {
         "status": "ok",
-        "message": "Orders API está funcionando"
+        "message": "Orders API está funcionando",
     }
 
 
@@ -24,7 +30,7 @@ def create_order_endpoint(order: Order):
     return {
         "status": "ok",
         "message": "Pedido recibido correctamente",
-        "order": saved_order
+        "order": saved_order,
     }
 
 
@@ -32,8 +38,9 @@ def create_order_endpoint(order: Order):
 def get_orders_endpoint():
     return {
         "status": "ok",
-        "orders": get_orders()
+        "orders": get_orders(),
     }
+
 
 @router.get("/{order_id}")
 def get_order_endpoint(order_id: int):
@@ -42,10 +49,26 @@ def get_order_endpoint(order_id: int):
     if order is None:
         return {
             "status": "error",
-            "message": "Pedido no encontrado"
+            "message": "Pedido no encontrado",
         }
 
     return {
         "status": "ok",
-        "order": order
+        "order": order,
+    }
+
+
+@router.delete("/{order_id}")
+def delete_order_endpoint(order_id: int):
+    deleted = delete_order(order_id)
+
+    if not deleted:
+        return {
+            "status": "error",
+            "message": "Pedido no encontrado",
+        }
+
+    return {
+        "status": "ok",
+        "message": "Pedido eliminado correctamente",
     }
