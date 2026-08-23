@@ -6,6 +6,7 @@ from app.services.order_service import (
     get_orders,
     get_order_by_id,
     delete_order,
+    update_order,
 )
 
 
@@ -55,6 +56,23 @@ def get_order_endpoint(order_id: int):
     return {
         "status": "ok",
         "order": order,
+    }
+
+
+@router.put("/{order_id}")
+def update_order_endpoint(order_id: int, order: Order):
+    updated_order = update_order(order_id, order)
+
+    if updated_order is None:
+        return {
+            "status": "error",
+            "message": "Pedido no encontrado",
+        }
+
+    return {
+        "status": "ok",
+        "message": "Pedido actualizado correctamente",
+        "order": updated_order,
     }
 
 

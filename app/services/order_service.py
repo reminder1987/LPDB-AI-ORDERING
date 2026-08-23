@@ -92,3 +92,34 @@ def delete_order(order_id: int):
 
     finally:
         db.close()
+
+
+def update_order(order_id: int, order: Order):
+    db = SessionLocal()
+
+    try:
+        order_db = (
+            db.query(OrderDB)
+            .filter(OrderDB.id == order_id)
+            .first()
+        )
+
+        if order_db is None:
+            return None
+
+        order_db.customer_name = order.customer_name
+        order_db.product = order.product
+        order_db.quantity = order.quantity
+
+        db.commit()
+        db.refresh(order_db)
+
+        return {
+            "id": order_db.id,
+            "customer_name": order_db.customer_name,
+            "product": order_db.product,
+            "quantity": order_db.quantity,
+        }
+
+    finally:
+        db.close()

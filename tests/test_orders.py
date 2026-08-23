@@ -101,3 +101,37 @@ def test_delete_order():
     data = response.json()
 
     assert data["status"] == "ok"
+
+
+def test_update_order():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Update Test",
+            "product": "Pizza",
+            "quantity": 1,
+        },
+    )
+
+    assert create_response.status_code == 200
+
+    order_id = create_response.json()["order"]["id"]
+
+    response = client.put(
+        f"/orders/{order_id}",
+        json={
+            "customer_name": "Update Test",
+            "product": "Hamburguesa",
+            "quantity": 3,
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["customer_name"] == "Update Test"
+    assert data["order"]["product"] == "Hamburguesa"
+    assert data["order"]["quantity"] == 3
