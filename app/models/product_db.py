@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String
+from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -17,14 +17,18 @@ class ProductDB(Base):
         nullable=False,
     )
 
-    category: Mapped[str] = mapped_column(
-        String(100),
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id"),
         nullable=False,
     )
 
     price: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
+    )
+
+    category: Mapped["CategoryDB"] = relationship(
+        back_populates="products",
     )
 
     recipe: Mapped["RecipeDB | None"] = relationship(

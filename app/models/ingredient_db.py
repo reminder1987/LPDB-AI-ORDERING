@@ -23,3 +23,7 @@ class IngredientDB(Base):
     category: Mapped["CategoryDB"] = relationship(
         back_populates="ingredients",
     )
+
+    recipe_ingredients: Mapped[list["RecipeIngredientDB"]] = relationship(
+        back_populates="ingredient",
+    )

@@ -8,6 +8,7 @@ class CategoryDB(Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
     name: Mapped[str] = mapped_column(
         String(100),
         unique=True,
@@ -15,5 +16,9 @@ class CategoryDB(Base):
     )
 
     ingredients: Mapped[list["IngredientDB"]] = relationship(
+        back_populates="category",
+    )
+
+    products: Mapped[list["ProductDB"]] = relationship(
         back_populates="category",
     )

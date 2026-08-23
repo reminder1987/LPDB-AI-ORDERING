@@ -41,4 +41,6 @@ class RecipeIngredientDB(Base):
         back_populates="ingredients",
     )
 
-    ingredient: Mapped["IngredientDB"] = relationship()
+    ingredient: Mapped["IngredientDB"] = relationship(
+        back_populates="recipe_ingredients",
+    )
