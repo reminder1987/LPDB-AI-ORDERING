@@ -24,7 +24,7 @@ def test_orders():
     }
 
 
-@router.post("/")
+@router.post("/", status_code=201)
 def create_order_endpoint(order: Order):
     saved_order = create_order(order)
 

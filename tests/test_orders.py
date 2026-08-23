@@ -30,7 +30,7 @@ def test_create_order_endpoint():
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
 
     data = response.json()
 
@@ -62,7 +62,7 @@ def test_get_order_by_id():
         },
     )
 
-    assert create_response.status_code == 200
+    assert create_response.status_code == 201
 
     created_order = create_response.json()["order"]
     order_id = created_order["id"]
@@ -90,7 +90,7 @@ def test_delete_order():
         },
     )
 
-    assert create_response.status_code == 200
+    assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
 
@@ -113,7 +113,7 @@ def test_update_order():
         },
     )
 
-    assert create_response.status_code == 200
+    assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
 
@@ -136,10 +136,12 @@ def test_update_order():
     assert data["order"]["product"] == "Hamburguesa"
     assert data["order"]["quantity"] == 3
 
+
 def test_get_order_not_found():
     response = client.get("/orders/9999")
 
     assert response.status_code == 404
+
 
 def test_update_order_not_found():
     response = client.put(
@@ -153,10 +155,12 @@ def test_update_order_not_found():
 
     assert response.status_code == 404
 
+
 def test_delete_order_not_found():
     response = client.delete("/orders/9999")
 
     assert response.status_code == 404
+
 
 def test_create_order_invalid_quantity_zero():
     response = client.post(
@@ -195,6 +199,7 @@ def test_create_order_invalid_empty_customer():
     )
 
     assert response.status_code == 422
+
 
 def test_create_order_invalid_empty_product():
     response = client.post(
