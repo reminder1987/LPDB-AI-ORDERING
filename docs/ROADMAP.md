@@ -17,8 +17,8 @@ Este documento es la fuente oficial del orden, alcance y estado de las fases del
 
 # ESTADO ACTUAL
 
-**Fase actual:** 13 — Frontend  
-**Estado:** EN PROGRESO  
+**Fase actual:** 13 — Canal de cliente, agente IA y dashboard operativo  
+**Estado:** EN DEFINICIÓN / PRÓXIMA IMPLEMENTACIÓN  
 **Última fase completada:** 12 — Consulta de pedidos  
 **Último checkpoint:** `221116b` — `feat: completar consultas de pedidos fase 12`  
 **Rama principal:** `master`
@@ -28,116 +28,61 @@ Este documento es la fuente oficial del orden, alcance y estado de las fases del
 # FASES DEL PROYECTO
 
 ## FASE 01 — Fundamentos del proyecto
-
 **Estado:** COMPLETADA
-
-Base inicial del proyecto, estructura, entorno y configuración fundamental.
-
----
 
 ## FASE 02 — API / CRUD inicial
-
 **Estado:** COMPLETADA
-
-Construcción inicial de la API de pedidos y operaciones CRUD.
-
----
 
 ## FASE 03 — PostgreSQL
-
 **Estado:** COMPLETADA
-
-Migración de la persistencia de pedidos hacia PostgreSQL y consolidación del acceso a datos.
-
----
 
 ## FASE 04 — Modelado de catálogo
-
 **Estado:** COMPLETADA
-
-Modelos de productos, categorías e ingredientes y relaciones del catálogo.
-
----
 
 ## FASE 05 — Productos / recetas
-
 **Estado:** COMPLETADA
-
-Catálogo, recetas y estructura necesaria para determinar composición y reglas de productos.
-
----
 
 ## FASE 06 — Sedes / disponibilidad
-
 **Estado:** COMPLETADA
-
-Sedes, disponibilidad de productos e ingredientes y servicios relacionados.
-
----
 
 ## FASE 07 — Modificaciones
-
 **Estado:** COMPLETADA
 
-Reglas y persistencia de modificaciones de pedidos:
-
-- `ADD`
-- `REMOVE`
-- `BASE_CHANGE`
-- Validaciones de modificaciones.
-
----
+Reglas y persistencia de `ADD`, `REMOVE` y `BASE_CHANGE`.
 
 ## FASE 08 — Agent / Intent / conversación
-
 **Estado:** COMPLETADA
 
-Interpretación de mensajes del cliente, detección de productos, cantidades, modificaciones, combos y flujo conversacional.
-
----
+Interpretación de mensajes, productos, cantidades, modificaciones, combos y flujo conversacional.
 
 ## FASE 09 — Integración completa de ordering
-
 **Estado:** COMPLETADA
 
-Integración del flujo completo de creación de pedidos con catálogo, modificaciones, disponibilidad, sedes, conversación y persistencia.
-
----
+Integración de catálogo, modificaciones, disponibilidad, sedes, conversación y persistencia.
 
 ## FASE 10 — Precio final
-
 **Estado:** COMPLETADA
 
-### Alcance
-
-- Precio base de cada producto.
+- Precio base de productos.
 - Precio de `ADD`.
 - `REMOVE` sin costo adicional.
 - `BASE_CHANGE` según producto/base resultante.
 - Cantidades.
 - Múltiples productos.
 - Combos y bebida.
-- Subtotal y total consistentes en respuesta y BD.
+- Subtotal y total consistentes.
 - No inventar precios de combo mientras no estén definidos.
 
----
-
 ## FASE 11 — Disponibilidad real
-
 **Estado:** COMPLETADA
 
-### Alcance
-
 - Producto disponible/no disponible.
-- Ingredientes y modificaciones válidas según disponibilidad.
+- Ingredientes y modificaciones según disponibilidad.
 - Bebidas disponibles.
 - Validación antes de crear la orden.
 - Integración con el flujo conversacional.
 
----
-
 ## FASE 12 — Consulta de pedidos
-
 **Estado:** COMPLETADA
 
 ### Alcance
@@ -156,12 +101,9 @@ Integración del flujo completo de creación de pedidos con catálogo, modificac
 - Pedidos con `REMOVE`.
 - Pedidos con `BASE_CHANGE`.
 - Múltiples items.
-- Combos.
-- Bebidas.
+- Combos y bebidas.
 - Precio de combo.
-- `unit_price`.
-- `subtotal`.
-- `total`.
+- `unit_price`, `subtotal` y `total`.
 - `404` para pedido inexistente.
 
 ### Checkpoint
@@ -170,75 +112,234 @@ Integración del flujo completo de creación de pedidos con catálogo, modificac
 
 ---
 
-## FASE 13 — Frontend
+# FASE 13 — Canal de cliente, agente IA y dashboard operativo
 
-**Estado:** EN PROGRESO
+**Estado:** EN DEFINICIÓN / PRÓXIMA IMPLEMENTACIÓN
 
-### Objetivo
+## Objetivo
 
-Construir la interfaz web que consuma la API real del proyecto sin duplicar la lógica de negocio del backend.
+Construir la capa de interacción del producto alrededor de la visión real del negocio:
 
-### Alcance previsto
+> El cliente no necesita descargar una aplicación nueva. El canal principal del cliente será WhatsApp, donde conversa con el agente de IA. El agente entiende y valida el pedido, confirma la orden y conduce el flujo hasta el pago mediante Toast. Una vez confirmado el pago, el pedido queda listo para el flujo operativo de Toast y su envío a cocina/KDS según la configuración del restaurante.
 
-- Pantalla principal.
-- Catálogo de productos.
-- Productos disponibles/no disponibles.
-- Selección de cantidad.
-- Modificaciones `ADD`, `REMOVE` y `BASE_CHANGE`.
-- Combos.
-- Bebidas.
-- Carrito/pedido.
-- Precios.
-- Subtotal.
-- Total.
-- Confirmación del pedido.
-- Consulta de pedidos.
-- Manejo de errores de API.
-- Estados de carga.
-- Diseño responsive.
+La interfaz web no será el frontend principal del cliente. El frontend web de esta fase será principalmente un **dashboard operativo para el restaurante/administrador**.
 
-### Principio arquitectónico
-
-El frontend presenta y solicita operaciones; la API permanece como fuente de verdad para reglas de negocio, disponibilidad, modificaciones y precios.
+## Arquitectura conceptual
 
 ```text
-FRONTEND
-   ↓
-FASTAPI
-   ↓
-SERVICES
-   ↓
-POSTGRESQL
+                    CLIENTE
+                       │
+                       │ WhatsApp
+                       ▼
+              ┌─────────────────┐
+              │  AGENTE DE IA   │
+              │    WHATSAPP     │
+              └────────┬────────┘
+                       │
+                       ▼
+              CATÁLOGO / PRECIOS
+              DISPONIBILIDAD
+              MODIFICACIONES
+                       │
+                       ▼
+                 CONFIRMA ORDEN
+                       │
+                       ▼
+                 INTEGRACIÓN TOAST
+                       │
+                       ▼
+                  PAGO EN TOAST
+                       │
+                       ▼
+                ORDEN PAGADA
+                       │
+                       ▼
+                 TOAST / KDS
+                       │
+                       ▼
+                    COCINA
 ```
 
-### Criterio de cierre
+En paralelo:
 
-El flujo principal de ordering debe poder ejecutarse desde la interfaz, consumiendo los endpoints reales y reflejando correctamente productos, cantidades, modificaciones, combos, disponibilidad y precios.
+```text
+RESTAURANTE
+     │
+     ▼
+DASHBOARD WEB
+     │
+     ├── Pedidos
+     ├── Productos
+     ├── Precios
+     ├── Disponibilidad
+     ├── Sedes
+     └── Configuración
+```
+
+## 13.1 Canal WhatsApp
+
+Definir e implementar el canal mediante el cual los clientes conversarán con el agente sin instalar una aplicación nueva.
+
+Debe contemplar:
+
+- Recepción de mensajes.
+- Envío de respuestas.
+- Identificación de cliente/conversación.
+- Persistencia de sesión.
+- Manejo de errores del canal.
+- Confirmación conversacional del pedido.
+
+El proveedor concreto de WhatsApp queda pendiente de decisión técnica antes de implementar la integración.
+
+## 13.2 Agente de IA / conversación
+
+Reutilizar el motor existente de `/agent/message` y `conversation_service` como núcleo de interpretación y conversación.
+
+El canal externo no debe duplicar la lógica de intent, modificaciones, disponibilidad ni precios.
+
+## 13.3 Confirmación del pedido
+
+El cliente debe recibir una representación clara del pedido antes del pago, incluyendo cuando corresponda:
+
+- Productos.
+- Cantidades.
+- Modificaciones.
+- Combos.
+- Bebidas.
+- Subtotal.
+- Total.
+
+## 13.4 Toast como sistema de pago y POS
+
+**No se construirá una pasarela de pagos propia para el producto.**
+
+La arquitectura objetivo es integrar Toast para que el pedido pueda entrar en su ecosistema de POS/pagos. Toast será la referencia externa para el precio final y el flujo de pago, sujeto a los permisos, capacidades y configuración del restaurante y de la integración aprobada por Toast.
+
+Flujo objetivo:
+
+```text
+pedido interpretado por LPDB
+          ↓
+   integración Toast
+          ↓
+ precio/check de Toast
+          ↓
+ confirmación del cliente
+          ↓
+     pago en Toast
+          ↓
+    pago confirmado
+          ↓
+ Toast / fulfillment
+          ↓
+      KDS / cocina
+```
+
+LPDB no debe almacenar datos sensibles de tarjetas ni convertirse en procesador de pagos propio.
+
+## 13.5 Toast y cocina
+
+La integración deberá diseñarse para que, después de que el pedido esté correctamente creado y pagado según el flujo de Toast, Toast pueda ejecutar su flujo normal de fulfillment y envío a cocina/KDS cuando el restaurante tenga configurado el comportamiento correspondiente.
+
+No se debe asumir que todo pedido será enviado automáticamente a cocina: esto depende de la configuración y capacidades de Toast/KDS del restaurante y deberá verificarse durante la integración.
+
+## 13.6 Dashboard web del restaurante
+
+Construir una interfaz web para operación y administración, no como requisito de descarga para el cliente.
+
+Debe contemplar inicialmente:
+
+- Pedidos.
+- Detalle de pedidos.
+- Estado de pedidos.
+- Productos.
+- Precios.
+- Disponibilidad.
+- Sedes.
+- Configuración operativa necesaria.
+
+## 13.7 Integración externa preparada
+
+La fase debe definir contratos internos limpios para:
+
+```text
+LPDB Core
+    ↓
+Integration Layer
+    ├── WhatsApp
+    └── Toast
+```
+
+La implementación completa y endurecimiento de las integraciones externas continúa en la Fase 19 cuando corresponda.
+
+## Principios arquitectónicos
+
+1. **WhatsApp es la interfaz principal del cliente.**
+2. **El dashboard web es la interfaz operativa del restaurante.**
+3. **Toast es el sistema externo objetivo para POS y pagos; LPDB no implementa una pasarela propia.**
+4. El backend FastAPI continúa siendo la fuente de verdad de la lógica de ordering de LPDB.
+5. El frontend no duplica reglas de precios, disponibilidad o modificaciones.
+6. El canal WhatsApp no debe contener lógica de negocio que deba vivir en los servicios del backend.
+7. Las integraciones externas deben aislarse mediante una capa de integración.
+8. No se implementará una app móvil nativa como requisito del producto salvo decisión explícita posterior.
+
+## Backend existente que alimenta esta fase
+
+Actualmente el backend dispone de piezas relevantes:
+
+- `/agent/message`
+- `/products/`
+- búsqueda de productos
+- consulta de recetas
+- validación de modificaciones
+- `/availability/{location_id}/{product_id}`
+- `/orders/`
+- `/orders/{id}`
+
+Estas capacidades deben reutilizarse antes de crear nuevos endpoints.
+
+## Lo que NO se debe asumir todavía
+
+No se debe asumir sin decisión explícita:
+
+- proveedor concreto de WhatsApp;
+- credenciales de producción;
+- permisos definitivos de Toast;
+- configuración definitiva de Toast Payments;
+- configuración de Toast KDS/auto-firing;
+- autenticación definitiva del dashboard;
+- infraestructura de producción.
+
+## Criterio de cierre
+
+La Fase 13 se considerará terminada cuando:
+
+1. El canal de cliente definido esté técnicamente integrado o preparado según el alcance acordado.
+2. El cliente pueda iniciar y continuar una conversación de ordering mediante WhatsApp.
+3. El agente pueda interpretar y validar el pedido usando el backend existente.
+4. El cliente pueda recibir y confirmar un resumen del pedido.
+5. El pedido pueda prepararse para el flujo de pago mediante Toast sin crear una pasarela propia.
+6. Exista un dashboard web operativo para el restaurante dentro del alcance acordado.
+7. Exista una separación clara entre canal, interfaz operativa, backend y futuras integraciones externas.
+8. Las pruebas de los flujos implementados pasen y exista un checkpoint de GitHub.
 
 ---
 
 ## FASE 14 — Pruebas integrales
-
 **Estado:** PENDIENTE
 
 ### Alcance
 
 - Pruebas del backend completo.
-- Pruebas del frontend.
-- Pruebas de integración frontend ↔ API.
+- Pruebas del dashboard.
+- Pruebas del canal WhatsApp.
+- Pruebas de integración canal ↔ API.
 - Flujos End-to-End.
 - Casos positivos y negativos.
 - Regresiones de las Fases 10–13.
 - Reducción de dependencia de pruebas manuales.
 
-### Criterio de cierre
-
-Los flujos principales del sistema deben estar cubiertos por pruebas reproducibles y pasar sin regresiones.
-
----
-
 ## FASE 15 — Autenticación y seguridad
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -252,15 +353,9 @@ Los flujos principales del sistema deben estar cubiertos por pruebas reproducibl
 - CORS.
 - Variables de entorno y secretos.
 - Validación y controles de entrada.
-
-### Criterio de cierre
-
-Los usuarios y operaciones estén protegidos según sus permisos y las credenciales sensibles no formen parte del código ni del repositorio.
-
----
+- Seguridad de webhooks y callbacks.
 
 ## FASE 16 — Datos y migraciones de producción
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -271,18 +366,11 @@ Los usuarios y operaciones estén protegidos según sus permisos y las credencia
 - Constraints.
 - Índices necesarios.
 - Tratamiento de datos legacy.
-- Estrategia de backup.
-- Estrategia de restauración.
+- Backups y restauración.
+- Estados de pedidos y pagos necesarios para producción.
 - Flujo desarrollo → staging → producción.
 
-### Criterio de cierre
-
-La base de datos de producción debe poder crearse y actualizarse mediante migraciones reproducibles sin copiar manualmente la BD de desarrollo.
-
----
-
 ## FASE 17 — Docker y despliegue
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -293,29 +381,22 @@ La base de datos de producción debe poder crearse y actualizarse mediante migra
 - Secrets.
 - Health checks.
 - Configuración de servicios.
-- Preparación del frontend para despliegue.
-
-### Criterio de cierre
-
-El sistema debe poder ejecutarse de forma reproducible fuera del entorno local de desarrollo.
-
----
+- Preparación del dashboard para despliegue.
+- Infraestructura necesaria para webhooks.
 
 ## FASE 18 — Staging
-
 **Estado:** PENDIENTE
 
 ### Alcance
 
 - Entorno de staging.
-- Deploy de backend y frontend.
+- Deploy de backend y dashboard.
 - Base de datos de staging.
 - Configuración independiente de producción.
 - Pruebas desde Internet.
+- Webhooks de prueba.
 - Smoke tests.
 - Correcciones antes de producción.
-
-### Flujo
 
 ```text
 GitHub
@@ -329,19 +410,21 @@ CORRECCIONES
 PRODUCCIÓN
 ```
 
----
-
 ## FASE 19 — Integraciones externas
-
 **Estado:** PENDIENTE
 
 ### Alcance
 
-Integraciones externas necesarias para el producto final, incluyendo Toast si forma parte del alcance definitivo.
+Integraciones externas necesarias para el producto final:
+
+- WhatsApp.
+- Toast Orders API.
+- Toast Payments, según capacidades y autorización del restaurante.
+- Toast webhooks.
+- Toast/KDS y fulfillment.
+- Otras integraciones que sean necesarias.
 
 ### Principio arquitectónico
-
-Las integraciones externas deben vivir detrás de una capa de integración y no contaminar el núcleo de ordering.
 
 ```text
 LPDB-AI-ORDERING
@@ -351,14 +434,13 @@ Integration Layer
 Servicios externos
 ```
 
+Las integraciones externas no deben contaminar el núcleo de ordering.
+
 ### Criterio de cierre
 
-Las integraciones definidas para producción deben funcionar con autenticación, manejo de errores, mapeo de datos y pruebas.
-
----
+Las integraciones definidas para producción deben funcionar con autenticación, manejo de errores, mapeo de datos, estados, reintentos cuando corresponda y pruebas.
 
 ## FASE 20 — Observabilidad y operación
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -370,16 +452,9 @@ Las integraciones definidas para producción deben funcionar con autenticación,
 - Monitoreo.
 - Alertas.
 - Auditoría.
-- Seguimiento de operaciones e integraciones.
-
-### Criterio de cierre
-
-Los problemas relevantes del sistema deben poder detectarse, diagnosticarse y rastrearse en producción.
-
----
+- Seguimiento de webhooks, pagos y sincronización con POS.
 
 ## FASE 21 — Producción
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -391,17 +466,17 @@ Los problemas relevantes del sistema deben poder detectarse, diagnosticarse y ra
 - Base de datos productiva.
 - Backups.
 - Monitoring.
+- Webhooks productivos.
+- Configuración productiva de WhatsApp.
+- Configuración productiva de Toast.
 - Smoke tests.
-- Prueba real de creación y consulta de pedidos.
+- Prueba real de conversación → pedido → pago → POS/KDS.
 
 ### Criterio de cierre
 
-La aplicación debe estar disponible públicamente y operar correctamente en un entorno productivo controlado.
-
----
+El producto debe estar disponible públicamente y operar correctamente en un entorno productivo controlado.
 
 ## FASE 22 — Documentación y entrega
-
 **Estado:** PENDIENTE
 
 ### Alcance
@@ -413,11 +488,14 @@ La aplicación debe estar disponible públicamente y operar correctamente en un 
 - API.
 - Base de datos.
 - Migraciones.
-- Frontend.
+- Dashboard.
+- Canal WhatsApp.
+- Toast.
 - Deployment.
 - Integraciones.
 - Troubleshooting.
 - Procedimientos operativos.
+- Guía de administración del restaurante.
 
 ### Criterio de cierre
 
@@ -428,28 +506,28 @@ El proyecto debe poder ser instalado, entendido, operado y mantenido por otra pe
 # MAPA RESUMIDO
 
 ```text
-FASE 01 — Fundamentos del proyecto             ✅
-FASE 02 — API / CRUD inicial                   ✅
-FASE 03 — PostgreSQL                            ✅
-FASE 04 — Modelado de catálogo                 ✅
-FASE 05 — Productos / recetas                  ✅
-FASE 06 — Sedes / disponibilidad               ✅
-FASE 07 — Modificaciones                       ✅
-FASE 08 — Agent / Intent / conversación        ✅
-FASE 09 — Integración completa ordering        ✅
-FASE 10 — Precio final                         ✅
-FASE 11 — Disponibilidad real                  ✅
-FASE 12 — Consulta de pedidos                  ✅
-FASE 13 — Frontend                             ▶️ ACTUAL
-FASE 14 — Pruebas integrales                   ⏳
-FASE 15 — Autenticación y seguridad             ⏳
-FASE 16 — Datos / migraciones producción       ⏳
-FASE 17 — Docker / despliegue                  ⏳
-FASE 18 — Staging                              ⏳
-FASE 19 — Integraciones externas               ⏳
-FASE 20 — Observabilidad                       ⏳
-FASE 21 — Producción                           ⏳
-FASE 22 — Documentación / entrega              ⏳
+FASE 01 — Fundamentos del proyecto                    ✅
+FASE 02 — API / CRUD inicial                          ✅
+FASE 03 — PostgreSQL                                  ✅
+FASE 04 — Modelado de catálogo                       ✅
+FASE 05 — Productos / recetas                        ✅
+FASE 06 — Sedes / disponibilidad                     ✅
+FASE 07 — Modificaciones                              ✅
+FASE 08 — Agent / Intent / conversación               ✅
+FASE 09 — Integración completa ordering               ✅
+FASE 10 — Precio final                                ✅
+FASE 11 — Disponibilidad real                         ✅
+FASE 12 — Consulta de pedidos                         ✅
+FASE 13 — WhatsApp + Agent + Toast + Dashboard        ▶️ ACTUAL
+FASE 14 — Pruebas integrales                          ⏳
+FASE 15 — Autenticación y seguridad                    ⏳
+FASE 16 — Datos / migraciones producción              ⏳
+FASE 17 — Docker / despliegue                         ⏳
+FASE 18 — Staging                                     ⏳
+FASE 19 — Integraciones externas                      ⏳
+FASE 20 — Observabilidad                              ⏳
+FASE 21 — Producción                                  ⏳
+FASE 22 — Documentación / entrega                     ⏳
 ```
 
 ---
@@ -461,7 +539,7 @@ FASE 22 — Documentación / entrega              ⏳
 | 10 | COMPLETADA | Integrada en el estado funcional previo |
 | 11 | COMPLETADA | Integrada en el estado funcional previo |
 | 12 | COMPLETADA | `221116b` |
-| 13 | EN PROGRESO | Pendiente de implementación |
+| 13 | EN DEFINICIÓN / PRÓXIMA IMPLEMENTACIÓN | Pendiente |
 
 ---
 
