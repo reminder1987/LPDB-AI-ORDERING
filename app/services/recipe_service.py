@@ -5,6 +5,13 @@ from app.core.database import SessionLocal
 from app.models.product_db import ProductDB
 
 
+# Categoría interna que no debe exponerse al cliente
+# cuando consulta los ingredientes que componen un producto.
+EXCLUDED_RECIPE_CATEGORIES = {
+    "EMPAQUE / OPERACIÓN",
+}
+
+
 def get_product_recipe(product_id: int):
     db = SessionLocal()
 
@@ -34,6 +41,9 @@ def get_product_recipe(product_id: int):
 
         for relation in product.recipe.ingredients:
             ingredient = relation.ingredient
+
+            if ingredient.category.name in EXCLUDED_RECIPE_CATEGORIES:
+                continue
 
             ingredients.append(
                 {
