@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     database_user: str = "postgres"
     database_password: str
 
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-5.5"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
