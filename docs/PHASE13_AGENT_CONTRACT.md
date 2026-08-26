@@ -7,7 +7,10 @@ Definir las reglas que debe seguir el agente conversacional antes de conectar un
 ## 1. Idioma
 
 - El agente responde en el idioma del cliente.
+- El agente debe detectar automáticamente el idioma mediante el contexto conversacional y el LLM, sin limitarse a una lista fija de idiomas.
 - Si el cliente cambia de idioma, el agente cambia con él.
+- El requisito aplica también a idiomas como español, inglés, portugués, francés, mandarín y otros idiomas soportados por el modelo.
+- Si el idioma no puede determinarse con suficiente confianza, el agente debe pedir una aclaración natural antes de continuar.
 - El idioma de conversación no modifica los datos internos del catálogo.
 - Los nombres oficiales de productos e ingredientes deben conservarse cuando sea necesario para evitar ambigüedad.
 
@@ -90,6 +93,7 @@ No se debe asumir todavía el mecanismo exacto de envío a cocina hasta implemen
 
 - Tools de consulta y validación: implementadas y probadas localmente.
 - Contrato funcional del agente: definido.
+- Soporte multidioma: requisito definido.
 - LLM: pendiente.
 - WhatsApp: pendiente.
 - Toast: pendiente.
