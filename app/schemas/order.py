@@ -1,46 +1,184 @@
+from decimal import Decimal
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+class OrderModificationCreate(BaseModel):
+    type: Literal[
+        "REMOVE",
+        "ADD",
+        "BASE_CHANGE",
+    ]
+
+    ingredient: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    new_base: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+
+class OrderItemCreate(BaseModel):
+    product: str = Field(
+        min_length=1,
+    )
+
+    quantity: int = Field(
+        gt=0,
+    )
+
+    modifications: list[OrderModificationCreate] = Field(
+        default_factory=list,
+    )
+
+    combo_requested: bool = Field(
+        default=False,
+    )
+
+    beverage_product_id: int | None = Field(
+        default=None,
+    )
+
+    beverage_product: str | None = Field(
+        default=None,
+        min_length=1,
+    )
 
 
 class OrderCreate(BaseModel):
     customer_name: str = Field(
         min_length=1,
-        description="Nombre del cliente que realiza el pedido.",
-        examples=["Carolina"],
     )
 
-    product: str = Field(
-        min_length=1,
-        description="Producto solicitado.",
-        examples=["Pizza"],
-    )
-
-    quantity: int = Field(
+    location_id: int = Field(
         gt=0,
-        description="Cantidad de unidades solicitadas. Debe ser mayor que 0.",
-        examples=[2],
     )
+
+    # Nueva estructura: una orden puede tener múltiples productos.
+    items: list[OrderItemCreate] = Field(
+        default_factory=list,
+    )
+
+    # Campos legacy para no romper consumidores existentes.
+    product: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+    quantity: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
+    modifications: list[OrderModificationCreate] = Field(
+        default_factory=list,
+    )
+
+    combo_requested: bool = Field(
+        default=False,
+    )
+
+    beverage_product_id: int | None = Field(
+        default=None,
+    )
+
+    beverage_product: str | None = Field(
+        default=None,
+        min_length=1,
+    )
+
+
+class OrderModificationResponse(BaseModel):
+    type: str
+    ingredient: str | None = None
+    new_base: str | None = None
+    price: Decimal | None = None
+
+
+class OrderBeverageResponse(BaseModel):
+    product_id: int
+    product: str
+
+
+class OrderComboResponse(BaseModel):
+    requested: bool
+    fries: str
+    beverage: OrderBeverageResponse | None = None
+
+    # Precio adicional del combo.
+    #
+    # Actualmente:
+    # $6.99
+    #
+    # Las papas y la bebida están incluidas.
+    price: Decimal | None = None
+
+
+class OrderItemResponse(BaseModel):
+    product: str
+    quantity: int
+
+    modifications: list[
+        OrderModificationResponse
+    ] = Field(
+        default_factory=list,
+    )
+
+    combo: OrderComboResponse | None = None
+
+    # Precio del producto final antes de multiplicar
+    # por la cantidad.
+    unit_price: Decimal | None = None
+
+    # Precio total de este item:
+    #
+    # unit_price × quantity
+    subtotal: Decimal | None = None
 
 
 class OrderResponse(BaseModel):
-    id: int = Field(
-        description="Identificador único del pedido.",
-        examples=[1],
+    id: int
+    customer_name: str
+    location_id: int
+
+    # ---------------------------------------------------------
+    # Campos legacy
+    #
+    # Se mantienen para no romper consumidores existentes.
+    # ---------------------------------------------------------
+
+    product: str
+    quantity: int
+
+    modifications: list[
+        OrderModificationResponse
+    ] = Field(
+        default_factory=list,
     )
 
-    customer_name: str = Field(
-        description="Nombre del cliente.",
-        examples=["Carolina"],
+    combo: OrderComboResponse | None = None
+
+    # ---------------------------------------------------------
+    # Nueva representación completa.
+    # ---------------------------------------------------------
+
+    items: list[OrderItemResponse] = Field(
+        default_factory=list,
     )
 
-    product: str = Field(
-        description="Producto solicitado.",
-        examples=["Pizza"],
-    )
+    # Suma de los subtotales de todos los items.
+    subtotal: Decimal | None = None
 
-    quantity: int = Field(
-        description="Cantidad de unidades solicitadas.",
-        examples=[2],
-    )
+    # Total final de la orden.
+    #
+    # Actualmente no existen impuestos,
+    # descuentos ni cargos adicionales en
+    # las reglas de negocio.
+    total: Decimal | None = None
 
 
 class OrderCreateResponse(BaseModel):

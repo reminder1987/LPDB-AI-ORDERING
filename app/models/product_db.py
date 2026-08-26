@@ -1,9 +1,15 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+if TYPE_CHECKING:
+    from app.models.category_db import ProductCategoryDB
+    from app.models.recipe_db import RecipeDB
 
 
 class ProductDB(Base):
@@ -18,7 +24,7 @@ class ProductDB(Base):
     )
 
     category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id"),
+        ForeignKey("product_categories.id"),
         nullable=False,
     )
 
@@ -27,7 +33,7 @@ class ProductDB(Base):
         nullable=False,
     )
 
-    category: Mapped["CategoryDB"] = relationship(
+    category: Mapped["ProductCategoryDB"] = relationship(
         back_populates="products",
     )
 

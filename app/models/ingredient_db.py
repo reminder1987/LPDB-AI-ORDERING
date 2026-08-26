@@ -1,7 +1,14 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+if TYPE_CHECKING:
+    from app.models.category_db import IngredientCategoryDB
+    from app.models.recipe_db import RecipeIngredientDB
 
 
 class IngredientDB(Base):
@@ -16,11 +23,11 @@ class IngredientDB(Base):
     )
 
     category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id"),
+        ForeignKey("ingredient_categories.id"),
         nullable=False,
     )
 
-    category: Mapped["CategoryDB"] = relationship(
+    category: Mapped["IngredientCategoryDB"] = relationship(
         back_populates="ingredients",
     )
 

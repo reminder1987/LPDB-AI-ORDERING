@@ -1,7 +1,14 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+if TYPE_CHECKING:
+    from app.models.ingredient_db import IngredientDB
+    from app.models.product_db import ProductDB
 
 
 class RecipeDB(Base):

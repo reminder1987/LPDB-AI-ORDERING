@@ -5,9 +5,7 @@ from app.schemas.order import (
     OrderCreateResponse,
     OrderListResponse,
     OrderResponseWrapper,
-    MessageResponse,
 )
-
 from app.services.order_service import (
     create_order,
     get_orders,
@@ -26,7 +24,10 @@ router = APIRouter(
 @router.get(
     "/test",
     summary="Verificar estado de la API de pedidos",
-    description="Comprueba que el módulo de pedidos está funcionando correctamente.",
+    description=(
+        "Comprueba que el módulo de pedidos está funcionando "
+        "correctamente."
+    ),
 )
 def test_orders():
     return {
@@ -42,12 +43,28 @@ def test_orders():
     summary="Crear un nuevo pedido",
     description=(
         "Crea un nuevo pedido y lo almacena en la base de datos. "
-        "La cantidad debe ser mayor que 0 y los campos de texto "
-        "deben contener al menos un carácter."
+        "El pedido debe indicar la sede mediante location_id. "
+        "Las modificaciones y el combo solicitado se validan "
+        "contra las reglas del catálogo antes de guardar."
     ),
+    responses={
+        400: {
+            "description": (
+                "El pedido, la sede o alguna de sus modificaciones "
+                "no está permitido."
+            ),
+        },
+    },
 )
 def create_order_endpoint(order: OrderCreate):
-    saved_order = create_order(order)
+    try:
+        saved_order = create_order(order)
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
     return {
         "status": "ok",
@@ -60,7 +77,10 @@ def create_order_endpoint(order: OrderCreate):
     "/",
     response_model=OrderListResponse,
     summary="Obtener todos los pedidos",
-    description="Devuelve la lista completa de pedidos almacenados.",
+    description=(
+        "Devuelve la lista completa de pedidos almacenados, "
+        "incluyendo la sede asociada cuando está disponible."
+    ),
 )
 def get_orders_endpoint():
     return {
@@ -73,7 +93,10 @@ def get_orders_endpoint():
     "/{order_id}",
     response_model=OrderResponseWrapper,
     summary="Obtener un pedido por ID",
-    description="Busca y devuelve un pedido utilizando su identificador único.",
+    description=(
+        "Busca y devuelve un pedido utilizando su identificador único, "
+        "incluyendo la sede asociada."
+    ),
     responses={
         404: {
             "description": "El pedido solicitado no existe.",
@@ -101,16 +124,38 @@ def get_order_endpoint(order_id: int):
     summary="Actualizar un pedido",
     description=(
         "Actualiza los datos de un pedido existente utilizando su "
-        "identificador único."
+        "identificador único. La sede también puede actualizarse "
+        "mediante location_id."
     ),
     responses={
+        400: {
+            "description": (
+                "El pedido, la sede o alguna de sus modificaciones "
+                "no está permitido."
+            ),
+        },
         404: {
-            "description": "El pedido que se desea actualizar no existe.",
+            "description": (
+                "El pedido que se desea actualizar no existe."
+            ),
         },
     },
 )
-def update_order_endpoint(order_id: int, order: OrderCreate):
-    updated_order = update_order(order_id, order)
+def update_order_endpoint(
+    order_id: int,
+    order: OrderCreate,
+):
+    try:
+        updated_order = update_order(
+            order_id,
+            order,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
     if updated_order is None:
         raise HTTPException(
