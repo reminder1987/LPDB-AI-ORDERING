@@ -54,6 +54,7 @@ class OrderCreate(BaseModel):
         min_length=1,
     )
 
+    # La sede es obligatoria para cualquier pedido nuevo.
     location_id: int = Field(
         gt=0,
     )
@@ -143,7 +144,13 @@ class OrderItemResponse(BaseModel):
 class OrderResponse(BaseModel):
     id: int
     customer_name: str
-    location_id: int
+
+    # Puede ser NULL únicamente en pedidos legacy creados
+    # antes de que la sede fuera obligatoria en el modelo.
+    #
+    # Los pedidos nuevos continúan exigiendo location_id
+    # mediante OrderCreate.
+    location_id: int | None = None
 
     # ---------------------------------------------------------
     # Campos legacy
