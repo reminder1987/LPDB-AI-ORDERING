@@ -33,18 +33,21 @@ class GetLocationInput(BaseModel):
     query: str = Field(min_length=1)
 
 
-class CalculateOrderPriceInput(BaseModel):
+class OrderItemPriceInput(BaseModel):
     product_id: int = Field(gt=0)
     quantity: int = Field(gt=0)
     modifications: list[ValidateModificationInput] = Field(default_factory=list)
     combo_requested: bool = False
-    beverage_product_id: int | None = Field(default=None, gt=0)
+
+
+class CalculateOrderPriceInput(BaseModel):
+    items: list[OrderItemPriceInput] = Field(min_length=1)
 
 
 class CreateOrderInput(BaseModel):
     customer_name: str = Field(min_length=1)
     location_id: int = Field(gt=0)
-    items: list[CalculateOrderPriceInput] = Field(min_length=1)
+    items: list[OrderItemPriceInput] = Field(min_length=1)
 
 
 class ToolError(BaseModel):
@@ -54,6 +57,7 @@ class ToolError(BaseModel):
 
 class PricePreview(BaseModel):
     ok: bool = True
+    items: list[dict]
     subtotal: Decimal
     total: Decimal
     note: str = (
