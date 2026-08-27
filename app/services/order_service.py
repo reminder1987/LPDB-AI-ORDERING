@@ -484,19 +484,9 @@ def _validate_product_availability(
     validated_modifications,
     tenant: TenantContext,
 ):
-    removed_ingredient_ids = {
-        modification["ingredient_id"]
-        for modification in validated_modifications
-        if (
-            modification["type"] == "REMOVE"
-            and modification["ingredient_id"] is not None
-        )
-    }
-
     if not is_product_available(
         product_id=product.id,
         location_id=location_id,
-        excluded_ingredient_ids=removed_ingredient_ids,
         tenant_id=tenant.tenant_id,
     ):
         raise ValueError(
