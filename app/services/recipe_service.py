@@ -12,7 +12,7 @@ EXCLUDED_RECIPE_CATEGORIES = {
 }
 
 
-def get_product_recipe(product_id: int):
+def get_product_recipe(product_id: int, tenant_id: int):
     db = SessionLocal()
 
     try:
@@ -24,7 +24,10 @@ def get_product_recipe(product_id: int):
                     ProductDB.recipe.property.mapper.class_.ingredients
                 )
             )
-            .where(ProductDB.id == product_id)
+            .where(
+                ProductDB.id == product_id,
+                ProductDB.tenant_id == tenant_id,
+            )
         )
 
         if product is None:
