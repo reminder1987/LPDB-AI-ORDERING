@@ -19,6 +19,11 @@ class OrderDB(Base):
         primary_key=True,
     )
 
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id"),
+        nullable=False,
+    )
+
     customer_name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
