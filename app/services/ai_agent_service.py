@@ -1,13 +1,14 @@
 """
 Servicio base del agente IA.
 
-Esta primera versión establece la frontera entre la conversación y el
+Esta versión establece la frontera entre la conversación, el tenant y el
 proveedor LLM. No crea órdenes y no ejecuta acciones de negocio por sí sola.
 """
 
 from dataclasses import dataclass
 
 from app.core.config import settings
+from app.core.tenant_context import TenantContext
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,11 @@ class AIAgentService:
             return "en"
         return "unknown"
 
-    def build_system_instructions(self, language: str) -> str:
+    def build_system_instructions(
+        self,
+        language: str,
+        tenant_context: TenantContext,
+    ) -> str:
         """Construye las reglas base que deberá recibir el LLM."""
         response_language = {
             "es": "Responde en español.",
@@ -77,9 +82,12 @@ class AIAgentService:
         return "\n".join(
             [
                 "Eres el asistente de pedidos de Los Perritos Del Barrio.",
+                f"Tenant activo: {tenant_context.tenant_name}.",
+                f"Tenant ID interno: {tenant_context.tenant_id}.",
                 response_language,
                 "No inventes productos, recetas, disponibilidad ni precios.",
                 "Usa las herramientas de LPDB para consultar datos de negocio.",
+                "Todas las consultas y acciones de negocio deben respetar el tenant activo.",
                 "No presentes ingredientes de EMPAQUE / OPERACIÓN como ingredientes del producto.",
                 "No crees una orden sin confirmación explícita del cliente.",
                 "El precio interno de LPDB no es el cobro final de Toast.",
@@ -87,13 +95,22 @@ class AIAgentService:
             ]
         )
 
-    def prepare_request(self, message: str) -> dict:
+    def prepare_request(
+        self,
+        message: str,
+        tenant_context: TenantContext,
+    ) -> dict:
         """Prepara el contexto mínimo para una futura llamada al LLM."""
         language = self.detect_language(message)
         return {
             "model": self.model,
             "language": language,
-            "system_instructions": self.build_system_instructions(language),
+            "tenant_id": tenant_context.tenant_id,
+            "tenant_slug": tenant_context.tenant_slug,
+            "tenant_name": tenant_context.tenant_name,
+            "system_instructions": self.build_system_instructions(
+                language, tenant_context
+            ),
             "message": message,
         }
 
