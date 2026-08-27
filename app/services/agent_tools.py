@@ -8,10 +8,9 @@ no deben duplicarlas.
 
 from decimal import Decimal
 
+from app.core.tenant_context import TenantContext
 from app.services.availability_service import get_product_availability
-from app.services.ingredient_availability_service import (
-    get_ingredient_availability,
-)
+from app.services.ingredient_availability_service import get_ingredient_availability
 from app.services.location_service import location_service
 from app.services.modification_service import (
     validate_addition,
@@ -26,57 +25,67 @@ from app.services.product_service import get_product_by_id, search_products
 from app.services.recipe_service import get_product_recipe
 
 
-def search_products_tool(query: str):
-    """Busca productos por nombre en el catálogo LPDB."""
+def search_products_tool(query: str, tenant: TenantContext):
+    """Busca productos dentro del tenant activo."""
     return [
         {
             "id": product.id,
             "name": product.name,
             "price": product.price,
         }
-        for product in search_products(query)
+        for product in search_products(query, tenant.tenant_id)
     ]
 
 
-def get_product_recipe_tool(product_id: int):
+def get_product_recipe_tool(product_id: int, tenant: TenantContext):
     """Obtiene únicamente los ingredientes comerciales de la receta."""
-    return get_product_recipe(product_id)
+    return get_product_recipe(product_id, tenant.tenant_id)
 
 
 def check_product_availability_tool(
     product_id: int,
     location_id: int,
+    tenant: TenantContext,
 ):
-    """Consulta disponibilidad real del producto en una sede."""
+    """Consulta disponibilidad real del producto en una sede del tenant."""
     return get_product_availability(
         product_id=product_id,
         location_id=location_id,
+        tenant_id=tenant.tenant_id,
     )
 
 
 def check_ingredient_availability_tool(
     ingredient_id: int,
     location_id: int,
+    tenant: TenantContext,
 ):
-    """Consulta disponibilidad de un ingrediente en una sede."""
+    """Consulta disponibilidad de un ingrediente en una sede del tenant."""
     return get_ingredient_availability(
         ingredient_id=ingredient_id,
         location_id=location_id,
+        tenant_id=tenant.tenant_id,
     )
 
 
 def validate_modification_tool(
     product_id: int,
     modification_type: str,
+    tenant: TenantContext,
     ingredient: str | None = None,
     new_base: str | None = None,
 ):
     """
     Delega la validación de modificación a las reglas existentes.
 
-    No se permite que el LLM decida por sí mismo si una modificación
-    es válida o cuánto cuesta.
+    La capa de modificación todavía no es tenant-aware; por seguridad,
+    primero verificamos que el producto pertenezca al tenant activo.
+    La adaptación completa de modification_service será el siguiente paso.
     """
+    product = get_product_by_id(product_id, tenant.tenant_id)
+    if product is None:
+        raise ValueError(f"Producto no encontrado: {product_id}")
+
     if modification_type == "REMOVE":
         if not ingredient:
             raise ValueError("REMOVE requiere ingredient")
@@ -92,13 +101,12 @@ def validate_modification_tool(
             raise ValueError("BASE_CHANGE requiere new_base")
         return validate_base_change(product_id, new_base)
 
-    raise ValueError(
-        f"Tipo de modificación no soportado: {modification_type}"
-    )
+    raise ValueError(f"Tipo de modificación no soportado: {modification_type}")
 
 
-def get_location_tool(query: str):
-    """Busca únicamente sedes activas que coincidan con la consulta."""
+def get_location_tool(query: str, tenant: TenantContext):
+    """Busca únicamente sedes activas del tenant que coincidan con la consulta."""
+    locations = location_service.find_locations(query, tenant.tenant_id)
     return [
         {
             "id": location.id,
@@ -107,24 +115,19 @@ def get_location_tool(query: str):
             "address": location.address,
             "toast_name": location.toast_name,
         }
-        for location in location_service.find_locations(query)
+        for location in locations
     ]
 
 
 def calculate_item_price_tool(
     product_id: int,
     quantity: int,
+    tenant: TenantContext,
     modifications: list[dict] | None = None,
     combo_requested: bool = False,
 ):
-    """
-    Calcula el precio interno de un item usando las reglas LPDB.
-
-    Esto es un preview interno. No representa el total final de cobro
-    de Toast, que posteriormente podrá incorporar sus propios cargos,
-    impuestos y propina.
-    """
-    product = get_product_by_id(product_id)
+    """Calcula el precio interno del item dentro del tenant activo."""
+    product = get_product_by_id(product_id, tenant.tenant_id)
 
     if product is None:
         raise ValueError(f"Producto no encontrado: {product_id}")
