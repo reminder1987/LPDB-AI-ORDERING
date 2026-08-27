@@ -13,6 +13,7 @@ from app.models.order_item_modification_db import OrderItemModificationDB
 from app.models.product_availability_db import ProductAvailabilityDB
 from app.models.product_db import ProductDB
 from app.models.recipe_db import RecipeDB, RecipeIngredientDB
+from app.models.tenant_db import TenantDB
 
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "ProductDB",
     "RecipeDB",
     "RecipeIngredientDB",
+    "TenantDB",
 ]
