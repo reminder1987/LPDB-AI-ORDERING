@@ -58,7 +58,7 @@ class TenantService:
         )
 
 
- tenant_service = TenantService()
+tenant_service = TenantService()
 
 
 __all__ = ["TenantNotFoundError", "TenantService", "tenant_service"]
