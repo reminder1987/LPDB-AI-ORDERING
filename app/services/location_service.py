@@ -7,13 +7,19 @@ from app.models.location_db import LocationDB
 
 class LocationService:
 
-    def get_all_active_locations(self):
+    def get_all_active_locations(
+        self,
+        tenant_id: int,
+    ):
         db = SessionLocal()
 
         try:
             return (
                 db.query(LocationDB)
-                .filter(LocationDB.active.is_(True))
+                .filter(
+                    LocationDB.tenant_id == tenant_id,
+                    LocationDB.active.is_(True),
+                )
                 .order_by(LocationDB.customer_name)
                 .all()
             )
@@ -24,6 +30,7 @@ class LocationService:
     def get_location_by_id(
         self,
         location_id: int,
+        tenant_id: int,
     ):
         db = SessionLocal()
 
@@ -32,6 +39,7 @@ class LocationService:
                 db.query(LocationDB)
                 .filter(
                     LocationDB.id == location_id,
+                    LocationDB.tenant_id == tenant_id,
                     LocationDB.active.is_(True),
                 )
                 .first()
@@ -43,6 +51,7 @@ class LocationService:
     def find_locations(
         self,
         query: str,
+        tenant_id: int,
     ):
         normalized_query = self._normalize_text(
             query,
@@ -56,7 +65,10 @@ class LocationService:
         try:
             locations = (
                 db.query(LocationDB)
-                .filter(LocationDB.active.is_(True))
+                .filter(
+                    LocationDB.tenant_id == tenant_id,
+                    LocationDB.active.is_(True),
+                )
                 .order_by(LocationDB.customer_name)
                 .all()
             )
