@@ -16,8 +16,6 @@ SOURCE_LOCAL = "LOCAL"
 SOURCE_TOAST = "TOAST"
 SOURCE_CALCULATED = "CALCULATED"
 
-# Estas categorías representan ingredientes que NO deben bloquear
-# la disponibilidad del producto cuando se agotan.
 NON_BLOCKING_CATEGORIES = {
     "SALSAS",
     "EMPAQUE / OPERACIÓN",
@@ -80,10 +78,8 @@ def _get_unavailable_blocking_ingredients(
 
     excluded = excluded_ingredient_ids or set()
     unavailable = []
-
     for relation in product.recipe.ingredients:
         ingredient = relation.ingredient
-
         if ingredient.tenant_id != tenant_id:
             continue
         if ingredient.id in excluded:
@@ -92,9 +88,7 @@ def _get_unavailable_blocking_ingredients(
             continue
         if _is_ingredient_available(db, ingredient.id, location_id):
             continue
-
         unavailable.append(ingredient)
-
     return unavailable
 
 
@@ -104,7 +98,6 @@ def get_ingredient_availability(ingredient_id: int, location_id: int, tenant_id:
         ingredient = _get_ingredient(db, ingredient_id, tenant_id)
         location = _get_location(db, location_id, tenant_id)
         record = _get_availability_record(db, ingredient_id, location_id)
-
         if record is None:
             return {
                 "ingredient_id": ingredient.id,
@@ -119,7 +112,6 @@ def get_ingredient_availability(ingredient_id: int, location_id: int, tenant_id:
                 "reason": None,
                 "updated_at": None,
             }
-
         return {
             "ingredient_id": ingredient.id,
             "ingredient": ingredient.name,
@@ -158,10 +150,8 @@ def set_ingredient_availability(
     try:
         _get_ingredient(db, ingredient_id, tenant_id)
         _get_location(db, location_id, tenant_id)
-
         record = _get_availability_record(db, ingredient_id, location_id)
         now = datetime.utcnow()
-
         if record is None:
             record = IngredientAvailabilityDB(
                 ingredient_id=ingredient_id,
@@ -179,9 +169,8 @@ def set_ingredient_availability(
             record.source = source
             record.reason = reason
             record.updated_at = now
-
         db.flush()
-        _recalculate_products_for_ingredient(
+        updated_products = _recalculate_products_for_ingredient(
             db=db,
             ingredient_id=ingredient_id,
             location_id=location_id,
@@ -189,7 +178,6 @@ def set_ingredient_availability(
         )
         db.commit()
         db.refresh(record)
-
         return {
             "id": record.id,
             "ingredient_id": record.ingredient_id,
@@ -199,6 +187,7 @@ def set_ingredient_availability(
             "source": record.source,
             "reason": record.reason,
             "updated_at": record.updated_at,
+            "affected_products": updated_products,
         }
     except Exception:
         db.rollback()
@@ -272,7 +261,6 @@ def get_products_affected_by_ingredient(ingredient_id: int, tenant_id: int):
 
 def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: int, tenant_id: int):
     ingredient = _get_ingredient(db, ingredient_id, tenant_id)
-
     products = db.scalars(
         select(ProductDB)
         .options(
@@ -288,10 +276,8 @@ def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: in
         )
         .order_by(ProductDB.name)
     ).unique().all()
-
     if not _is_blocking_ingredient(ingredient):
         return []
-
     updated_products = []
     for product in products:
         product_availability = db.scalar(
@@ -300,17 +286,14 @@ def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: in
                 ProductAvailabilityDB.location_id == location_id,
             )
         )
-
         if product_availability is not None and product_availability.manual_override:
             continue
-
         unavailable_ingredients = _get_unavailable_blocking_ingredients(
             db=db,
             product=product,
             location_id=location_id,
             tenant_id=tenant_id,
         )
-
         now = datetime.utcnow()
         if unavailable_ingredients:
             unavailable_names = ", ".join(i.name for i in unavailable_ingredients)
@@ -319,7 +302,6 @@ def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: in
         else:
             available = True
             reason = None
-
         if product_availability is None:
             product_availability = ProductAvailabilityDB(
                 product_id=product.id,
@@ -337,7 +319,6 @@ def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: in
             product_availability.source = SOURCE_CALCULATED
             product_availability.reason = reason
             product_availability.updated_at = now
-
         updated_products.append({
             "product_id": product.id,
             "product": product.name,
@@ -345,7 +326,6 @@ def _recalculate_products_for_ingredient(db, ingredient_id: int, location_id: in
             "source": SOURCE_CALCULATED,
             "reason": reason,
         })
-
     return updated_products
 
 
@@ -391,7 +371,6 @@ def get_product_ingredient_blocking_reason(
         )
         if product is None:
             raise ValueError(f"Producto no encontrado: {product_id}")
-
         _get_location(db, location_id, tenant_id)
         unavailable_ingredients = _get_unavailable_blocking_ingredients(
             db=db,
