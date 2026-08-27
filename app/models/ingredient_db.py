@@ -16,9 +16,13 @@ class IngredientDB(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id"),
+        nullable=False,
+    )
+
     name: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         nullable=False,
     )
 
