@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from app.api.dependencies import get_tenant_context
+from app.core.tenant_context import TenantContext
 from app.schemas.order import (
     OrderCreate,
     OrderCreateResponse,
@@ -56,9 +58,15 @@ def test_orders():
         },
     },
 )
-def create_order_endpoint(order: OrderCreate):
+def create_order_endpoint(
+    order: OrderCreate,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
     try:
-        saved_order = create_order(order)
+        saved_order = create_order(
+            order,
+            tenant,
+        )
 
     except ValueError as exc:
         raise HTTPException(
@@ -82,10 +90,14 @@ def create_order_endpoint(order: OrderCreate):
         "incluyendo la sede asociada cuando está disponible."
     ),
 )
-def get_orders_endpoint():
+def get_orders_endpoint(
+    tenant: TenantContext = Depends(get_tenant_context),
+):
     return {
         "status": "ok",
-        "orders": get_orders(),
+        "orders": get_orders(
+            tenant,
+        ),
     }
 
 
@@ -103,8 +115,14 @@ def get_orders_endpoint():
         },
     },
 )
-def get_order_endpoint(order_id: int):
-    order = get_order_by_id(order_id)
+def get_order_endpoint(
+    order_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
+    order = get_order_by_id(
+        order_id,
+        tenant,
+    )
 
     if order is None:
         raise HTTPException(
@@ -144,11 +162,13 @@ def get_order_endpoint(order_id: int):
 def update_order_endpoint(
     order_id: int,
     order: OrderCreate,
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     try:
         updated_order = update_order(
             order_id,
             order,
+            tenant,
         )
 
     except ValueError as exc:
@@ -185,8 +205,14 @@ def update_order_endpoint(
         },
     },
 )
-def delete_order_endpoint(order_id: int):
-    deleted = delete_order(order_id)
+def delete_order_endpoint(
+    order_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
+    deleted = delete_order(
+        order_id,
+        tenant,
+    )
 
     if not deleted:
         raise HTTPException(
