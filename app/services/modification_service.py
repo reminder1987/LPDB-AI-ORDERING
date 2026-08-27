@@ -167,6 +167,7 @@ def _get_chargeable_addition_price(
 def validate_removal(
     product_id: int,
     ingredient_name: str,
+    tenant_id: int,
 ):
     """
     Valida si un ingrediente de la receta puede ser retirado.
@@ -189,7 +190,8 @@ def validate_removal(
     """
 
     recipe = get_product_recipe(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if recipe is None:
@@ -212,7 +214,8 @@ def validate_removal(
         }
 
     product_category = _get_product_category(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if product_category is None:
@@ -314,6 +317,7 @@ def validate_removal(
 def validate_addition(
     product_id: int,
     ingredient_name: str,
+    tenant_id: int,
     ingredient_category: str | None = None,
 ):
     """
@@ -330,7 +334,8 @@ def validate_addition(
     """
 
     recipe = get_product_recipe(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if recipe is None:
@@ -340,7 +345,8 @@ def validate_addition(
         }
 
     product_category = _get_product_category(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if product_category is None:
@@ -465,6 +471,7 @@ def validate_addition(
 def validate_base_change(
     product_id: int,
     new_base: str,
+    tenant_id: int,
 ):
     """
     Valida cambios de base para productos que los permiten.
@@ -481,7 +488,8 @@ def validate_base_change(
     """
 
     recipe = get_product_recipe(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if recipe is None:
@@ -491,7 +499,8 @@ def validate_base_change(
         }
 
     product_category = _get_product_category(
-        product_id
+        product_id,
+        tenant_id,
     )
 
     if product_category is None:
@@ -568,7 +577,8 @@ def validate_base_change(
             select(ProductDB).where(
                 ProductDB.name.ilike(
                     new_product_name
-                )
+                ),
+                ProductDB.tenant_id == tenant_id,
             )
         )
 
@@ -781,6 +791,7 @@ def _find_word_matches(
 
 def _get_product_category(
     product_id: int,
+    tenant_id: int,
 ):
     """
     Obtiene la categoría del producto desde PostgreSQL.
@@ -796,7 +807,8 @@ def _get_product_category(
     try:
         product = db.scalar(
             select(ProductDB).where(
-                ProductDB.id == product_id
+                ProductDB.id == product_id,
+                ProductDB.tenant_id == tenant_id,
             )
         )
 
