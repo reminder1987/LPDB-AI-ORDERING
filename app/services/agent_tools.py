@@ -75,13 +75,7 @@ def validate_modification_tool(
     ingredient: str | None = None,
     new_base: str | None = None,
 ):
-    """
-    Delega la validación de modificación a las reglas existentes.
-
-    La capa de modificación todavía no es tenant-aware; por seguridad,
-    primero verificamos que el producto pertenezca al tenant activo.
-    La adaptación completa de modification_service será el siguiente paso.
-    """
+    """Valida una modificación usando las reglas del tenant activo."""
     product = get_product_by_id(product_id, tenant.tenant_id)
     if product is None:
         raise ValueError(f"Producto no encontrado: {product_id}")
@@ -89,17 +83,17 @@ def validate_modification_tool(
     if modification_type == "REMOVE":
         if not ingredient:
             raise ValueError("REMOVE requiere ingredient")
-        return validate_removal(product_id, ingredient)
+        return validate_removal(product_id, ingredient, tenant.tenant_id)
 
     if modification_type == "ADD":
         if not ingredient:
             raise ValueError("ADD requiere ingredient")
-        return validate_addition(product_id, ingredient)
+        return validate_addition(product_id, ingredient, tenant.tenant_id)
 
     if modification_type == "BASE_CHANGE":
         if not new_base:
             raise ValueError("BASE_CHANGE requiere new_base")
-        return validate_base_change(product_id, new_base)
+        return validate_base_change(product_id, new_base, tenant.tenant_id)
 
     raise ValueError(f"Tipo de modificación no soportado: {modification_type}")
 
