@@ -32,6 +32,7 @@ from app.models.recipe_db import (
     RecipeDB,
     RecipeIngredientDB,
 )
+from app.models.tenant_db import TenantDB
 
 
 # ============================================================
