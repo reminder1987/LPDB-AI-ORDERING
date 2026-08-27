@@ -482,6 +482,7 @@ def _validate_product_availability(
     product,
     location_id: int,
     validated_modifications,
+    tenant: TenantContext,
 ):
     removed_ingredient_ids = {
         modification["ingredient_id"]
@@ -496,6 +497,7 @@ def _validate_product_availability(
         product_id=product.id,
         location_id=location_id,
         excluded_ingredient_ids=removed_ingredient_ids,
+        tenant_id=tenant.tenant_id,
     ):
         raise ValueError(
             "Producto no disponible en la sede seleccionada: "
@@ -510,6 +512,7 @@ def _validate_product_availability(
 def _validate_modification_availability(
     validated_modifications,
     location_id: int,
+    tenant: TenantContext,
 ):
     for modification in validated_modifications:
 
@@ -522,6 +525,7 @@ def _validate_modification_availability(
         if not is_ingredient_available(
             ingredient_id=ingredient_id,
             location_id=location_id,
+            tenant_id=tenant.tenant_id,
         ):
             raise ValueError(
                 "Ingrediente no disponible en la sede seleccionada: "
@@ -609,6 +613,7 @@ def create_order(
             _validate_modification_availability(
                 validated_modifications,
                 location.id,
+                tenant,
             )
 
             final_product = (
@@ -624,6 +629,7 @@ def create_order(
                 final_product,
                 location.id,
                 validated_modifications,
+                tenant,
             )
 
             prepared = {
@@ -1029,6 +1035,7 @@ def update_order(
             _validate_modification_availability(
                 validated_modifications,
                 location.id,
+                tenant,
             )
 
             final_product = (
@@ -1044,6 +1051,7 @@ def update_order(
                 final_product,
                 location.id,
                 validated_modifications,
+                tenant,
             )
 
             prepared = {
