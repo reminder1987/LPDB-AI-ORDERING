@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
+from app.core.tenant_context import TenantContext
 from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
 from app.models.order_item_combo_db import OrderItemComboDB
@@ -93,6 +94,7 @@ def _normalize_text(
 def _find_product_by_name(
     db,
     product_name: str,
+    tenant: TenantContext,
 ):
 
     target = _normalize_text(
@@ -100,7 +102,10 @@ def _find_product_by_name(
     )
 
     products = db.scalars(
-        select(ProductDB)
+        select(ProductDB).where(
+            ProductDB.tenant_id
+            == tenant.tenant_id,
+        )
     ).all()
 
     for product in products:
@@ -121,6 +126,7 @@ def _find_product_by_name(
 def _find_ingredient_by_name(
     db,
     ingredient_name: str,
+    tenant: TenantContext,
 ):
 
     target = _normalize_text(
@@ -128,7 +134,10 @@ def _find_ingredient_by_name(
     )
 
     ingredients = db.scalars(
-        select(IngredientDB)
+        select(IngredientDB).where(
+            IngredientDB.tenant_id
+            == tenant.tenant_id,
+        )
     ).all()
 
     for ingredient in ingredients:
@@ -199,6 +208,7 @@ def _get_order_items(
 def _validate_combo_data(
     db,
     item: OrderItemCreate,
+    tenant: TenantContext,
 ):
 
     if not item.combo_requested:
@@ -223,7 +233,9 @@ def _validate_combo_data(
     beverage = db.scalar(
         select(ProductDB).where(
             ProductDB.id
-            == item.beverage_product_id
+            == item.beverage_product_id,
+            ProductDB.tenant_id
+            == tenant.tenant_id,
         )
     )
 
@@ -279,7 +291,9 @@ def _validate_combo_data(
     fries = db.scalar(
         select(IngredientDB).where(
             IngredientDB.id
-            == COMBO_FRIES_INGREDIENT_ID
+            == COMBO_FRIES_INGREDIENT_ID,
+            IngredientDB.tenant_id
+            == tenant.tenant_id,
         )
     )
 
@@ -318,6 +332,7 @@ def _validate_combo_data(
 def _validate_location(
     db,
     location_id: int,
+    tenant: TenantContext,
 ):
 
     from app.models.location_db import LocationDB
@@ -325,6 +340,8 @@ def _validate_location(
     location = db.scalar(
         select(LocationDB).where(
             LocationDB.id == location_id,
+            LocationDB.tenant_id
+            == tenant.tenant_id,
             LocationDB.active.is_(True),
         )
     )
@@ -348,6 +365,7 @@ def _resolve_final_product(
     db,
     product,
     validated_modifications,
+    tenant: TenantContext,
 ):
 
     final_product = product
@@ -367,7 +385,9 @@ def _resolve_final_product(
                 ProductDB.id
                 == modification[
                     "new_product_id"
-                ]
+                ],
+                ProductDB.tenant_id
+                == tenant.tenant_id,
             )
         )
 
@@ -515,6 +535,7 @@ def _validate_modification_availability(
 
 def create_order(
     order: OrderCreate,
+    tenant: TenantContext,
 ):
 
     db = SessionLocal()
@@ -528,6 +549,7 @@ def create_order(
         location = _validate_location(
             db,
             order.location_id,
+            tenant,
         )
 
         # ----------------------------------------------------
@@ -557,6 +579,7 @@ def create_order(
             product = _find_product_by_name(
                 db,
                 item.product,
+                tenant,
             )
 
             if product is None:
@@ -570,6 +593,7 @@ def create_order(
                 _validate_combo_data(
                     db,
                     item,
+                    tenant,
                 )
             )
 
@@ -578,6 +602,7 @@ def create_order(
                     db,
                     product.id,
                     item.modifications,
+                    tenant,
                 )
             )
 
@@ -591,6 +616,7 @@ def create_order(
                     db,
                     product,
                     validated_modifications,
+                    tenant,
                 )
             )
 
@@ -648,6 +674,7 @@ def create_order(
         first = prepared_items[0]
 
         saved_order = OrderDB(
+            tenant_id=tenant.tenant_id,
             customer_name=(
                 order.customer_name
             ),
@@ -805,7 +832,9 @@ def create_order(
 # CONSULTAR TODAS LAS ÓRDENES
 # ============================================================
 
-def get_orders():
+def get_orders(
+    tenant: TenantContext,
+):
 
     db = SessionLocal()
 
@@ -813,6 +842,10 @@ def get_orders():
 
         orders = db.scalars(
             select(OrderDB)
+            .where(
+                OrderDB.tenant_id
+                == tenant.tenant_id,
+            )
             .order_by(OrderDB.id)
         ).all()
 
@@ -835,6 +868,7 @@ def get_orders():
 
 def get_order_by_id(
     order_id: int,
+    tenant: TenantContext,
 ):
 
     db = SessionLocal()
@@ -844,6 +878,8 @@ def get_order_by_id(
         order = db.scalar(
             select(OrderDB).where(
                 OrderDB.id == order_id,
+                OrderDB.tenant_id
+                == tenant.tenant_id,
             )
         )
 
@@ -867,6 +903,7 @@ def get_order_by_id(
 
 def delete_order(
     order_id: int,
+    tenant: TenantContext,
 ):
 
     db = SessionLocal()
@@ -876,6 +913,8 @@ def delete_order(
         order = db.scalar(
             select(OrderDB).where(
                 OrderDB.id == order_id,
+                OrderDB.tenant_id
+                == tenant.tenant_id,
             )
         )
 
@@ -901,6 +940,7 @@ def delete_order(
 def update_order(
     order_id: int,
     order: OrderCreate,
+    tenant: TenantContext,
 ):
 
     db = SessionLocal()
@@ -914,6 +954,8 @@ def update_order(
         order_db = db.scalar(
             select(OrderDB).where(
                 OrderDB.id == order_id,
+                OrderDB.tenant_id
+                == tenant.tenant_id,
             )
         )
 
@@ -928,6 +970,7 @@ def update_order(
         location = _validate_location(
             db,
             order.location_id,
+            tenant,
         )
 
         # ----------------------------------------------------
@@ -956,6 +999,7 @@ def update_order(
             product = _find_product_by_name(
                 db,
                 item.product,
+                tenant,
             )
 
             if product is None:
@@ -969,6 +1013,7 @@ def update_order(
                 _validate_combo_data(
                     db,
                     item,
+                    tenant,
                 )
             )
 
@@ -977,6 +1022,7 @@ def update_order(
                     db,
                     product.id,
                     item.modifications,
+                    tenant,
                 )
             )
 
@@ -990,6 +1036,7 @@ def update_order(
                     db,
                     product,
                     validated_modifications,
+                    tenant,
                 )
             )
 
@@ -1216,6 +1263,7 @@ def _validate_modifications(
     db,
     product_id: int,
     modifications,
+    tenant: TenantContext,
 ):
 
     validated_modifications = []
@@ -1263,6 +1311,7 @@ def _validate_modifications(
                 _find_ingredient_by_name(
                     db,
                     modification.ingredient,
+                    tenant,
                 )
             )
 
@@ -1307,6 +1356,7 @@ def _validate_modifications(
                 _find_ingredient_by_name(
                     db,
                     modification.ingredient,
+                    tenant,
                 )
             )
 
