@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -9,6 +9,14 @@ from app.models.base import Base
 class ConversationSessionDB(Base):
     __tablename__ = "conversation_sessions"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "session_id",
+            name="uq_conversation_sessions_tenant_session",
+        ),
+    )
+
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
@@ -16,7 +24,6 @@ class ConversationSessionDB(Base):
 
     session_id: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         nullable=False,
         index=True,
     )
