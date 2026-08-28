@@ -3,7 +3,12 @@ from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_tenant_context
 from app.core.tenant_context import TenantContext
-from app.services.conversation_service import conversation_service
+from app.services.ai_agent_service import (
+    ai_agent_service,
+)
+from app.services.conversation_service import (
+    conversation_service,
+)
 
 
 router = APIRouter(
@@ -34,13 +39,26 @@ class AgentMessageRequest(BaseModel):
     summary="Procesar mensaje conversacional",
     description=(
         "Procesa un mensaje del cliente mediante el motor "
-        "de intención y mantiene el estado de la conversación."
+        "conversacional de LPDB y mantiene el estado de la "
+        "conversación por tenant y sesión."
     ),
 )
 def process_agent_message(
     payload: AgentMessageRequest,
-    tenant: TenantContext = Depends(get_tenant_context),
+    tenant: TenantContext = Depends(
+        get_tenant_context,
+    ),
 ):
+    # --------------------------------------------------------
+    # CORE CONVERSACIONAL
+    # --------------------------------------------------------
+    #
+    # El ConversationService continúa siendo la autoridad
+    # sobre el estado y las reglas comerciales del pedido.
+    #
+    # NO se reemplaza por el LLM en esta etapa.
+    # --------------------------------------------------------
+
     result = conversation_service.process_message(
         session_id=payload.session_id,
         message=payload.message,
@@ -55,7 +73,10 @@ def process_agent_message(
     }
 
     for key, value in result.items():
-        if key not in {"status", "message"}:
+        if key not in {
+            "status",
+            "message",
+        }:
             response[key] = value
 
     return response

@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -34,6 +41,10 @@ class ConversationSessionDB(Base):
         index=True,
     )
 
+    # --------------------------------------------------------
+    # Estado de conversación
+    # --------------------------------------------------------
+
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -49,6 +60,10 @@ class ConversationSessionDB(Base):
         Integer,
         nullable=True,
     )
+
+    # --------------------------------------------------------
+    # Estado del pedido
+    # --------------------------------------------------------
 
     items_json: Mapped[str] = mapped_column(
         Text,
@@ -82,6 +97,19 @@ class ConversationSessionDB(Base):
         String(100),
         nullable=True,
     )
+
+    # --------------------------------------------------------
+    # Continuidad del agente OpenAI
+    # --------------------------------------------------------
+
+    openai_response_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    # --------------------------------------------------------
+    # Timestamps
+    # --------------------------------------------------------
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

@@ -269,7 +269,9 @@ TOOL_DEFINITIONS: list[dict] = [
         "description": (
             "Crea una orden real en LPDB. "
             "SOLO debe utilizarse después de que el cliente haya "
-            "confirmado explícitamente el pedido completo."
+            "confirmado explícitamente el pedido completo. "
+            "El campo confirmed debe ser true únicamente cuando "
+            "la confirmación explícita del cliente ya haya ocurrido."
         ),
         "parameters": {
             "type": "object",
@@ -332,11 +334,19 @@ TOOL_DEFINITIONS: list[dict] = [
                         "additionalProperties": False,
                     },
                 },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": (
+                        "Debe ser true únicamente después de una "
+                        "confirmación explícita del cliente."
+                    ),
+                },
             },
             "required": [
                 "customer_name",
                 "location_id",
                 "items",
+                "confirmed",
             ],
             "additionalProperties": False,
         },

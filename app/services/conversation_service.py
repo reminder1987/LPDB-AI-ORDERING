@@ -193,6 +193,99 @@ class ConversationService:
 
     # --------------------------------------------------------
 
+    def get_openai_response_id(
+        self,
+        session_id: str,
+        tenant_id: int,
+    ) -> str | None:
+        """
+        Recupera el último OpenAI response ID asociado
+        a una sesión concreta dentro de un tenant.
+        """
+
+        db = SessionLocal()
+
+        try:
+
+            session = (
+                db.query(
+                    ConversationSessionDB,
+                )
+                .filter(
+                    ConversationSessionDB.session_id
+                    == session_id,
+                    ConversationSessionDB.tenant_id
+                    == tenant_id,
+                )
+                .first()
+            )
+
+            if session is None:
+
+                return None
+
+            return session.openai_response_id
+
+        finally:
+
+            db.close()
+
+    # --------------------------------------------------------
+
+    def save_openai_response_id(
+        self,
+        session_id: str,
+        tenant_id: int,
+        response_id: str | None,
+    ) -> None:
+        """
+        Guarda el último OpenAI response ID de la conversación.
+
+        La sesión siempre está aislada por tenant.
+        """
+
+        db = SessionLocal()
+
+        try:
+
+            session = (
+                db.query(
+                    ConversationSessionDB,
+                )
+                .filter(
+                    ConversationSessionDB.session_id
+                    == session_id,
+                    ConversationSessionDB.tenant_id
+                    == tenant_id,
+                )
+                .first()
+            )
+
+            if session is None:
+
+                session = ConversationSessionDB(
+                    session_id=session_id,
+                    tenant_id=tenant_id,
+                )
+
+                db.add(session)
+
+            session.openai_response_id = response_id
+
+            db.commit()
+
+        except Exception:
+
+            db.rollback()
+
+            raise
+
+        finally:
+
+            db.close()
+
+    # --------------------------------------------------------
+
     def _save_state(
         self,
         session_id: str,
@@ -448,10 +541,6 @@ class ConversationService:
 
         # ====================================================
         # 1. ESTADOS CONVERSACIONALES PENDIENTES
-        #
-        # Estos estados tienen prioridad porque una respuesta
-        # como "Sí" o "Coca Cola Normal" no debe interpretarse
-        # como un pedido nuevo.
         # ====================================================
 
         if (
@@ -480,35 +569,17 @@ class ConversationService:
 
         # ====================================================
         # 2. INTERPRETAR EL MENSAJE
-        #
-        # IMPORTANTE:
-        #
-        # Primero intentamos descubrir productos.
-        #
-        # Esto permite conservar el pedido mientras esperamos
-        # una sede.
         # ====================================================
 
         intent = parse_customer_message(
             message,
         )
 
-        # ----------------------------------------------------
-        # Si encontramos productos, actualizamos el estado.
-        #
-        # La sede puede venir en el mismo mensaje o todavía
-        # faltar.
-        # ----------------------------------------------------
-
         if intent.status != "needs_input":
 
             state.items = list(
                 intent.items,
             )
-
-            # ------------------------------------------------
-            # Combo pendiente de confirmación
-            # ------------------------------------------------
 
             if (
                 intent.status
@@ -533,10 +604,6 @@ class ConversationService:
 
                 state.beverage_name = None
 
-            # ------------------------------------------------
-            # Combo que ya requiere bebida
-            # ------------------------------------------------
-
             elif (
                 intent.status
                 == "needs_beverage"
@@ -555,10 +622,6 @@ class ConversationService:
                 )
 
                 state.beverage_required = True
-
-            # ------------------------------------------------
-            # Pedido normal
-            # ------------------------------------------------
 
             else:
 
@@ -592,11 +655,6 @@ class ConversationService:
                 state.location_id = (
                     selected_location.id
                 )
-
-                # --------------------------------------------
-                # Si hay productos pendientes, podemos
-                # continuar inmediatamente.
-                # --------------------------------------------
 
                 if state.items:
 
@@ -699,10 +757,6 @@ class ConversationService:
                         tenant=tenant,
                     )
 
-                # --------------------------------------------
-                # Encontramos sede pero no producto.
-                # --------------------------------------------
-
                 state.status = "waiting_product"
 
                 self._save_state(
@@ -774,8 +828,7 @@ class ConversationService:
                 }
 
             # ------------------------------------------------
-            # El mensaje parece pedir una sede pero no
-            # corresponde a una sede específica.
+            # Solicitud explícita de sede
             # ------------------------------------------------
 
             if self._looks_like_location_request(
@@ -825,9 +878,7 @@ class ConversationService:
                 }
 
             # ------------------------------------------------
-            # No encontramos sede.
-            #
-            # Si ya tenemos productos, los conservamos.
+            # No encontramos sede pero sí producto
             # ------------------------------------------------
 
             if state.items:
@@ -854,7 +905,7 @@ class ConversationService:
                 }
 
             # ------------------------------------------------
-            # No tenemos ni sede ni producto.
+            # No tenemos ni sede ni producto
             # ------------------------------------------------
 
             state.status = (
@@ -882,8 +933,6 @@ class ConversationService:
         # 4. YA TENEMOS SEDE
         # ====================================================
 
-        # Si el intent no encontró productos, preguntamos
-        # por el producto.
         if not state.items:
 
             state.status = (
@@ -973,10 +1022,6 @@ class ConversationService:
         tenant: TenantContext,
     ) -> dict:
 
-        # ----------------------------------------------------
-        # COMBO: confirmar
-        # ----------------------------------------------------
-
         if (
             intent.status
             == "needs_combo_confirmation"
@@ -1018,10 +1063,6 @@ class ConversationService:
                 ),
             }
 
-        # ----------------------------------------------------
-        # COMBO: requiere bebida
-        # ----------------------------------------------------
-
         if (
             intent.status
             == "needs_beverage"
@@ -1058,10 +1099,6 @@ class ConversationService:
                     state.customer_name
                 ),
             }
-
-        # ----------------------------------------------------
-        # Pedido listo
-        # ----------------------------------------------------
 
         return self._create_ready_order(
             session_id=session_id,
@@ -1244,7 +1281,8 @@ class ConversationService:
                     ProductDB.category,
                 )
                 .filter(
-                    ProductDB.tenant_id == tenant.tenant_id,
+                    ProductDB.tenant_id
+                    == tenant.tenant_id,
                     ProductDB.name.isnot(None),
                 )
                 .all()
