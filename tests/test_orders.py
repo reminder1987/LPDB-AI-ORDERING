@@ -7,9 +7,15 @@ from app.schemas.order import OrderCreate
 client = TestClient(app)
 
 
+TENANT_HEADERS = {
+    "X-Tenant": "lpdb",
+}
+
+
 def test_order_model():
     order = OrderCreate(
         customer_name="Carolina",
+        location_id=1,
         product="Pizza",
         quantity=2,
     )
@@ -24,9 +30,11 @@ def test_create_order_endpoint():
         "/orders/",
         json={
             "customer_name": "Test",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 1,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 201
@@ -40,7 +48,10 @@ def test_create_order_endpoint():
 
 
 def test_get_orders_endpoint():
-    response = client.get("/orders/")
+    response = client.get(
+        "/orders/",
+        headers=TENANT_HEADERS,
+    )
 
     assert response.status_code == 200
 
@@ -56,9 +67,11 @@ def test_get_order_by_id():
         "/orders/",
         json={
             "customer_name": "Carolina",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 2,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert create_response.status_code == 201
@@ -66,7 +79,10 @@ def test_get_order_by_id():
     created_order = create_response.json()["order"]
     order_id = created_order["id"]
 
-    response = client.get(f"/orders/{order_id}")
+    response = client.get(
+        f"/orders/{order_id}",
+        headers=TENANT_HEADERS,
+    )
 
     assert response.status_code == 200
 
@@ -84,16 +100,21 @@ def test_delete_order():
         "/orders/",
         json={
             "customer_name": "Delete Test",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 1,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
 
-    response = client.delete(f"/orders/{order_id}")
+    response = client.delete(
+        f"/orders/{order_id}",
+        headers=TENANT_HEADERS,
+    )
 
     assert response.status_code == 204
 
@@ -103,9 +124,11 @@ def test_update_order():
         "/orders/",
         json={
             "customer_name": "Update Test",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 1,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert create_response.status_code == 201
@@ -116,9 +139,11 @@ def test_update_order():
         f"/orders/{order_id}",
         json={
             "customer_name": "Update Test",
+            "location_id": 1,
             "product": "Hamburguesa",
             "quantity": 3,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -133,7 +158,10 @@ def test_update_order():
 
 
 def test_get_order_not_found():
-    response = client.get("/orders/9999")
+    response = client.get(
+        "/orders/9999",
+        headers=TENANT_HEADERS,
+    )
 
     assert response.status_code == 404
 
@@ -143,16 +171,21 @@ def test_update_order_not_found():
         "/orders/9999",
         json={
             "customer_name": "Carolina",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 2,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 404
 
 
 def test_delete_order_not_found():
-    response = client.delete("/orders/9999")
+    response = client.delete(
+        "/orders/9999",
+        headers=TENANT_HEADERS,
+    )
 
     assert response.status_code == 404
 
@@ -162,9 +195,11 @@ def test_create_order_invalid_quantity_zero():
         "/orders/",
         json={
             "customer_name": "Carolina",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 0,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 422
@@ -175,9 +210,11 @@ def test_create_order_invalid_quantity_negative():
         "/orders/",
         json={
             "customer_name": "Carolina",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": -1,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 422
@@ -188,9 +225,11 @@ def test_create_order_invalid_empty_customer():
         "/orders/",
         json={
             "customer_name": "",
+            "location_id": 1,
             "product": "Pizza",
             "quantity": 2,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 422
@@ -201,9 +240,11 @@ def test_create_order_invalid_empty_product():
         "/orders/",
         json={
             "customer_name": "Carolina",
+            "location_id": 1,
             "product": "",
             "quantity": 2,
         },
+        headers=TENANT_HEADERS,
     )
 
     assert response.status_code == 422

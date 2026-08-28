@@ -2,6 +2,9 @@ from app.models.category_db import (
     IngredientCategoryDB,
     ProductCategoryDB,
 )
+from app.models.conversation_session_db import (
+    ConversationSessionDB,
+)
 from app.models.ingredient_availability_db import (
     IngredientAvailabilityDB,
 )
@@ -17,6 +20,7 @@ from app.models.tenant_db import TenantDB
 
 
 __all__ = [
+    "ConversationSessionDB",
     "IngredientAvailabilityDB",
     "IngredientCategoryDB",
     "ProductCategoryDB",

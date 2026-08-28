@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -14,11 +14,25 @@ if TYPE_CHECKING:
 class ProductCategoryDB(Base):
     __tablename__ = "product_categories"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "name",
+            name="uq_product_categories_tenant_name",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+    )
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id"),
+        nullable=False,
+    )
 
     name: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         nullable=False,
     )
 
@@ -30,11 +44,25 @@ class ProductCategoryDB(Base):
 class IngredientCategoryDB(Base):
     __tablename__ = "ingredient_categories"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "name",
+            name="uq_ingredient_categories_tenant_name",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+    )
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id"),
+        nullable=False,
+    )
 
     name: Mapped[str] = mapped_column(
         String(100),
-        unique=True,
         nullable=False,
     )
 

@@ -1,20 +1,43 @@
 import pytest
 
+from decimal import Decimal
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core import database as database_module
+
 from app.models.base import Base
+from app.models.category_db import (
+    IngredientCategoryDB,
+    ProductCategoryDB,
+)
+from app.models.ingredient_db import IngredientDB
+from app.models.location_db import LocationDB
+from app.models.product_availability_db import ProductAvailabilityDB
+from app.models.product_db import ProductDB
+from app.models.recipe_db import (
+    RecipeDB,
+    RecipeIngredientDB,
+)
+from app.models.tenant_db import TenantDB
+
+from app.services import conversation_service
 from app.services import order_service
+from app.services import recipe_service
+from app.services import tenant_service
 
 
 TEST_DATABASE_URL = "sqlite://"
+
 
 engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
 
 TestingSessionLocal = sessionmaker(
     bind=engine,
@@ -27,11 +50,246 @@ TestingSessionLocal = sessionmaker(
 def setup_test_database(monkeypatch):
     Base.metadata.create_all(bind=engine)
 
+    # --------------------------------------------------------
+    # USAR SQLITE DE PRUEBAS EN TODOS LOS SERVICIOS
+    # --------------------------------------------------------
+
     monkeypatch.setattr(
         order_service,
         "SessionLocal",
         TestingSessionLocal,
     )
+
+    monkeypatch.setattr(
+        conversation_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        tenant_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        recipe_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    # modification_service importa SessionLocal desde
+    # app.core.database dentro de sus funciones.
+    #
+    # Por eso aquí se parchea la fuente real.
+    monkeypatch.setattr(
+        database_module,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        # ====================================================
+        # TENANT
+        # ====================================================
+
+        tenant = TenantDB(
+            id=1,
+            slug="lpdb",
+            name="Los Perritos Del Barrio",
+            active=True,
+        )
+
+        db.add(tenant)
+        db.flush()
+
+        # ====================================================
+        # CATEGORÍAS DE PRODUCTO
+        # ====================================================
+
+        hot_dogs_category = ProductCategoryDB(
+            id=1,
+            tenant_id=tenant.id,
+            name="HOT DOGS",
+        )
+
+        perros_category = ProductCategoryDB(
+            id=2,
+            tenant_id=tenant.id,
+            name="PERROS",
+        )
+
+        hamburguesas_category = ProductCategoryDB(
+            id=3,
+            tenant_id=tenant.id,
+            name="HAMBURGUESAS",
+        )
+
+        db.add_all(
+            [
+                hot_dogs_category,
+                perros_category,
+                hamburguesas_category,
+            ]
+        )
+
+        db.flush()
+
+        # ====================================================
+        # CATEGORÍA DE INGREDIENTES
+        # ====================================================
+
+        toppings_category = IngredientCategoryDB(
+            id=1,
+            tenant_id=tenant.id,
+            name="TOPPINGS",
+        )
+
+        db.add(toppings_category)
+        db.flush()
+
+        # ====================================================
+        # SEDE
+        # ====================================================
+
+        location = LocationDB(
+            id=1,
+            tenant_id=tenant.id,
+            customer_name="Test Location",
+            toast_name="Test Location",
+            city="Miami",
+            address="Test Address",
+            active=True,
+        )
+
+        db.add(location)
+        db.flush()
+
+        # ====================================================
+        # PRODUCTOS
+        # ====================================================
+
+        pizza = ProductDB(
+            id=1,
+            tenant_id=tenant.id,
+            name="Pizza",
+            category_id=hot_dogs_category.id,
+            price=Decimal("9.99"),
+        )
+
+        perro_del_barrio = ProductDB(
+            id=2,
+            tenant_id=tenant.id,
+            name="PERRO DEL BARRIO",
+            category_id=perros_category.id,
+            price=Decimal("9.99"),
+        )
+
+        hamburguesa = ProductDB(
+            id=3,
+            tenant_id=tenant.id,
+            name="Hamburguesa",
+            category_id=hamburguesas_category.id,
+            price=Decimal("9.99"),
+        )
+
+        db.add_all(
+            [
+                pizza,
+                perro_del_barrio,
+                hamburguesa,
+            ]
+        )
+
+        db.flush()
+
+        # ====================================================
+        # INGREDIENTE
+        #
+        # Necesario para:
+        #
+        # test_validate_removal_respects_tenant
+        # test_validate_addition_respects_tenant
+        # ====================================================
+
+        tocineta = IngredientDB(
+            id=1,
+            tenant_id=tenant.id,
+            name="TOCINETA",
+            category_id=toppings_category.id,
+        )
+
+        db.add(tocineta)
+        db.flush()
+
+        # ====================================================
+        # RECETA DE PERRO DEL BARRIO
+        # ====================================================
+
+        recipe = RecipeDB(
+            id=1,
+            product_id=perro_del_barrio.id,
+        )
+
+        db.add(recipe)
+        db.flush()
+
+        recipe_tocineta = RecipeIngredientDB(
+            recipe_id=recipe.id,
+            ingredient_id=tocineta.id,
+        )
+
+        db.add(recipe_tocineta)
+
+        # ====================================================
+        # DISPONIBILIDAD DE PRODUCTOS
+        # ====================================================
+
+        pizza_availability = ProductAvailabilityDB(
+            product_id=pizza.id,
+            location_id=location.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
+        perro_availability = ProductAvailabilityDB(
+            product_id=perro_del_barrio.id,
+            location_id=location.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
+        hamburguesa_availability = ProductAvailabilityDB(
+            product_id=hamburguesa.id,
+            location_id=location.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
+        db.add_all(
+            [
+                pizza_availability,
+                perro_availability,
+                hamburguesa_availability,
+            ]
+        )
+
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
 
     yield
 
