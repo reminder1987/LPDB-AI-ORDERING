@@ -11,6 +11,7 @@ from decimal import Decimal
 from app.core.tenant_context import TenantContext
 from app.services.availability_service import get_product_availability
 from app.services.ingredient_availability_service import get_ingredient_availability
+from app.services.ingredient_service import search_ingredients
 from app.services.location_service import location_service
 from app.services.modification_service import (
     validate_addition,
@@ -34,6 +35,26 @@ def search_products_tool(query: str, tenant: TenantContext):
             "price": product.price,
         }
         for product in search_products(query, tenant.tenant_id)
+    ]
+
+
+def search_ingredients_tool(query: str, tenant: TenantContext):
+    """
+    Busca ingredientes dentro del tenant activo.
+
+    La categoría se obtiene directamente del catálogo.
+    El agente no debe inventar ni proporcionar la categoría.
+    """
+    return [
+        {
+            "id": ingredient.id,
+            "name": ingredient.name,
+            "category": ingredient.category.name,
+        }
+        for ingredient in search_ingredients(
+            query,
+            tenant.tenant_id,
+        )
     ]
 
 
@@ -77,30 +98,72 @@ def validate_modification_tool(
 ):
     """Valida una modificación usando las reglas del tenant activo."""
     product = get_product_by_id(product_id, tenant.tenant_id)
+
     if product is None:
         raise ValueError(f"Producto no encontrado: {product_id}")
 
     if modification_type == "REMOVE":
         if not ingredient:
             raise ValueError("REMOVE requiere ingredient")
-        return validate_removal(product_id, ingredient, tenant.tenant_id)
+
+        return validate_removal(
+            product_id,
+            ingredient,
+            tenant.tenant_id,
+        )
 
     if modification_type == "ADD":
         if not ingredient:
             raise ValueError("ADD requiere ingredient")
-        return validate_addition(product_id, ingredient, tenant.tenant_id)
+
+        ingredients = search_ingredients(
+            ingredient,
+            tenant.tenant_id,
+        )
+
+        exact_matches = [
+            item
+            for item in ingredients
+            if item.name.casefold() == ingredient.strip().casefold()
+        ]
+
+        if len(exact_matches) == 1:
+            ingredient_record = exact_matches[0]
+
+            return validate_addition(
+                product_id,
+                ingredient_record.name,
+                ingredient_record.category.name,
+            )
+
+        return {
+            "allowed": False,
+            "reason": (
+                "No se pudo resolver de forma inequívoca "
+                f"el ingrediente: {ingredient}"
+            ),
+        }
 
     if modification_type == "BASE_CHANGE":
         if not new_base:
             raise ValueError("BASE_CHANGE requiere new_base")
-        return validate_base_change(product_id, new_base, tenant.tenant_id)
 
-    raise ValueError(f"Tipo de modificación no soportado: {modification_type}")
+        return validate_base_change(
+            product_id,
+            new_base,
+            tenant.tenant_id,
+        )
+
+    raise ValueError(
+        "Tipo de modificación no soportado "
+        f"para: {modification_type}"
+    )
 
 
 def get_location_tool(query: str, tenant: TenantContext):
     """Busca únicamente sedes activas del tenant que coincidan con la consulta."""
     locations = location_service.find_locations(query, tenant.tenant_id)
+
     return [
         {
             "id": location.id,
@@ -152,6 +215,7 @@ def calculate_item_price_tool(
 
 __all__ = [
     "search_products_tool",
+    "search_ingredients_tool",
     "get_product_recipe_tool",
     "check_product_availability_tool",
     "check_ingredient_availability_tool",
