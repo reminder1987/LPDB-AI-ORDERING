@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.dependencies import get_tenant_context
+from app.core.tenant_context import TenantContext
 from app.services.availability_service import (
     get_product_availability,
     set_product_availability,
@@ -23,11 +25,13 @@ router = APIRouter(
 def get_product_availability_endpoint(
     location_id: int,
     product_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     try:
         availability = get_product_availability(
             product_id=product_id,
             location_id=location_id,
+            tenant_id=tenant.tenant_id,
         )
 
     except ValueError as exc:
@@ -55,12 +59,14 @@ def set_product_availability_endpoint(
     product_id: int,
     available: bool,
     reason: str | None = None,
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     try:
         availability = set_product_availability(
             product_id=product_id,
             location_id=location_id,
             available=available,
+            tenant_id=tenant.tenant_id,
             manual_override=True,
             source="LOCAL",
             reason=reason,

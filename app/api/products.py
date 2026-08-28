@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.api.dependencies import get_tenant_context
+from app.core.tenant_context import TenantContext
 from app.schemas.product import (
     ProductListResponse,
     ProductSearchResponse,
@@ -34,10 +36,14 @@ router = APIRouter(
     summary="Obtener todos los productos",
     description="Devuelve todos los productos registrados en el catálogo.",
 )
-def get_products_endpoint():
+def get_products_endpoint(
+    tenant: TenantContext = Depends(get_tenant_context),
+):
     return {
         "status": "ok",
-        "products": get_products(),
+        "products": get_products(
+            tenant.tenant_id,
+        ),
     }
 
 
@@ -53,10 +59,14 @@ def search_products_endpoint(
         min_length=1,
         description="Texto que se desea buscar en el nombre del producto.",
     ),
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     return {
         "status": "ok",
-        "products": search_products(q),
+        "products": search_products(
+            q,
+            tenant.tenant_id,
+        ),
     }
 
 
@@ -71,8 +81,14 @@ def search_products_endpoint(
         },
     },
 )
-def get_product_endpoint(product_id: int):
-    product = get_product_by_id(product_id)
+def get_product_endpoint(
+    product_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
+    product = get_product_by_id(
+        product_id,
+        tenant.tenant_id,
+    )
 
     if product is None:
         raise HTTPException(
@@ -94,8 +110,14 @@ def get_product_endpoint(product_id: int):
         },
     },
 )
-def get_product_recipe_endpoint(product_id: int):
-    recipe = get_product_recipe(product_id)
+def get_product_recipe_endpoint(
+    product_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
+    recipe = get_product_recipe(
+        product_id,
+        tenant.tenant_id,
+    )
 
     if recipe is None:
         raise HTTPException(
@@ -118,10 +140,12 @@ def validate_removal_endpoint(
         min_length=1,
         description="Ingrediente que el cliente desea retirar.",
     ),
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     result = validate_removal(
         product_id,
         ingredient,
+        tenant.tenant_id,
     )
 
     return result
@@ -143,10 +167,12 @@ def validate_addition_endpoint(
         default=None,
         description="Categoría del ingrediente.",
     ),
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     result = validate_addition(
         product_id,
         ingredient,
+        tenant.tenant_id,
         category,
     )
 
@@ -165,10 +191,12 @@ def validate_base_change_endpoint(
         min_length=1,
         description="Nueva base solicitada por el cliente.",
     ),
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     result = validate_base_change(
         product_id,
         new_base,
+        tenant.tenant_id,
     )
 
     return result
