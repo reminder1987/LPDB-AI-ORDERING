@@ -9,8 +9,15 @@ no deben duplicarlas.
 from decimal import Decimal
 
 from app.core.tenant_context import TenantContext
+from app.schemas.order import (
+    OrderCreate,
+    OrderItemCreate,
+    OrderModificationCreate,
+)
 from app.services.availability_service import get_product_availability
-from app.services.ingredient_availability_service import get_ingredient_availability
+from app.services.ingredient_availability_service import (
+    get_ingredient_availability,
+)
 from app.services.ingredient_service import search_ingredients
 from app.services.location_service import location_service
 from app.services.modification_service import (
@@ -18,11 +25,15 @@ from app.services.modification_service import (
     validate_base_change,
     validate_removal,
 )
+from app.services.order_service import create_order
 from app.services.price_service import (
     calculate_item_subtotal,
     calculate_item_unit_price,
 )
-from app.services.product_service import get_product_by_id, search_products
+from app.services.product_service import (
+    get_product_by_id,
+    search_products,
+)
 from app.services.recipe_service import get_product_recipe
 
 
@@ -58,9 +69,15 @@ def search_ingredients_tool(query: str, tenant: TenantContext):
     ]
 
 
-def get_product_recipe_tool(product_id: int, tenant: TenantContext):
+def get_product_recipe_tool(
+    product_id: int,
+    tenant: TenantContext,
+):
     """Obtiene únicamente los ingredientes comerciales de la receta."""
-    return get_product_recipe(product_id, tenant.tenant_id)
+    return get_product_recipe(
+        product_id,
+        tenant.tenant_id,
+    )
 
 
 def check_product_availability_tool(
@@ -97,14 +114,21 @@ def validate_modification_tool(
     new_base: str | None = None,
 ):
     """Valida una modificación usando las reglas del tenant activo."""
-    product = get_product_by_id(product_id, tenant.tenant_id)
+    product = get_product_by_id(
+        product_id,
+        tenant.tenant_id,
+    )
 
     if product is None:
-        raise ValueError(f"Producto no encontrado: {product_id}")
+        raise ValueError(
+            f"Producto no encontrado: {product_id}"
+        )
 
     if modification_type == "REMOVE":
         if not ingredient:
-            raise ValueError("REMOVE requiere ingredient")
+            raise ValueError(
+                "REMOVE requiere ingredient"
+            )
 
         return validate_removal(
             product_id,
@@ -114,7 +138,9 @@ def validate_modification_tool(
 
     if modification_type == "ADD":
         if not ingredient:
-            raise ValueError("ADD requiere ingredient")
+            raise ValueError(
+                "ADD requiere ingredient"
+            )
 
         ingredients = search_ingredients(
             ingredient,
@@ -124,29 +150,32 @@ def validate_modification_tool(
         exact_matches = [
             item
             for item in ingredients
-            if item.name.casefold() == ingredient.strip().casefold()
+            if item.name.casefold()
+            == ingredient.strip().casefold()
         ]
 
-        if len(exact_matches) == 1:
-            ingredient_record = exact_matches[0]
+        if len(exact_matches) != 1:
+            return {
+                "allowed": False,
+                "reason": (
+                    "No se pudo resolver de forma inequívoca "
+                    f"el ingrediente: {ingredient}"
+                ),
+            }
 
-            return validate_addition(
-                product_id,
-                ingredient_record.name,
-                ingredient_record.category.name,
-            )
+        ingredient_record = exact_matches[0]
 
-        return {
-            "allowed": False,
-            "reason": (
-                "No se pudo resolver de forma inequívoca "
-                f"el ingrediente: {ingredient}"
-            ),
-        }
+        return validate_addition(
+            product_id,
+            ingredient_record.name,
+            tenant.tenant_id,
+        )
 
     if modification_type == "BASE_CHANGE":
         if not new_base:
-            raise ValueError("BASE_CHANGE requiere new_base")
+            raise ValueError(
+                "BASE_CHANGE requiere new_base"
+            )
 
         return validate_base_change(
             product_id,
@@ -160,9 +189,15 @@ def validate_modification_tool(
     )
 
 
-def get_location_tool(query: str, tenant: TenantContext):
+def get_location_tool(
+    query: str,
+    tenant: TenantContext,
+):
     """Busca únicamente sedes activas del tenant que coincidan con la consulta."""
-    locations = location_service.find_locations(query, tenant.tenant_id)
+    locations = location_service.find_locations(
+        query,
+        tenant.tenant_id,
+    )
 
     return [
         {
@@ -184,10 +219,15 @@ def calculate_item_price_tool(
     combo_requested: bool = False,
 ):
     """Calcula el precio interno del item dentro del tenant activo."""
-    product = get_product_by_id(product_id, tenant.tenant_id)
+    product = get_product_by_id(
+        product_id,
+        tenant.tenant_id,
+    )
 
     if product is None:
-        raise ValueError(f"Producto no encontrado: {product_id}")
+        raise ValueError(
+            f"Producto no encontrado: {product_id}"
+        )
 
     normalized_modifications = modifications or []
 
@@ -213,6 +253,123 @@ def calculate_item_price_tool(
     }
 
 
+def create_order_tool(
+    customer_name: str,
+    location_id: int,
+    items: list[dict],
+    tenant: TenantContext,
+    confirmed: bool = False,
+):
+    """
+    Crea un pedido utilizando exclusivamente el OrderService.
+
+    La creación requiere confirmación explícita del cliente.
+    La tool no duplica las reglas de negocio del OrderService.
+    """
+
+    if not confirmed:
+        return {
+            "ok": False,
+            "error": (
+                "El pedido requiere confirmación explícita "
+                "del cliente antes de ser creado."
+            ),
+        }
+
+    if not items:
+        raise ValueError(
+            "La orden requiere al menos un item."
+        )
+
+    order_items = []
+
+    for item in items:
+        product_id = item.get("product_id")
+
+        if product_id is None:
+            raise ValueError(
+                "Cada item requiere product_id."
+            )
+
+        product = get_product_by_id(
+            product_id,
+            tenant.tenant_id,
+        )
+
+        if product is None:
+            raise ValueError(
+                f"Producto no encontrado: {product_id}"
+            )
+
+        modifications = []
+
+        for modification in item.get(
+            "modifications",
+            [],
+        ):
+            modifications.append(
+                OrderModificationCreate(
+                    type=modification["type"],
+                    ingredient=modification.get(
+                        "ingredient"
+                    ),
+                    new_base=modification.get(
+                        "new_base"
+                    ),
+                )
+            )
+
+        beverage_product_id = item.get(
+            "beverage_product_id"
+        )
+
+        beverage_product = None
+
+        if beverage_product_id is not None:
+            beverage = get_product_by_id(
+                beverage_product_id,
+                tenant.tenant_id,
+            )
+
+            if beverage is None:
+                raise ValueError(
+                    "Bebida no encontrada: "
+                    f"{beverage_product_id}"
+                )
+
+            beverage_product = beverage.name
+
+        order_items.append(
+            OrderItemCreate(
+                product=product.name,
+                quantity=item["quantity"],
+                modifications=modifications,
+                combo_requested=item.get(
+                    "combo_requested",
+                    False,
+                ),
+                beverage_product_id=beverage_product_id,
+                beverage_product=beverage_product,
+            )
+        )
+
+    order = OrderCreate(
+        customer_name=customer_name,
+        location_id=location_id,
+        items=order_items,
+    )
+
+    saved_order = create_order(
+        order,
+        tenant,
+    )
+
+    return {
+        "ok": True,
+        "order": saved_order,
+    }
+
+
 __all__ = [
     "search_products_tool",
     "search_ingredients_tool",
@@ -222,4 +379,5 @@ __all__ = [
     "validate_modification_tool",
     "get_location_tool",
     "calculate_item_price_tool",
+    "create_order_tool",
 ]
