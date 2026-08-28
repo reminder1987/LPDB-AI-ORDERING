@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from app.api.dependencies import get_tenant_context
+from app.core.tenant_context import TenantContext
 from app.services.conversation_service import conversation_service
 
 
@@ -37,11 +39,13 @@ class AgentMessageRequest(BaseModel):
 )
 def process_agent_message(
     payload: AgentMessageRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     result = conversation_service.process_message(
         session_id=payload.session_id,
         message=payload.message,
         customer_name=payload.customer_name,
+        tenant=tenant,
     )
 
     response = {

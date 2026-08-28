@@ -4,6 +4,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from app.core.database import SessionLocal
+from app.core.tenant_context import TenantContext
 
 from app.models.conversation_session_db import (
     ConversationSessionDB,
@@ -158,6 +159,7 @@ class ConversationService:
     def get_state(
         self,
         session_id: str,
+        tenant_id: int,
     ) -> ConversationState:
 
         db = SessionLocal()
@@ -171,6 +173,8 @@ class ConversationService:
                 .filter(
                     ConversationSessionDB.session_id
                     == session_id,
+                    ConversationSessionDB.tenant_id
+                    == tenant_id,
                 )
                 .first()
             )
@@ -193,6 +197,7 @@ class ConversationService:
         self,
         session_id: str,
         state: ConversationState,
+        tenant_id: int,
     ) -> None:
 
         db = SessionLocal()
@@ -206,6 +211,8 @@ class ConversationService:
                 .filter(
                     ConversationSessionDB.session_id
                     == session_id,
+                    ConversationSessionDB.tenant_id
+                    == tenant_id,
                 )
                 .first()
             )
@@ -214,6 +221,7 @@ class ConversationService:
 
                 session = ConversationSessionDB(
                     session_id=session_id,
+                    tenant_id=tenant_id,
                 )
 
                 db.add(session)
@@ -285,6 +293,7 @@ class ConversationService:
     def _clear_state(
         self,
         session_id: str,
+        tenant_id: int,
     ) -> None:
 
         db = SessionLocal()
@@ -298,6 +307,8 @@ class ConversationService:
                 .filter(
                     ConversationSessionDB.session_id
                     == session_id,
+                    ConversationSessionDB.tenant_id
+                    == tenant_id,
                 )
                 .first()
             )
@@ -417,10 +428,12 @@ class ConversationService:
         session_id: str,
         message: str,
         customer_name: str,
+        tenant: TenantContext,
     ) -> dict:
 
         state = self.get_state(
             session_id,
+            tenant.tenant_id,
         )
 
         # ----------------------------------------------------
@@ -450,6 +463,7 @@ class ConversationService:
                 session_id=session_id,
                 state=state,
                 message=message,
+                tenant=tenant,
             )
 
         if (
@@ -461,6 +475,7 @@ class ConversationService:
                 session_id=session_id,
                 state=state,
                 message=message,
+                tenant=tenant,
             )
 
         # ====================================================
@@ -562,6 +577,7 @@ class ConversationService:
             locations = (
                 location_service.find_locations(
                     message,
+                    tenant.tenant_id,
                 )
             )
 
@@ -587,6 +603,7 @@ class ConversationService:
                     self._save_state(
                         session_id,
                         state,
+                        tenant.tenant_id,
                     )
 
                     if (
@@ -679,6 +696,7 @@ class ConversationService:
                         location_id=(
                             state.location_id
                         ),
+                        tenant=tenant,
                     )
 
                 # --------------------------------------------
@@ -690,6 +708,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return {
@@ -728,6 +747,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return {
@@ -764,7 +784,9 @@ class ConversationService:
 
                 locations = (
                     location_service
-                    .get_all_active_locations()
+                    .get_all_active_locations(
+                        tenant.tenant_id,
+                    )
                 )
 
                 state.status = (
@@ -774,6 +796,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return {
@@ -816,6 +839,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return {
@@ -840,6 +864,7 @@ class ConversationService:
             self._save_state(
                 session_id,
                 state,
+                tenant.tenant_id,
             )
 
             return {
@@ -868,6 +893,7 @@ class ConversationService:
             self._save_state(
                 session_id,
                 state,
+                tenant.tenant_id,
             )
 
             return {
@@ -895,6 +921,7 @@ class ConversationService:
                 session_id=session_id,
                 state=state,
                 intent=intent,
+                tenant=tenant,
             )
 
         if (
@@ -906,6 +933,7 @@ class ConversationService:
                 session_id=session_id,
                 state=state,
                 intent=intent,
+                tenant=tenant,
             )
 
         return self._create_ready_order(
@@ -930,6 +958,7 @@ class ConversationService:
             location_id=(
                 state.location_id
             ),
+            tenant=tenant,
         )
 
     # ========================================================
@@ -941,6 +970,7 @@ class ConversationService:
         session_id: str,
         state: ConversationState,
         intent,
+        tenant: TenantContext,
     ) -> dict:
 
         # ----------------------------------------------------
@@ -977,6 +1007,7 @@ class ConversationService:
             self._save_state(
                 session_id,
                 state,
+                tenant.tenant_id,
             )
 
             return {
@@ -1017,6 +1048,7 @@ class ConversationService:
             self._save_state(
                 session_id,
                 state,
+                tenant.tenant_id,
             )
 
             return {
@@ -1053,6 +1085,7 @@ class ConversationService:
             location_id=(
                 state.location_id
             ),
+            tenant=tenant,
         )
 
     # ========================================================
@@ -1094,6 +1127,7 @@ class ConversationService:
         session_id: str,
         state: ConversationState,
         message: str,
+        tenant: TenantContext,
     ) -> dict:
 
         answer = _normalize(
@@ -1117,6 +1151,7 @@ class ConversationService:
             self._save_state(
                 session_id,
                 state,
+                tenant.tenant_id,
             )
 
             return {
@@ -1149,6 +1184,7 @@ class ConversationService:
                 combo_requested=False,
                 combo_product=None,
                 location_id=state.location_id,
+                tenant=tenant,
             )
 
         # ----------------------------------------------------
@@ -1175,6 +1211,7 @@ class ConversationService:
         session_id: str,
         state: ConversationState,
         message: str,
+        tenant: TenantContext,
     ) -> dict:
 
         normalized_message = _normalize(
@@ -1207,8 +1244,8 @@ class ConversationService:
                     ProductDB.category,
                 )
                 .filter(
-                    ProductDB.name
-                    .isnot(None),
+                    ProductDB.tenant_id == tenant.tenant_id,
+                    ProductDB.name.isnot(None),
                 )
                 .all()
             )
@@ -1259,6 +1296,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return self._create_ready_order(
@@ -1281,6 +1319,7 @@ class ConversationService:
                     location_id=(
                         state.location_id
                     ),
+                    tenant=tenant,
                 )
 
             # ------------------------------------------------
@@ -1337,6 +1376,7 @@ class ConversationService:
                 self._save_state(
                     session_id,
                     state,
+                    tenant.tenant_id,
                 )
 
                 return self._create_ready_order(
@@ -1359,6 +1399,7 @@ class ConversationService:
                     location_id=(
                         state.location_id
                     ),
+                    tenant=tenant,
                 )
 
         finally:
@@ -1391,6 +1432,7 @@ class ConversationService:
         customer_name: str,
         items: list[IntentItem],
         combo_requested: bool,
+        tenant: TenantContext,
         beverage_product_id: int | None = None,
         beverage_product: str | None = None,
         combo_product: str | None = None,
@@ -1486,6 +1528,7 @@ class ConversationService:
 
             saved_order = create_order(
                 order,
+                tenant,
             )
 
         except ValueError as exc:
@@ -1504,6 +1547,7 @@ class ConversationService:
 
         self._clear_state(
             session_id,
+            tenant.tenant_id,
         )
 
         response = {

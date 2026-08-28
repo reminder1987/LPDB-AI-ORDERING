@@ -21,6 +21,12 @@ class ConversationSessionDB(Base):
         index=True,
     )
 
+    tenant_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        index=True,
+    )
+
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
