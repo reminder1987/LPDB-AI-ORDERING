@@ -1291,6 +1291,7 @@ def _validate_modifications(
             validation = validate_removal(
                 product_id,
                 modification.ingredient,
+                tenant.tenant_id,
             )
 
             if not validation.get(
@@ -1420,6 +1421,7 @@ def _validate_modifications(
                 validate_base_change(
                     product_id,
                     modification.new_base,
+                    tenant.tenant_id,
                 )
             )
 
