@@ -24,10 +24,28 @@ class OrderDB(Base):
         nullable=False,
     )
 
+    # --------------------------------------------------------
+    # Estado de la orden
+    # --------------------------------------------------------
+
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="created",
+    )
+
+    # --------------------------------------------------------
+    # Cliente
+    # --------------------------------------------------------
+
     customer_name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
     )
+
+    # --------------------------------------------------------
+    # Sede
+    # --------------------------------------------------------
 
     location_id: Mapped[int] = mapped_column(
         ForeignKey(
@@ -35,6 +53,15 @@ class OrderDB(Base):
         ),
         nullable=False,
     )
+
+    # --------------------------------------------------------
+    # Campos legacy
+    #
+    # Se mantienen porque todavía existen consumidores
+    # que utilizan esta representación de la orden.
+    #
+    # La representación completa vive en order_items.
+    # --------------------------------------------------------
 
     product: Mapped[str] = mapped_column(
         String(100),
@@ -45,6 +72,10 @@ class OrderDB(Base):
         Integer,
         nullable=False,
     )
+
+    # --------------------------------------------------------
+    # Relaciones
+    # --------------------------------------------------------
 
     location: Mapped["LocationDB"] = relationship()
 

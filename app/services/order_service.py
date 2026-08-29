@@ -671,6 +671,7 @@ def create_order(
 
         saved_order = OrderDB(
             tenant_id=tenant.tenant_id,
+            status="created",
             customer_name=(
                 order.customer_name
             ),
@@ -1369,6 +1370,7 @@ def _validate_modifications(
             validation = validate_addition(
                 product_id,
                 ingredient.name,
+                tenant.tenant_id,
                 ingredient.category.name,
             )
 

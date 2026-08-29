@@ -47,6 +47,48 @@ def test_create_order_endpoint():
     assert data["order"]["quantity"] == 1
 
 
+def test_new_order_starts_with_created_status():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Status Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["order"]["id"] > 0
+
+    # El estado de ciclo de vida de la orden
+    # debe comenzar como "created".
+    #
+    # El estado se almacena en OrderDB y no
+    # forma parte actualmente de OrderResponse,
+    # por lo que verificamos directamente la
+    # persistencia en la base de datos.
+    from app.core.database import SessionLocal
+    from app.models.order_db import OrderDB
+
+    db = SessionLocal()
+
+    try:
+        order = db.query(OrderDB).filter(
+            OrderDB.id == data["order"]["id"]
+        ).first()
+
+        assert order is not None
+        assert order.status == "created"
+
+    finally:
+        db.close()
+
+
 def test_get_orders_endpoint():
     response = client.get(
         "/orders/",
