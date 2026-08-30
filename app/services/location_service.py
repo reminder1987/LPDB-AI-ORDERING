@@ -154,9 +154,19 @@ class LocationService:
         # ---------------------------------------------------------
         # 3. Ciudad.
         #
-        # Se utiliza solamente como coincidencia adicional.
-        # No se considera suficiente una ciudad genérica si varias
-        # sedes comparten la misma.
+        # La ciudad puede contener información adicional como
+        # barrio, ciudad y estado.
+        #
+        # Ejemplo:
+        #
+        # "WYNWOOD, MIAMI"
+        #
+        # Una consulta como "Miami" debe poder encontrarla.
+        #
+        # Cuando varias sedes comparten la misma ciudad,
+        # find_locations() devuelve todas las coincidencias.
+        # La decisión final sobre cuál sede utilizar corresponde
+        # al agente y al cliente.
         # ---------------------------------------------------------
 
         city = self._normalize_text(
@@ -169,10 +179,11 @@ class LocationService:
                 city.split()
             )
 
-            if (
-                len(city_tokens) > 1
-                and city_tokens.issubset(query_tokens)
-            ):
+            matched_city_tokens = (
+                city_tokens & query_tokens
+            )
+
+            if matched_city_tokens:
                 return True
 
         # ---------------------------------------------------------

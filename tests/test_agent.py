@@ -2,11 +2,19 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from app.core import database as database_module
 from app.core.tenant_context import TenantContext
 from app.main import app
+from app.models.conversation_session_db import (
+    ConversationSessionDB,
+)
+from app.models.customer_db import CustomerDB
 from app.services.ai_agent_service import (
     AIAgentService,
     AgentResponse,
+)
+from app.services.conversation_service import (
+    conversation_service,
 )
 
 
@@ -428,6 +436,163 @@ def test_agent_message_endpoint_preserves_tenant_and_session():
     }
 
 
+def test_agent_message_endpoint_passes_customer_id_from_identity(
+    monkeypatch,
+):
+    captured = {}
+
+    fake_customer = SimpleNamespace(
+        id=123,
+    )
+
+    def fake_get_or_create_customer(
+        tenant_id,
+        channel,
+        external_id,
+        name,
+        phone=None,
+        email=None,
+    ):
+        captured["customer_tenant_id"] = tenant_id
+        captured["channel"] = channel
+        captured["external_id"] = external_id
+        captured["name"] = name
+        captured["phone"] = phone
+        captured["email"] = email
+
+        return fake_customer
+
+    def fake_process_message(
+        session_id,
+        message,
+        customer_name,
+        tenant,
+        customer_id=None,
+    ):
+        captured["session_id"] = session_id
+        captured["message"] = message
+        captured["customer_name"] = customer_name
+        captured["tenant"] = tenant
+        captured["customer_id"] = customer_id
+
+        return {
+            "status": "needs_input",
+            "message": "¿Cuál sede deseas?",
+            "customer_id": customer_id,
+        }
+
+    monkeypatch.setattr(
+        "app.api.agent.customer_service.get_or_create_customer",
+        fake_get_or_create_customer,
+    )
+
+    monkeypatch.setattr(
+        "app.api.agent.conversation_service.process_message",
+        fake_process_message,
+    )
+
+    response = client.post(
+        "/agent/message",
+        json={
+            "session_id": "identity-session-001",
+            "customer_name": "Carolina",
+            "channel": "WhatsApp",
+            "external_id": "whatsapp-user-001",
+            "phone": "3050000010",
+            "email": "carolina@example.com",
+            "message": "Quiero un perro",
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert captured["customer_tenant_id"] == 1
+    assert captured["channel"] == "WhatsApp"
+    assert captured["external_id"] == (
+        "whatsapp-user-001"
+    )
+    assert captured["name"] == "Carolina"
+    assert captured["phone"] == "3050000010"
+    assert captured["email"] == (
+        "carolina@example.com"
+    )
+
+    assert captured["session_id"] == (
+        "identity-session-001"
+    )
+
+    assert captured["customer_id"] == 123
+
+    assert captured["tenant"] is not None
+    assert captured["tenant"].tenant_id == 1
+
+    assert data["customer_id"] == 123
+    assert data["customer_name"] == "Carolina"
+    assert data["status"] == "needs_input"
+
+
+def test_agent_message_endpoint_without_identity_preserves_legacy_flow(
+    monkeypatch,
+):
+    captured = {}
+
+    def fake_process_message(
+        session_id,
+        message,
+        customer_name,
+        tenant,
+        customer_id=None,
+    ):
+        captured["session_id"] = session_id
+        captured["message"] = message
+        captured["customer_name"] = customer_name
+        captured["tenant"] = tenant
+        captured["customer_id"] = customer_id
+
+        return {
+            "status": "needs_input",
+            "message": "¿Cuál sede deseas?",
+        }
+
+    monkeypatch.setattr(
+        "app.api.agent.conversation_service.process_message",
+        fake_process_message,
+    )
+
+    response = client.post(
+        "/agent/message",
+        json={
+            "session_id": "legacy-session-001",
+            "customer_name": "Carolina",
+            "message": "Quiero un perro",
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert captured["session_id"] == (
+        "legacy-session-001"
+    )
+
+    assert captured["customer_name"] == (
+        "Carolina"
+    )
+
+    assert captured["customer_id"] is None
+
+    assert captured["tenant"] is not None
+    assert captured["tenant"].tenant_id == 1
+
+    assert data["customer_id"] is None
+    assert data["customer_name"] == "Carolina"
+
+
 def test_process_message_accepts_session_id(
     monkeypatch,
 ):
@@ -639,6 +804,7 @@ def test_agent_message_endpoint_preserves_same_session(
         message,
         customer_name,
         tenant,
+        customer_id=None,
     ):
         calls.append(
             {
@@ -646,6 +812,7 @@ def test_agent_message_endpoint_preserves_same_session(
                 "message": message,
                 "customer_name": customer_name,
                 "tenant": tenant,
+                "customer_id": customer_id,
             }
         )
 
@@ -694,3 +861,143 @@ def test_agent_message_endpoint_preserves_same_session(
 
     assert calls[0]["tenant"].tenant_id == 1
     assert calls[1]["tenant"].tenant_id == 1
+
+    assert calls[0]["customer_id"] is None
+    assert calls[1]["customer_id"] is None
+
+
+def test_agent_message_endpoint_persists_real_customer_identity_in_session():
+    session_id = (
+        "e2e-customer-identity-session-debug-003"
+    )
+
+    channel = "whatsapp"
+
+    external_id = (
+        "e2e-whatsapp-customer-identity-debug-003"
+    )
+
+    try:
+        response = client.post(
+            "/agent/message",
+            json={
+                "session_id": session_id,
+                "customer_name": "Carolina",
+                "channel": channel,
+                "external_id": external_id,
+                "phone": "3059990013",
+                "email": (
+                    "e2e-customer-identity-debug-003@example.com"
+                ),
+                "message": "Quiero un perro",
+            },
+            headers=TENANT_HEADERS,
+        )
+
+        assert response.status_code == 200
+
+        data = response.json()
+
+        assert data["customer_id"] is not None
+        assert data["customer_name"] == "Carolina"
+
+        customer_id = data["customer_id"]
+
+        # ----------------------------------------------------
+        # PRIMERA VERIFICACIÓN:
+        # el ConversationService debe poder recuperar
+        # exactamente la misma sesión que acaba de procesar
+        # el endpoint.
+        # ----------------------------------------------------
+
+        recovered_state = (
+            conversation_service.get_state(
+                session_id=session_id,
+                tenant_id=TENANT_LPDB.tenant_id,
+            )
+        )
+
+        assert recovered_state.customer_id == (
+            customer_id
+        )
+
+        assert recovered_state.customer_name == (
+            "Carolina"
+        )
+
+        assert recovered_state.status == (
+            "waiting_location"
+        )
+
+        # ----------------------------------------------------
+        # SEGUNDA VERIFICACIÓN:
+        # comprobar directamente CustomerDB y
+        # ConversationSessionDB.
+        #
+        # IMPORTANTE:
+        # Se accede dinámicamente a SessionLocal desde
+        # database_module para utilizar el mismo SQLite
+        # configurado por tests/conftest.py.
+        # ----------------------------------------------------
+
+        db = database_module.SessionLocal()
+
+        try:
+            customer = (
+                db.query(CustomerDB)
+                .filter(
+                    CustomerDB.id == customer_id,
+                    CustomerDB.tenant_id
+                    == TENANT_LPDB.tenant_id,
+                )
+                .first()
+            )
+
+            assert customer is not None
+
+            assert customer.id == customer_id
+            assert customer.tenant_id == 1
+            assert customer.name == "Carolina"
+            assert customer.phone == "3059990013"
+            assert (
+                customer.email
+                == "e2e-customer-identity-debug-003@example.com"
+            )
+
+            session = (
+                db.query(
+                    ConversationSessionDB,
+                )
+                .filter(
+                    ConversationSessionDB.session_id
+                    == session_id,
+                    ConversationSessionDB.tenant_id
+                    == TENANT_LPDB.tenant_id,
+                )
+                .first()
+            )
+
+            assert session is not None
+
+            assert session.customer_id == (
+                customer_id
+            )
+
+            assert session.customer_name == (
+                "Carolina"
+            )
+
+            assert session.tenant_id == 1
+
+            assert session.status == (
+                "waiting_location"
+            )
+
+        finally:
+            db.close()
+
+    finally:
+        conversation_service._clear_state(
+            session_id=session_id,
+            tenant_id=TENANT_LPDB.tenant_id,
+        )

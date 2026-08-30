@@ -21,6 +21,11 @@ from app.models.conversation_session_db import (
     ConversationSessionDB,
 )
 
+from app.models.customer_db import CustomerDB
+from app.models.customer_identity_db import CustomerIdentityDB
+
+from app.models.external_mapping_db import ExternalMappingDB
+
 from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
 from app.models.order_item_db import OrderItemDB

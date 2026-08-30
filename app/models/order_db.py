@@ -5,9 +5,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.location_db import LocationDB
+from app.core.order_status import (
+    ORDER_STATUS_CREATED,
+)
 
 
 if TYPE_CHECKING:
+    from app.models.customer_db import CustomerDB
     from app.models.order_item_db import OrderItemDB
 
 
@@ -31,11 +35,28 @@ class OrderDB(Base):
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        default="created",
+        default=ORDER_STATUS_CREATED,
     )
 
     # --------------------------------------------------------
     # Cliente
+    # --------------------------------------------------------
+
+    customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "customers.id",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    customer: Mapped["CustomerDB | None"] = relationship(
+        "CustomerDB",
+        back_populates="orders",
+    )
+
+    # --------------------------------------------------------
+    # Compatibilidad legacy
     # --------------------------------------------------------
 
     customer_name: Mapped[str] = mapped_column(

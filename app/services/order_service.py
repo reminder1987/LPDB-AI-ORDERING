@@ -5,7 +5,12 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
+from app.core.order_status import (
+    ORDER_STATUS_CREATED,
+    transition_order_status,
+)
 from app.core.tenant_context import TenantContext
+from app.models.customer_db import CustomerDB
 from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
 from app.models.order_item_combo_db import OrderItemComboDB
@@ -45,13 +50,6 @@ COMBO_PRICE = Decimal("6.99")
 
 # ============================================================
 # BEBIDAS PERMITIDAS PARA COMBO
-# ============================================================
-#
-# Estas son las ÚNICAS bebidas que pueden seleccionarse
-# cuando el cliente solicita un combo.
-#
-# No todas las bebidas del catálogo son bebidas de combo.
-#
 # ============================================================
 
 COMBO_BEVERAGE_PRODUCT_IDS = {
@@ -152,6 +150,48 @@ def _find_ingredient_by_name(
 
 
 # ============================================================
+# VALIDAR CLIENTE
+# ============================================================
+
+def _validate_customer(
+    db,
+    customer_id: int | None,
+    tenant: TenantContext,
+):
+
+    # --------------------------------------------------------
+    # Compatibilidad legacy
+    #
+    # Si no existe customer_id, la orden continúa funcionando
+    # como antes.
+    # --------------------------------------------------------
+
+    if customer_id is None:
+
+        return None
+
+    customer = db.scalar(
+        select(CustomerDB).where(
+            CustomerDB.id
+            == customer_id,
+            CustomerDB.tenant_id
+            == tenant.tenant_id,
+            CustomerDB.active.is_(True),
+        )
+    )
+
+    if customer is None:
+
+        raise ValueError(
+            "El cliente seleccionado no existe, "
+            "está inactivo o no pertenece al tenant activo: "
+            f"{customer_id}"
+        )
+
+    return customer
+
+
+# ============================================================
 # ITEMS DE LA ORDEN
 # ============================================================
 
@@ -159,19 +199,11 @@ def _get_order_items(
     order: OrderCreate,
 ) -> list[OrderItemCreate]:
 
-    # --------------------------------------------------------
-    # Nueva estructura
-    # --------------------------------------------------------
-
     if order.items:
 
         return list(
             order.items,
         )
-
-    # --------------------------------------------------------
-    # Compatibilidad con formato legacy
-    # --------------------------------------------------------
 
     if order.product is None:
 
@@ -215,20 +247,12 @@ def _validate_combo_data(
 
         return None
 
-    # --------------------------------------------------------
-    # Bebida obligatoria
-    # --------------------------------------------------------
-
     if item.beverage_product_id is None:
 
         raise ValueError(
             "El combo requiere seleccionar "
             "una gaseosa."
         )
-
-    # --------------------------------------------------------
-    # Buscar bebida
-    # --------------------------------------------------------
 
     beverage = db.scalar(
         select(ProductDB).where(
@@ -246,11 +270,6 @@ def _validate_combo_data(
             "no existe."
         )
 
-    # --------------------------------------------------------
-    # Verificar que realmente sea una bebida
-    # permitida para combo.
-    # --------------------------------------------------------
-
     if (
         beverage.id
         not in COMBO_BEVERAGE_PRODUCT_IDS
@@ -260,10 +279,6 @@ def _validate_combo_data(
             "La bebida seleccionada "
             "no está permitida para combos."
         )
-
-    # --------------------------------------------------------
-    # Verificar nombre enviado por el cliente/agente
-    # --------------------------------------------------------
 
     if not item.beverage_product:
 
@@ -283,10 +298,6 @@ def _validate_combo_data(
             "La gaseosa seleccionada "
             "no coincide con el producto."
         )
-
-    # --------------------------------------------------------
-    # Papas del combo
-    # --------------------------------------------------------
 
     fries = db.scalar(
         select(IngredientDB).where(
@@ -314,10 +325,6 @@ def _validate_combo_data(
             "para el combo no corresponde "
             "a PAPAS A LA FRANCESA."
         )
-
-    # --------------------------------------------------------
-    # Datos validados
-    # --------------------------------------------------------
 
     return {
         "fries": fries,
@@ -484,6 +491,7 @@ def _validate_product_availability(
     validated_modifications,
     tenant: TenantContext,
 ):
+
     if not is_product_available(
         product_id=product.id,
         location_id=location_id,
@@ -504,6 +512,7 @@ def _validate_modification_availability(
     location_id: int,
     tenant: TenantContext,
 ):
+
     for modification in validated_modifications:
 
         if modification["type"] != "ADD":
@@ -537,6 +546,16 @@ def create_order(
     try:
 
         # ----------------------------------------------------
+        # Cliente
+        # ----------------------------------------------------
+
+        customer = _validate_customer(
+            db,
+            order.customer_id,
+            tenant,
+        )
+
+        # ----------------------------------------------------
         # Sede
         # ----------------------------------------------------
 
@@ -562,8 +581,7 @@ def create_order(
             )
 
         # ----------------------------------------------------
-        # Preparar todos los items antes
-        # de modificar la base de datos.
+        # Preparar todos los items
         # ----------------------------------------------------
 
         prepared_items = []
@@ -643,7 +661,7 @@ def create_order(
             )
 
         # ----------------------------------------------------
-        # Calcular total antes de guardar.
+        # Calcular total antes de guardar
         # ----------------------------------------------------
 
         item_subtotals = [
@@ -661,17 +679,19 @@ def create_order(
         )
 
         # ----------------------------------------------------
-        # Primer item.
-        #
-        # Estos campos siguen existiendo en orders
-        # por compatibilidad legacy.
+        # Primer item legacy
         # ----------------------------------------------------
 
         first = prepared_items[0]
 
         saved_order = OrderDB(
             tenant_id=tenant.tenant_id,
-            status="created",
+            status=ORDER_STATUS_CREATED,
+            customer_id=(
+                customer.id
+                if customer is not None
+                else None
+            ),
             customer_name=(
                 order.customer_name
             ),
@@ -805,12 +825,88 @@ def create_order(
             saved_order,
         )
 
-        # ----------------------------------------------------
-        # Serializar
-        # ----------------------------------------------------
-
         return _serialize_order(
             saved_order,
+            db,
+        )
+
+    except Exception:
+
+        db.rollback()
+
+        raise
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# CAMBIAR ESTADO DE UNA ORDEN
+# ============================================================
+
+def update_order_status(
+    order_id: int,
+    new_status: str,
+    tenant: TenantContext,
+):
+    """
+    Cambia el estado interno de una orden.
+
+    La orden se busca siempre dentro del tenant activo.
+
+    La transición se valida exclusivamente mediante
+    order_status.transition_order_status().
+
+    Esta función es la única puerta del OrderService para
+    modificar el ciclo de vida de una orden.
+    """
+
+    db = SessionLocal()
+
+    try:
+
+        # ----------------------------------------------------
+        # Buscar orden dentro del tenant
+        # ----------------------------------------------------
+
+        order = db.scalar(
+            select(OrderDB).where(
+                OrderDB.id == order_id,
+                OrderDB.tenant_id
+                == tenant.tenant_id,
+            )
+        )
+
+        if order is None:
+
+            return None
+
+        # ----------------------------------------------------
+        # Validar transición
+        # ----------------------------------------------------
+
+        validated_status = (
+            transition_order_status(
+                current_status=order.status,
+                new_status=new_status,
+            )
+        )
+
+        # ----------------------------------------------------
+        # Aplicar nuevo estado
+        # ----------------------------------------------------
+
+        order.status = validated_status
+
+        db.commit()
+
+        db.refresh(
+            order,
+        )
+
+        return _serialize_order(
+            order,
             db,
         )
 
@@ -961,6 +1057,28 @@ def update_order(
             return None
 
         # ----------------------------------------------------
+        # Cliente
+        #
+        # Si viene customer_id, validamos que pertenezca al
+        # tenant y esté activo.
+        #
+        # Si no viene, conservamos el customer_id existente.
+        # Esto evita romper consumidores legacy.
+        # ----------------------------------------------------
+
+        customer = _validate_customer(
+            db,
+            order.customer_id,
+            tenant,
+        )
+
+        if customer is not None:
+
+            order_db.customer_id = (
+                customer.id
+            )
+
+        # ----------------------------------------------------
         # Sede
         # ----------------------------------------------------
 
@@ -1109,10 +1227,7 @@ def update_order(
         )
 
         # ----------------------------------------------------
-        # Eliminar items anteriores.
-        #
-        # Las relaciones tienen cascade
-        # delete-orphan.
+        # Eliminar items anteriores
         # ----------------------------------------------------
 
         existing_items = list(
@@ -1577,11 +1692,6 @@ def _serialize_combo(
             else None
         ),
 
-        # El precio del combo ya no queda pendiente.
-        #
-        # Si por alguna razón encontramos un registro
-        # antiguo con combo_price NULL, utilizamos
-        # el precio oficial actual.
         "price": (
             Decimal(
                 str(combo.combo_price)
@@ -1772,6 +1882,14 @@ def _serialize_order(
 
     return {
         "id": order.id,
+
+        "tenant_id": order.tenant_id,
+
+        "status": order.status,
+
+        "customer_id": (
+            order.customer_id
+        ),
 
         "customer_name": (
             order.customer_name

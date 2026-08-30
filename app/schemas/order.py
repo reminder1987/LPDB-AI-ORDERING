@@ -54,6 +54,20 @@ class OrderCreate(BaseModel):
         min_length=1,
     )
 
+    # ---------------------------------------------------------
+    # Cliente
+    #
+    # Permite vincular la orden con el CustomerDB.
+    #
+    # Es opcional para mantener compatibilidad con consumidores
+    # legacy que todavía crean órdenes sin identidad de cliente.
+    # ---------------------------------------------------------
+
+    customer_id: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
     # La sede es obligatoria para cualquier pedido nuevo.
     location_id: int = Field(
         gt=0,

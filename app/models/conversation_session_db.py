@@ -1,16 +1,22 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
     DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+if TYPE_CHECKING:
+    from app.models.customer_db import CustomerDB
 
 
 class ConversationSessionDB(Base):
@@ -36,9 +42,26 @@ class ConversationSessionDB(Base):
     )
 
     tenant_id: Mapped[int] = mapped_column(
-        Integer,
+        ForeignKey("tenants.id"),
         nullable=False,
         index=True,
+    )
+
+    # --------------------------------------------------------
+    # Cliente
+    # --------------------------------------------------------
+
+    customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "customers.id",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    customer: Mapped["CustomerDB | None"] = relationship(
+        "CustomerDB",
+        back_populates="conversation_sessions",
     )
 
     # --------------------------------------------------------

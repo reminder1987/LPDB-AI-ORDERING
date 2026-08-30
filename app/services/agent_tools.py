@@ -37,25 +37,36 @@ from app.services.product_service import (
 from app.services.recipe_service import get_product_recipe
 
 
-def search_products_tool(query: str, tenant: TenantContext):
+def search_products_tool(
+    query: str,
+    tenant: TenantContext,
+):
     """Busca productos dentro del tenant activo."""
+
     return [
         {
             "id": product.id,
             "name": product.name,
             "price": product.price,
         }
-        for product in search_products(query, tenant.tenant_id)
+        for product in search_products(
+            query,
+            tenant.tenant_id,
+        )
     ]
 
 
-def search_ingredients_tool(query: str, tenant: TenantContext):
+def search_ingredients_tool(
+    query: str,
+    tenant: TenantContext,
+):
     """
     Busca ingredientes dentro del tenant activo.
 
     La categoría se obtiene directamente del catálogo.
     El agente no debe inventar ni proporcionar la categoría.
     """
+
     return [
         {
             "id": ingredient.id,
@@ -74,6 +85,7 @@ def get_product_recipe_tool(
     tenant: TenantContext,
 ):
     """Obtiene únicamente los ingredientes comerciales de la receta."""
+
     return get_product_recipe(
         product_id,
         tenant.tenant_id,
@@ -86,6 +98,7 @@ def check_product_availability_tool(
     tenant: TenantContext,
 ):
     """Consulta disponibilidad real del producto en una sede del tenant."""
+
     return get_product_availability(
         product_id=product_id,
         location_id=location_id,
@@ -99,6 +112,7 @@ def check_ingredient_availability_tool(
     tenant: TenantContext,
 ):
     """Consulta disponibilidad de un ingrediente en una sede del tenant."""
+
     return get_ingredient_availability(
         ingredient_id=ingredient_id,
         location_id=location_id,
@@ -114,6 +128,7 @@ def validate_modification_tool(
     new_base: str | None = None,
 ):
     """Valida una modificación usando las reglas del tenant activo."""
+
     product = get_product_by_id(
         product_id,
         tenant.tenant_id,
@@ -125,6 +140,7 @@ def validate_modification_tool(
         )
 
     if modification_type == "REMOVE":
+
         if not ingredient:
             raise ValueError(
                 "REMOVE requiere ingredient"
@@ -137,6 +153,7 @@ def validate_modification_tool(
         )
 
     if modification_type == "ADD":
+
         if not ingredient:
             raise ValueError(
                 "ADD requiere ingredient"
@@ -172,6 +189,7 @@ def validate_modification_tool(
         )
 
     if modification_type == "BASE_CHANGE":
+
         if not new_base:
             raise ValueError(
                 "BASE_CHANGE requiere new_base"
@@ -194,6 +212,7 @@ def get_location_tool(
     tenant: TenantContext,
 ):
     """Busca únicamente sedes activas del tenant que coincidan con la consulta."""
+
     locations = location_service.find_locations(
         query,
         tenant.tenant_id,
@@ -218,7 +237,15 @@ def calculate_item_price_tool(
     modifications: list[dict] | None = None,
     combo_requested: bool = False,
 ):
-    """Calcula el precio interno del item dentro del tenant activo."""
+    """
+    Calcula el precio interno del item dentro del tenant activo.
+
+    El agente NO proporciona precios de modificaciones.
+
+    Los precios oficiales de las modificaciones deben ser
+    determinados por las reglas del Core.
+    """
+
     product = get_product_by_id(
         product_id,
         tenant.tenant_id,
@@ -231,9 +258,146 @@ def calculate_item_price_tool(
 
     normalized_modifications = modifications or []
 
+    # --------------------------------------------------------
+    # RESOLVER PRECIOS DESDE EL CORE
+    # --------------------------------------------------------
+    #
+    # La tool recibe únicamente:
+    #
+    #     type
+    #     ingredient
+    #     new_base
+    #
+    # Nunca acepta un "price" proporcionado por el agente.
+    #
+    # Para ADD debemos obtener la regla oficial del
+    # modification_service.
+    # --------------------------------------------------------
+
+    resolved_modifications = []
+
+    for modification in normalized_modifications:
+
+        modification_type = modification.get("type")
+
+        if modification_type == "ADD":
+
+            ingredient = modification.get("ingredient")
+
+            if not ingredient:
+                raise ValueError(
+                    "ADD requiere ingredient"
+                )
+
+            validation = validate_modification_tool(
+                product_id=product_id,
+                modification_type="ADD",
+                tenant=tenant,
+                ingredient=ingredient,
+            )
+
+            if not validation.get("allowed"):
+                raise ValueError(
+                    validation.get(
+                        "reason",
+                        "La adición no está permitida.",
+                    )
+                )
+
+            resolved_modifications.append(
+                {
+                    "type": "ADD",
+                    "ingredient": validation.get(
+                        "ingredient",
+                        ingredient,
+                    ),
+                    "price": validation.get(
+                        "price",
+                        Decimal("0.00"),
+                    ),
+                }
+            )
+
+        elif modification_type == "REMOVE":
+
+            ingredient = modification.get("ingredient")
+
+            if not ingredient:
+                raise ValueError(
+                    "REMOVE requiere ingredient"
+                )
+
+            validation = validate_modification_tool(
+                product_id=product_id,
+                modification_type="REMOVE",
+                tenant=tenant,
+                ingredient=ingredient,
+            )
+
+            if not validation.get("allowed"):
+                raise ValueError(
+                    validation.get(
+                        "reason",
+                        "La remoción no está permitida.",
+                    )
+                )
+
+            resolved_modifications.append(
+                {
+                    "type": "REMOVE",
+                    "ingredient": validation.get(
+                        "ingredient",
+                        ingredient,
+                    ),
+                    "price": Decimal("0.00"),
+                }
+            )
+
+        elif modification_type == "BASE_CHANGE":
+
+            new_base = modification.get("new_base")
+
+            if not new_base:
+                raise ValueError(
+                    "BASE_CHANGE requiere new_base"
+                )
+
+            validation = validate_modification_tool(
+                product_id=product_id,
+                modification_type="BASE_CHANGE",
+                tenant=tenant,
+                new_base=new_base,
+            )
+
+            if not validation.get("allowed"):
+                raise ValueError(
+                    validation.get(
+                        "reason",
+                        "El cambio de base no está permitido.",
+                    )
+                )
+
+            resolved_modifications.append(
+                {
+                    "type": "BASE_CHANGE",
+                    "new_base": new_base,
+                    "price": Decimal("0.00"),
+                }
+            )
+
+        else:
+
+            raise ValueError(
+                "Tipo de modificación no soportado "
+                f"para cálculo de precio: "
+                f"{modification_type}"
+            )
+
     unit_price = calculate_item_unit_price(
-        product_price=Decimal(product.price),
-        modifications=normalized_modifications,
+        product_price=Decimal(
+            str(product.price)
+        ),
+        modifications=resolved_modifications,
         combo_requested=combo_requested,
     )
 
@@ -284,6 +448,7 @@ def create_order_tool(
     order_items = []
 
     for item in items:
+
         product_id = item.get("product_id")
 
         if product_id is None:
@@ -307,6 +472,7 @@ def create_order_tool(
             "modifications",
             [],
         ):
+
             modifications.append(
                 OrderModificationCreate(
                     type=modification["type"],
@@ -326,6 +492,7 @@ def create_order_tool(
         beverage_product = None
 
         if beverage_product_id is not None:
+
             beverage = get_product_by_id(
                 beverage_product_id,
                 tenant.tenant_id,

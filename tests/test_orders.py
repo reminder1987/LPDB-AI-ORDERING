@@ -25,6 +25,24 @@ def test_order_model():
     assert order.quantity == 2
 
 
+def test_order_model_accepts_customer_id():
+    customer_id = 3
+
+    order = OrderCreate(
+        customer_name="Carolina",
+        customer_id=customer_id,
+        location_id=1,
+        product="Pizza",
+        quantity=2,
+    )
+
+    assert order.customer_name == "Carolina"
+    assert order.customer_id == customer_id
+    assert order.location_id == 1
+    assert order.product == "Pizza"
+    assert order.quantity == 2
+
+
 def test_create_order_endpoint():
     response = client.post(
         "/orders/",
@@ -47,6 +65,93 @@ def test_create_order_endpoint():
     assert data["order"]["quantity"] == 1
 
 
+def test_create_order_endpoint_with_customer_id():
+    from app.core.database import SessionLocal
+    from app.models.customer_db import CustomerDB
+    from app.models.order_db import OrderDB
+
+    db = SessionLocal()
+
+    try:
+        customer = CustomerDB(
+            tenant_id=1,
+            name="Order Customer Test",
+            phone="3059999001",
+            email="order-customer-test@example.com",
+            active=True,
+        )
+
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+
+        customer_id = customer.id
+
+    finally:
+        db.close()
+
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Order Customer Test",
+            "customer_id": customer_id,
+            "location_id": 1,
+            "product": "PERRO DEL BARRIO",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["customer_name"] == (
+        "Order Customer Test"
+    )
+    assert data["order"]["product"] == (
+        "PERRO DEL BARRIO"
+    )
+    assert data["order"]["quantity"] == 1
+
+    order_id = data["order"]["id"]
+
+    db = SessionLocal()
+
+    try:
+        order = (
+            db.query(OrderDB)
+            .filter(
+                OrderDB.id == order_id,
+                OrderDB.tenant_id == 1,
+            )
+            .first()
+        )
+
+        assert order is not None
+        assert order.customer_id == customer_id
+
+    finally:
+        db.close()
+
+
+def test_create_order_rejects_customer_from_another_tenant():
+    response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Carolina",
+            "customer_id": 999999,
+            "location_id": 1,
+            "product": "PERRO DEL BARRIO",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 400
+
+
 def test_new_order_starts_with_created_status():
     response = client.post(
         "/orders/",
@@ -65,13 +170,6 @@ def test_new_order_starts_with_created_status():
 
     assert data["order"]["id"] > 0
 
-    # El estado de ciclo de vida de la orden
-    # debe comenzar como "created".
-    #
-    # El estado se almacena en OrderDB y no
-    # forma parte actualmente de OrderResponse,
-    # por lo que verificamos directamente la
-    # persistencia en la base de datos.
     from app.core.database import SessionLocal
     from app.models.order_db import OrderDB
 

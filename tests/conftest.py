@@ -4,7 +4,6 @@ from decimal import Decimal
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.core import database as database_module
 
@@ -15,7 +14,9 @@ from app.models.category_db import (
 )
 from app.models.ingredient_db import IngredientDB
 from app.models.location_db import LocationDB
-from app.models.product_availability_db import ProductAvailabilityDB
+from app.models.product_availability_db import (
+    ProductAvailabilityDB,
+)
 from app.models.product_db import ProductDB
 from app.models.recipe_db import (
     RecipeDB,
@@ -24,18 +25,20 @@ from app.models.recipe_db import (
 from app.models.tenant_db import TenantDB
 
 from app.services import conversation_service
+from app.services import customer_service
 from app.services import order_service
 from app.services import recipe_service
 from app.services import tenant_service
 
 
-TEST_DATABASE_URL = "sqlite://"
+TEST_DATABASE_URL = "sqlite:///./test_lpdb.sqlite"
 
 
 engine = create_engine(
     TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+    connect_args={
+        "check_same_thread": False,
+    },
 )
 
 
@@ -48,7 +51,14 @@ TestingSessionLocal = sessionmaker(
 
 @pytest.fixture(autouse=True)
 def setup_test_database(monkeypatch):
-    Base.metadata.create_all(bind=engine)
+
+    # --------------------------------------------------------
+    # CREAR TODAS LAS TABLAS DE PRUEBA
+    # --------------------------------------------------------
+
+    Base.metadata.create_all(
+        bind=engine,
+    )
 
     # --------------------------------------------------------
     # USAR SQLITE DE PRUEBAS EN TODOS LOS SERVICIOS
@@ -78,19 +88,29 @@ def setup_test_database(monkeypatch):
         TestingSessionLocal,
     )
 
-    # modification_service importa SessionLocal desde
-    # app.core.database dentro de sus funciones.
+    # --------------------------------------------------------
+    # CUSTOMER SERVICE
     #
-    # Por eso aquí se parchea la fuente real.
+    # customer_service importa SessionLocal desde
+    # app.core.database.
+    #
+    # Por eso se parchea la fuente real.
+    # --------------------------------------------------------
+
     monkeypatch.setattr(
         database_module,
         "SessionLocal",
         TestingSessionLocal,
     )
 
+    # --------------------------------------------------------
+    # DATOS BASE DE PRUEBA
+    # --------------------------------------------------------
+
     db = TestingSessionLocal()
 
     try:
+
         # ====================================================
         # TENANT
         # ====================================================
@@ -147,7 +167,10 @@ def setup_test_database(monkeypatch):
             name="TOPPINGS",
         )
 
-        db.add(toppings_category)
+        db.add(
+            toppings_category,
+        )
+
         db.flush()
 
         # ====================================================
@@ -164,7 +187,10 @@ def setup_test_database(monkeypatch):
             active=True,
         )
 
-        db.add(location)
+        db.add(
+            location,
+        )
+
         db.flush()
 
         # ====================================================
@@ -207,11 +233,6 @@ def setup_test_database(monkeypatch):
 
         # ====================================================
         # INGREDIENTE
-        #
-        # Necesario para:
-        #
-        # test_validate_removal_respects_tenant
-        # test_validate_addition_respects_tenant
         # ====================================================
 
         tocineta = IngredientDB(
@@ -221,7 +242,10 @@ def setup_test_database(monkeypatch):
             category_id=toppings_category.id,
         )
 
-        db.add(tocineta)
+        db.add(
+            tocineta,
+        )
+
         db.flush()
 
         # ====================================================
@@ -233,7 +257,10 @@ def setup_test_database(monkeypatch):
             product_id=perro_del_barrio.id,
         )
 
-        db.add(recipe)
+        db.add(
+            recipe,
+        )
+
         db.flush()
 
         recipe_tocineta = RecipeIngredientDB(
@@ -241,7 +268,9 @@ def setup_test_database(monkeypatch):
             ingredient_id=tocineta.id,
         )
 
-        db.add(recipe_tocineta)
+        db.add(
+            recipe_tocineta,
+        )
 
         # ====================================================
         # DISPONIBILIDAD DE PRODUCTOS
@@ -285,12 +314,21 @@ def setup_test_database(monkeypatch):
         db.commit()
 
     except Exception:
+
         db.rollback()
+
         raise
 
     finally:
+
         db.close()
 
     yield
 
-    Base.metadata.drop_all(bind=engine)
+    # --------------------------------------------------------
+    # LIMPIAR DATOS DESPUÉS DE CADA TEST
+    # --------------------------------------------------------
+
+    Base.metadata.drop_all(
+        bind=engine,
+    )

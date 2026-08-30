@@ -241,6 +241,135 @@ def test_multi_turn_conversation_uses_persisted_state():
         tenant_id=TENANT_LPDB.tenant_id,
     )
 
+
+def test_save_and_get_customer_id_preserves_customer_across_turns():
+    service = ConversationService()
+
+    session_id = "conversation-customer-persistence-1"
+    customer_id = 3
+
+    first_turn_state = ConversationState(
+        status="waiting_combo_confirmation",
+        customer_id=customer_id,
+        customer_name="Carolina",
+        location_id=1,
+        combo_product="PERRO DEL BARRIO",
+    )
+
+    service._save_state(
+        session_id=session_id,
+        state=first_turn_state,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    recovered_state = service.get_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    assert recovered_state.customer_id == customer_id
+    assert recovered_state.customer_name == "Carolina"
+    assert recovered_state.location_id == 1
+    assert recovered_state.status == (
+        "waiting_combo_confirmation"
+    )
+
+    service._clear_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+
+def test_customer_id_remains_persisted_when_conversation_state_changes():
+    service = ConversationService()
+
+    session_id = "conversation-customer-multi-turn-1"
+    customer_id = 3
+
+    first_state = ConversationState(
+        status="waiting_combo_confirmation",
+        customer_id=customer_id,
+        customer_name="Carolina",
+        location_id=1,
+        combo_product="PERRO DEL BARRIO",
+    )
+
+    service._save_state(
+        session_id=session_id,
+        state=first_state,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    recovered_state = service.get_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    assert recovered_state.customer_id == customer_id
+
+    recovered_state.status = "waiting_beverage"
+    recovered_state.combo_requested = True
+    recovered_state.beverage_required = True
+
+    service._save_state(
+        session_id=session_id,
+        state=recovered_state,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    second_turn_state = service.get_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    assert second_turn_state.customer_id == customer_id
+    assert second_turn_state.status == (
+        "waiting_beverage"
+    )
+    assert second_turn_state.combo_requested is True
+    assert second_turn_state.beverage_required is True
+
+    service._clear_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+
+def test_customer_id_does_not_cross_tenant_boundary():
+    service = ConversationService()
+
+    session_id = "conversation-customer-tenant-isolation-1"
+    customer_id = 3
+
+    state = ConversationState(
+        status="ready",
+        customer_id=customer_id,
+        customer_name="Carolina",
+        location_id=1,
+    )
+
+    service._save_state(
+        session_id=session_id,
+        state=state,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+    isolated_state = service.get_state(
+        session_id=session_id,
+        tenant_id=999999,
+    )
+
+    assert isolated_state.status == "new"
+    assert isolated_state.customer_id is None
+    assert isolated_state.customer_name is None
+    assert isolated_state.location_id is None
+
+    service._clear_state(
+        session_id=session_id,
+        tenant_id=TENANT_LPDB.tenant_id,
+    )
+
+
 def test_save_and_get_openai_response_id_preserves_tenant_session():
     service = ConversationService()
 
@@ -328,6 +457,7 @@ def test_missing_openai_response_id_returns_none():
     )
 
     assert result is None
+
 
 def test_save_state_preserves_existing_openai_response_id():
     service = ConversationService()

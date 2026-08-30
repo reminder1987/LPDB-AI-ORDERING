@@ -127,6 +127,8 @@ class ConversationState:
     # Cliente
     # --------------------------------------------------------
 
+    customer_id: int | None = None
+
     customer_name: str | None = None
 
     # --------------------------------------------------------
@@ -319,7 +321,21 @@ class ConversationService:
 
                 db.add(session)
 
+                # ------------------------------------------------
+                # Materializamos la nueva sesión antes del commit.
+                #
+                # Esto garantiza que la instancia recién creada
+                # quede registrada en la transacción actual antes
+                # de continuar con la asignación del estado.
+                # ------------------------------------------------
+
+                db.flush()
+
             session.status = state.status
+
+            session.customer_id = (
+                state.customer_id
+            )
 
             session.customer_name = (
                 state.customer_name
@@ -368,6 +384,10 @@ class ConversationService:
             session.beverage_name = (
                 state.beverage_name
             )
+
+            # ------------------------------------------------
+            # Confirmamos explícitamente toda la persistencia.
+            # ------------------------------------------------
 
             db.commit()
 
@@ -504,6 +524,9 @@ class ConversationService:
             beverage_name=(
                 session.beverage_name
             ),
+            customer_id=(
+                session.customer_id
+            ),
             customer_name=(
                 session.customer_name
             ),
@@ -522,6 +545,7 @@ class ConversationService:
         message: str,
         customer_name: str,
         tenant: TenantContext,
+        customer_id: int | None = None,
     ) -> dict:
 
         state = self.get_state(
@@ -532,6 +556,15 @@ class ConversationService:
         # ----------------------------------------------------
         # Cliente
         # ----------------------------------------------------
+
+        if customer_id is not None:
+
+            if (
+                state.customer_id is None
+                or state.customer_id == customer_id
+            ):
+
+                state.customer_id = customer_id
 
         if state.customer_name is None:
 
@@ -644,10 +677,6 @@ class ConversationService:
                 )
             )
 
-            # ------------------------------------------------
-            # Una sola sede encontrada
-            # ------------------------------------------------
-
             if len(locations) == 1:
 
                 selected_location = locations[0]
@@ -685,6 +714,9 @@ class ConversationService:
                             "customer_name": (
                                 state.customer_name
                             ),
+                            "customer_id": (
+                                state.customer_id
+                            ),
                             "location": {
                                 "id": (
                                     selected_location.id
@@ -719,6 +751,9 @@ class ConversationService:
                             "customer_name": (
                                 state.customer_name
                             ),
+                            "customer_id": (
+                                state.customer_id
+                            ),
                             "location": {
                                 "id": (
                                     selected_location.id
@@ -734,6 +769,9 @@ class ConversationService:
 
                     return self._create_ready_order(
                         session_id=session_id,
+                        customer_id=(
+                            state.customer_id
+                        ),
                         customer_name=(
                             state.customer_name
                             or "CLIENTE"
@@ -775,6 +813,9 @@ class ConversationService:
                     "customer_name": (
                         state.customer_name
                     ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
                     "location": {
                         "id": (
                             selected_location.id
@@ -787,10 +828,6 @@ class ConversationService:
                         ),
                     },
                 }
-
-            # ------------------------------------------------
-            # Varias sedes
-            # ------------------------------------------------
 
             if len(locations) > 1:
 
@@ -813,6 +850,9 @@ class ConversationService:
                     "customer_name": (
                         state.customer_name
                     ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
                     "locations": [
                         {
                             "id": location.id,
@@ -826,10 +866,6 @@ class ConversationService:
                         for location in locations
                     ],
                 }
-
-            # ------------------------------------------------
-            # Solicitud explícita de sede
-            # ------------------------------------------------
 
             if self._looks_like_location_request(
                 message,
@@ -863,6 +899,9 @@ class ConversationService:
                     "customer_name": (
                         state.customer_name
                     ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
                     "locations": [
                         {
                             "id": location.id,
@@ -876,10 +915,6 @@ class ConversationService:
                         for location in locations
                     ],
                 }
-
-            # ------------------------------------------------
-            # No encontramos sede pero sí producto
-            # ------------------------------------------------
 
             if state.items:
 
@@ -902,11 +937,10 @@ class ConversationService:
                     "customer_name": (
                         state.customer_name
                     ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
                 }
-
-            # ------------------------------------------------
-            # No tenemos ni sede ni producto
-            # ------------------------------------------------
 
             state.status = (
                 "waiting_location"
@@ -926,6 +960,9 @@ class ConversationService:
                 ),
                 "customer_name": (
                     state.customer_name
+                ),
+                "customer_id": (
+                    state.customer_id
                 ),
             }
 
@@ -954,6 +991,9 @@ class ConversationService:
                 ),
                 "customer_name": (
                     state.customer_name
+                ),
+                "customer_id": (
+                    state.customer_id
                 ),
             }
 
@@ -987,6 +1027,9 @@ class ConversationService:
 
         return self._create_ready_order(
             session_id=session_id,
+            customer_id=(
+                state.customer_id
+            ),
             customer_name=(
                 state.customer_name
                 or "CLIENTE"
@@ -1061,6 +1104,9 @@ class ConversationService:
                 "customer_name": (
                     state.customer_name
                 ),
+                "customer_id": (
+                    state.customer_id
+                ),
             }
 
         if (
@@ -1098,10 +1144,16 @@ class ConversationService:
                 "customer_name": (
                     state.customer_name
                 ),
+                "customer_id": (
+                    state.customer_id
+                ),
             }
 
         return self._create_ready_order(
             session_id=session_id,
+            customer_id=(
+                state.customer_id
+            ),
             customer_name=(
                 state.customer_name
                 or "CLIENTE"
@@ -1171,10 +1223,6 @@ class ConversationService:
             message,
         )
 
-        # ----------------------------------------------------
-        # SI
-        # ----------------------------------------------------
-
         if _is_yes(answer):
 
             state.status = (
@@ -1203,16 +1251,18 @@ class ConversationService:
                 "customer_name": (
                     state.customer_name
                 ),
+                "customer_id": (
+                    state.customer_id
+                ),
             }
-
-        # ----------------------------------------------------
-        # NO
-        # ----------------------------------------------------
 
         if _is_no(answer):
 
             return self._create_ready_order(
                 session_id=session_id,
+                customer_id=(
+                    state.customer_id
+                ),
                 customer_name=(
                     state.customer_name
                     or "CLIENTE"
@@ -1224,10 +1274,6 @@ class ConversationService:
                 tenant=tenant,
             )
 
-        # ----------------------------------------------------
-        # RESPUESTA INVÁLIDA
-        # ----------------------------------------------------
-
         return {
             "status": "needs_input",
             "message": (
@@ -1236,6 +1282,9 @@ class ConversationService:
             ),
             "customer_name": (
                 state.customer_name
+            ),
+            "customer_id": (
+                state.customer_id
             ),
         }
 
@@ -1264,6 +1313,9 @@ class ConversationService:
                 ),
                 "customer_name": (
                     state.customer_name
+                ),
+                "customer_id": (
+                    state.customer_id
                 ),
             }
 
@@ -1339,6 +1391,9 @@ class ConversationService:
 
                 return self._create_ready_order(
                     session_id=session_id,
+                    customer_id=(
+                        state.customer_id
+                    ),
                     customer_name=(
                         state.customer_name
                         or "CLIENTE"
@@ -1359,10 +1414,6 @@ class ConversationService:
                     ),
                     tenant=tenant,
                 )
-
-            # ------------------------------------------------
-            # Búsqueda parcial
-            # ------------------------------------------------
 
             partial_matches = []
 
@@ -1419,6 +1470,9 @@ class ConversationService:
 
                 return self._create_ready_order(
                     session_id=session_id,
+                    customer_id=(
+                        state.customer_id
+                    ),
                     customer_name=(
                         state.customer_name
                         or "CLIENTE"
@@ -1444,10 +1498,6 @@ class ConversationService:
 
             db.close()
 
-        # ----------------------------------------------------
-        # No encontrada
-        # ----------------------------------------------------
-
         return {
             "status": "needs_input",
             "message": (
@@ -1457,6 +1507,9 @@ class ConversationService:
             ),
             "customer_name": (
                 state.customer_name
+            ),
+            "customer_id": (
+                state.customer_id
             ),
         }
 
@@ -1471,15 +1524,12 @@ class ConversationService:
         items: list[IntentItem],
         combo_requested: bool,
         tenant: TenantContext,
+        customer_id: int | None = None,
         beverage_product_id: int | None = None,
         beverage_product: str | None = None,
         combo_product: str | None = None,
         location_id: int | None = None,
     ) -> dict:
-
-        # ----------------------------------------------------
-        # Sede
-        # ----------------------------------------------------
 
         if location_id is None:
 
@@ -1490,11 +1540,8 @@ class ConversationService:
                     "realizar el pedido?"
                 ),
                 "customer_name": customer_name,
+                "customer_id": customer_id,
             }
-
-        # ----------------------------------------------------
-        # Productos
-        # ----------------------------------------------------
 
         if not items:
 
@@ -1504,11 +1551,8 @@ class ConversationService:
                     "¿Qué producto deseas pedir?"
                 ),
                 "customer_name": customer_name,
+                "customer_id": customer_id,
             }
-
-        # ----------------------------------------------------
-        # Construir todos los items
-        # ----------------------------------------------------
 
         order_items: list[
             OrderItemCreate
@@ -1552,14 +1596,11 @@ class ConversationService:
                 )
             )
 
-        # ----------------------------------------------------
-        # Crear OrderCreate
-        # ----------------------------------------------------
-
         try:
 
             order = OrderCreate(
                 customer_name=customer_name,
+                customer_id=customer_id,
                 location_id=location_id,
                 items=order_items,
             )
@@ -1575,13 +1616,8 @@ class ConversationService:
                 "status": "error",
                 "message": str(exc),
                 "customer_name": customer_name,
+                "customer_id": customer_id,
             }
-
-        # ----------------------------------------------------
-        # Pedido terminado.
-        #
-        # Eliminamos la sesión persistida.
-        # ----------------------------------------------------
 
         self._clear_state(
             session_id,
@@ -1592,6 +1628,7 @@ class ConversationService:
             "status": "ready",
             "message": None,
             "customer_name": customer_name,
+            "customer_id": customer_id,
             "order": saved_order,
             "items": [
                 {
