@@ -1,4 +1,4 @@
-import json
+﻿import json
 import unicodedata
 
 from dataclasses import dataclass, field
@@ -600,6 +600,18 @@ class ConversationService:
                 tenant=tenant,
             )
 
+        if (
+            state.status
+            == "awaiting_order_confirmation"
+        ):
+
+            return self._process_order_confirmation(
+                session_id=session_id,
+                state=state,
+                message=message,
+                tenant=tenant,
+            )
+
         # ====================================================
         # 2. INTERPRETAR EL MENSAJE
         # ====================================================
@@ -767,31 +779,9 @@ class ConversationService:
                             },
                         }
 
-                    return self._create_ready_order(
+                    return self._request_order_confirmation(
                         session_id=session_id,
-                        customer_id=(
-                            state.customer_id
-                        ),
-                        customer_name=(
-                            state.customer_name
-                            or "CLIENTE"
-                        ),
-                        items=state.items,
-                        combo_requested=(
-                            state.combo_requested
-                        ),
-                        beverage_product_id=(
-                            state.beverage_product_id
-                        ),
-                        beverage_product=(
-                            state.beverage_name
-                        ),
-                        combo_product=(
-                            state.combo_product
-                        ),
-                        location_id=(
-                            state.location_id
-                        ),
+                        state=state,
                         tenant=tenant,
                     )
 
@@ -1025,31 +1015,9 @@ class ConversationService:
                 tenant=tenant,
             )
 
-        return self._create_ready_order(
+        return self._request_order_confirmation(
             session_id=session_id,
-            customer_id=(
-                state.customer_id
-            ),
-            customer_name=(
-                state.customer_name
-                or "CLIENTE"
-            ),
-            items=state.items,
-            combo_requested=(
-                state.combo_requested
-            ),
-            beverage_product_id=(
-                state.beverage_product_id
-            ),
-            beverage_product=(
-                state.beverage_name
-            ),
-            combo_product=(
-                state.combo_product
-            ),
-            location_id=(
-                state.location_id
-            ),
+            state=state,
             tenant=tenant,
         )
 
@@ -1149,31 +1117,9 @@ class ConversationService:
                 ),
             }
 
-        return self._create_ready_order(
+        return self._request_order_confirmation(
             session_id=session_id,
-            customer_id=(
-                state.customer_id
-            ),
-            customer_name=(
-                state.customer_name
-                or "CLIENTE"
-            ),
-            items=intent.items,
-            combo_requested=(
-                intent.combo_requested
-            ),
-            beverage_product_id=(
-                state.beverage_product_id
-            ),
-            beverage_product=(
-                state.beverage_name
-            ),
-            combo_product=(
-                state.combo_product
-            ),
-            location_id=(
-                state.location_id
-            ),
+            state=state,
             tenant=tenant,
         )
 
@@ -1258,19 +1204,19 @@ class ConversationService:
 
         if _is_no(answer):
 
-            return self._create_ready_order(
+            state.combo_requested = False
+
+            state.combo_product = None
+
+            state.beverage_required = False
+
+            state.beverage_product_id = None
+
+            state.beverage_name = None
+
+            return self._request_order_confirmation(
                 session_id=session_id,
-                customer_id=(
-                    state.customer_id
-                ),
-                customer_name=(
-                    state.customer_name
-                    or "CLIENTE"
-                ),
-                items=state.items,
-                combo_requested=False,
-                combo_product=None,
-                location_id=state.location_id,
+                state=state,
                 tenant=tenant,
             )
 
@@ -1389,29 +1335,9 @@ class ConversationService:
                     tenant.tenant_id,
                 )
 
-                return self._create_ready_order(
+                return self._request_order_confirmation(
                     session_id=session_id,
-                    customer_id=(
-                        state.customer_id
-                    ),
-                    customer_name=(
-                        state.customer_name
-                        or "CLIENTE"
-                    ),
-                    items=state.items,
-                    combo_requested=True,
-                    beverage_product_id=(
-                        state.beverage_product_id
-                    ),
-                    beverage_product=(
-                        state.beverage_name
-                    ),
-                    combo_product=(
-                        state.combo_product
-                    ),
-                    location_id=(
-                        state.location_id
-                    ),
+                    state=state,
                     tenant=tenant,
                 )
 
@@ -1468,29 +1394,9 @@ class ConversationService:
                     tenant.tenant_id,
                 )
 
-                return self._create_ready_order(
+                return self._request_order_confirmation(
                     session_id=session_id,
-                    customer_id=(
-                        state.customer_id
-                    ),
-                    customer_name=(
-                        state.customer_name
-                        or "CLIENTE"
-                    ),
-                    items=state.items,
-                    combo_requested=True,
-                    beverage_product_id=(
-                        state.beverage_product_id
-                    ),
-                    beverage_product=(
-                        state.beverage_name
-                    ),
-                    combo_product=(
-                        state.combo_product
-                    ),
-                    location_id=(
-                        state.location_id
-                    ),
+                    state=state,
                     tenant=tenant,
                 )
 
@@ -1504,6 +1410,199 @@ class ConversationService:
                 "No encontré esa gaseosa. "
                 "Indícame una gaseosa disponible, "
                 "por ejemplo Coca Cola Normal."
+            ),
+            "customer_name": (
+                state.customer_name
+            ),
+            "customer_id": (
+                state.customer_id
+            ),
+        }
+
+    # ========================================================
+    # CONFIRMACIÓN FINAL DEL PEDIDO
+    # ========================================================
+
+    def _request_order_confirmation(
+        self,
+        session_id: str,
+        state: ConversationState,
+        tenant: TenantContext,
+    ) -> dict:
+
+        state.status = (
+            "awaiting_order_confirmation"
+        )
+
+        self._save_state(
+            session_id,
+            state,
+            tenant.tenant_id,
+        )
+
+        return {
+            "status": "needs_input",
+            "message": (
+                self._build_order_confirmation_message(
+                    state,
+                )
+            ),
+            "customer_name": (
+                state.customer_name
+            ),
+            "customer_id": (
+                state.customer_id
+            ),
+        }
+
+    # --------------------------------------------------------
+
+    def _build_order_confirmation_message(
+        self,
+        state: ConversationState,
+    ) -> str:
+
+        item_lines = []
+
+        for item in state.items:
+
+            item_text = (
+                f"{item.quantity} x "
+                f"{item.product}"
+            )
+
+            modifications = []
+
+            for modification in item.modifications:
+
+                if modification.type == "REMOVE":
+
+                    modifications.append(
+                        "sin "
+                        f"{modification.ingredient}"
+                    )
+
+                elif modification.type == "ADD":
+
+                    modifications.append(
+                        "con adicional de "
+                        f"{modification.ingredient}"
+                    )
+
+                elif (
+                    modification.type
+                    == "BASE_CHANGE"
+                ):
+
+                    modifications.append(
+                        "con base de "
+                        f"{modification.new_base}"
+                    )
+
+            if modifications:
+
+                item_text += (
+                    " ("
+                    + ", ".join(modifications)
+                    + ")"
+                )
+
+            item_lines.append(
+                item_text,
+            )
+
+        message = (
+            "Este es tu pedido: "
+            + ", ".join(item_lines)
+        )
+
+        if state.combo_requested:
+
+            message += " en combo"
+
+            if state.beverage_name:
+
+                message += (
+                    f" con {state.beverage_name}"
+                )
+
+        message += ". ¿Deseas confirmarlo?"
+
+        return message
+
+    # --------------------------------------------------------
+
+    def _process_order_confirmation(
+        self,
+        session_id: str,
+        state: ConversationState,
+        message: str,
+        tenant: TenantContext,
+    ) -> dict:
+
+        answer = _normalize(
+            message,
+        )
+
+        if _is_yes(answer):
+
+            return self._create_ready_order(
+                session_id=session_id,
+                customer_id=(
+                    state.customer_id
+                ),
+                customer_name=(
+                    state.customer_name
+                    or "CLIENTE"
+                ),
+                items=state.items,
+                combo_requested=(
+                    state.combo_requested
+                ),
+                beverage_product_id=(
+                    state.beverage_product_id
+                ),
+                beverage_product=(
+                    state.beverage_name
+                ),
+                combo_product=(
+                    state.combo_product
+                ),
+                location_id=(
+                    state.location_id
+                ),
+                tenant=tenant,
+            )
+
+        if _is_no(answer):
+
+            state.status = "ready"
+
+            self._save_state(
+                session_id,
+                state,
+                tenant.tenant_id,
+            )
+
+            return {
+                "status": "needs_input",
+                "message": (
+                    "Perfecto. ¿Qué deseas "
+                    "cambiar de tu pedido?"
+                ),
+                "customer_name": (
+                    state.customer_name
+                ),
+                "customer_id": (
+                    state.customer_id
+                ),
+            }
+
+        return {
+            "status": "needs_input",
+            "message": (
+                "¿Deseas confirmar tu pedido? "
+                "Responde SI o NO."
             ),
             "customer_name": (
                 state.customer_name
