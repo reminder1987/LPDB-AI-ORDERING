@@ -157,6 +157,7 @@ class OrderItemResponse(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
+    status: str
     customer_name: str
 
     # Puede ser NULL únicamente en pedidos legacy creados
