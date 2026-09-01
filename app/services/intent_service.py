@@ -554,7 +554,7 @@ def _detect_modifications(
             text,
         ):
 
-            ingredient = _clean_ingredient(
+            ingredient = _normalize_add_ingredient(
                 match.group(1),
             )
 
