@@ -1414,11 +1414,34 @@ def _validate_modifications(
                 "allowed"
             ):
 
+                reason = validation.get(
+                    "reason",
+                    "",
+                )
+
+                # ------------------------------------------------
+                # NO-OP:
+                # Si el ingrediente solicitado no forma parte
+                # de la receta, no hay nada que retirar.
+                #
+                # Ejemplo:
+                # "Perro del Barrio sin cebolla"
+                #
+                # Si CEBOLLA no está en la receta, simplemente
+                # continuamos el pedido sin registrar REMOVE.
+                # ------------------------------------------------
+
+                if reason == (
+                    f"{modification.ingredient} "
+                    "no forma parte de la receta"
+                ):
+                    continue
+
                 raise ValueError(
-                    validation.get(
-                        "reason",
+                    reason
+                    or (
                         "La remoción no está "
-                        "permitida.",
+                        "permitida."
                     )
                 )
 

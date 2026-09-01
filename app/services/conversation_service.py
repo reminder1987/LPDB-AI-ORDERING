@@ -613,12 +613,280 @@ class ConversationService:
             )
 
         # ====================================================
-        # 2. INTERPRETAR EL MENSAJE
+        # 2. SI ESTAMOS ESPERANDO SEDE
+        #
+        # IMPORTANTE:
+        # El mensaje de la sede NO debe volver a pasar por
+        # parse_customer_message(), porque podría reemplazar
+        # state.items con una interpretación vacía.
+        #
+        # Los productos y sus modificaciones ya pertenecen
+        # al estado persistente de la conversación.
+        # ====================================================
+
+        if state.status == "waiting_location":
+
+            locations = (
+                location_service.find_locations(
+                    message,
+                    tenant.tenant_id,
+                )
+            )
+
+            if len(locations) == 1:
+
+                selected_location = locations[0]
+
+                state.location_id = (
+                    selected_location.id
+                )
+
+                # --------------------------------------------
+                # Si todavía estamos ofreciendo combo,
+                # mantenemos esa decisión pendiente.
+                # --------------------------------------------
+
+                if (
+                    state.items
+                    and state.combo_product
+                    and not state.combo_requested
+                ):
+
+                    state.status = (
+                        "waiting_combo_confirmation"
+                    )
+
+                    self._save_state(
+                        session_id,
+                        state,
+                        tenant.tenant_id,
+                    )
+
+                    return {
+                        "status": "needs_input",
+                        "message": (
+                            "Sede seleccionada: "
+                            f"{selected_location.customer_name}. "
+                            "¿Quieres llevar "
+                            f"el {(
+                                state.combo_product
+                                or "producto"
+                            ).lower()} en combo?"
+                        ),
+                        "customer_name": (
+                            state.customer_name
+                        ),
+                        "customer_id": (
+                            state.customer_id
+                        ),
+                        "location": {
+                            "id": (
+                                selected_location.id
+                            ),
+                            "name": (
+                                selected_location.customer_name
+                            ),
+                            "toast_name": (
+                                selected_location.toast_name
+                            ),
+                        },
+                    }
+
+                # --------------------------------------------
+                # Si ya es combo y falta gaseosa.
+                # --------------------------------------------
+
+                if (
+                    state.items
+                    and state.combo_requested
+                    and state.beverage_product_id
+                    is None
+                ):
+
+                    state.status = (
+                        "waiting_beverage"
+                    )
+
+                    state.beverage_required = True
+
+                    self._save_state(
+                        session_id,
+                        state,
+                        tenant.tenant_id,
+                    )
+
+                    return {
+                        "status": "needs_input",
+                        "message": (
+                            "Sede seleccionada: "
+                            f"{selected_location.customer_name}. "
+                            "¿Qué gaseosa quieres con tu "
+                            f"{(
+                                state.combo_product
+                                or "producto"
+                            ).lower()}?"
+                        ),
+                        "customer_name": (
+                            state.customer_name
+                        ),
+                        "customer_id": (
+                            state.customer_id
+                        ),
+                        "location": {
+                            "id": (
+                                selected_location.id
+                            ),
+                            "name": (
+                                selected_location.customer_name
+                            ),
+                            "toast_name": (
+                                selected_location.toast_name
+                            ),
+                        },
+                    }
+
+                # --------------------------------------------
+                # Pedido normal: conservar exactamente los
+                # items persistidos, incluyendo modificaciones.
+                # --------------------------------------------
+
+                if state.items:
+
+                    state.status = (
+                        "awaiting_order_confirmation"
+                    )
+
+                    self._save_state(
+                        session_id,
+                        state,
+                        tenant.tenant_id,
+                    )
+
+                    return {
+                        "status": "needs_input",
+                        "message": (
+                            self._build_order_confirmation_message(
+                                state,
+                            )
+                        ),
+                        "customer_name": (
+                            state.customer_name
+                        ),
+                        "customer_id": (
+                            state.customer_id
+                        ),
+                        "location": {
+                            "id": (
+                                selected_location.id
+                            ),
+                            "name": (
+                                selected_location.customer_name
+                            ),
+                            "toast_name": (
+                                selected_location.toast_name
+                            ),
+                        },
+                    }
+
+                state.status = "waiting_product"
+
+                self._save_state(
+                    session_id,
+                    state,
+                    tenant.tenant_id,
+                )
+
+                return {
+                    "status": "needs_input",
+                    "message": (
+                        "Sede seleccionada: "
+                        f"{selected_location.customer_name}. "
+                        "¿Qué producto deseas pedir?"
+                    ),
+                    "customer_name": (
+                        state.customer_name
+                    ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
+                    "location": {
+                        "id": (
+                            selected_location.id
+                        ),
+                        "name": (
+                            selected_location.customer_name
+                        ),
+                        "toast_name": (
+                            selected_location.toast_name
+                        ),
+                    },
+                }
+
+            if len(locations) > 1:
+
+                self._save_state(
+                    session_id,
+                    state,
+                    tenant.tenant_id,
+                )
+
+                return {
+                    "status": "needs_input",
+                    "message": (
+                        "Encontré varias sedes. "
+                        "¿Cuál deseas utilizar?"
+                    ),
+                    "customer_name": (
+                        state.customer_name
+                    ),
+                    "customer_id": (
+                        state.customer_id
+                    ),
+                    "locations": [
+                        {
+                            "id": location.id,
+                            "name": (
+                                location.customer_name
+                            ),
+                            "toast_name": (
+                                location.toast_name
+                            ),
+                        }
+                        for location in locations
+                    ],
+                }
+
+            return {
+                "status": "needs_input",
+                "message": (
+                    "No encontré esa sede. "
+                    "Puedes indicar Dirty Rabbit, "
+                    "Wynwood Food Truck o Sunrise."
+                ),
+                "customer_name": (
+                    state.customer_name
+                ),
+                "customer_id": (
+                    state.customer_id
+                ),
+            }
+
+        # ====================================================
+        # 3. INTERPRETAR UN MENSAJE NUEVO
         # ====================================================
 
         intent = parse_customer_message(
             message,
         )
+
+        # ----------------------------------------------------
+        # Guardamos inmediatamente el intent interpretado.
+        #
+        # Esto es crítico: si el mensaje contiene una
+        # modificación, por ejemplo "sin cebolla", la
+        # modificación debe entrar al estado persistente
+        # ANTES de resolver la sede.
+        # ----------------------------------------------------
 
         if intent.status != "needs_input":
 
@@ -676,8 +944,19 @@ class ConversationService:
                     intent.combo_requested
                 )
 
+            # --------------------------------------------
+            # Persistimos aquí antes de cualquier intento
+            # de resolver la sede.
+            # --------------------------------------------
+
+            self._save_state(
+                session_id,
+                state,
+                tenant.tenant_id,
+            )
+
         # ====================================================
-        # 3. RESOLVER SEDE
+        # 4. RESOLVER SEDE EN UN MENSAJE NUEVO
         # ====================================================
 
         if state.location_id is None:
@@ -699,29 +978,27 @@ class ConversationService:
 
                 if state.items:
 
-                    self._save_state(
-                        session_id,
-                        state,
-                        tenant.tenant_id,
-                    )
-
                     if (
                         state.status
                         == "waiting_combo_confirmation"
                     ):
+
+                        self._save_state(
+                            session_id,
+                            state,
+                            tenant.tenant_id,
+                        )
 
                         return {
                             "status": "needs_input",
                             "message": (
                                 "Sede seleccionada: "
                                 f"{selected_location.customer_name}. "
-                                + (
-                                    "¿Quieres llevar "
-                                    f"el {(
-                                        state.combo_product
-                                        or 'producto'
-                                    ).lower()} en combo?"
-                                )
+                                "¿Quieres llevar "
+                                f"el {(
+                                    state.combo_product
+                                    or "producto"
+                                ).lower()} en combo?"
                             ),
                             "customer_name": (
                                 state.customer_name
@@ -747,18 +1024,22 @@ class ConversationService:
                         == "waiting_beverage"
                     ):
 
+                        self._save_state(
+                            session_id,
+                            state,
+                            tenant.tenant_id,
+                        )
+
                         return {
                             "status": "needs_input",
                             "message": (
                                 "Sede seleccionada: "
                                 f"{selected_location.customer_name}. "
-                                + (
-                                    "¿Qué gaseosa quieres con tu "
-                                    f"{(
-                                        state.combo_product
-                                        or 'producto'
-                                    ).lower()}?"
-                                )
+                                "¿Qué gaseosa quieres con tu "
+                                f"{(
+                                    state.combo_product
+                                    or "producto"
+                                ).lower()}?"
                             ),
                             "customer_name": (
                                 state.customer_name
@@ -779,11 +1060,41 @@ class ConversationService:
                             },
                         }
 
-                    return self._request_order_confirmation(
-                        session_id=session_id,
-                        state=state,
-                        tenant=tenant,
+                    state.status = (
+                        "awaiting_order_confirmation"
                     )
+
+                    self._save_state(
+                        session_id,
+                        state,
+                        tenant.tenant_id,
+                    )
+
+                    return {
+                        "status": "needs_input",
+                        "message": (
+                            self._build_order_confirmation_message(
+                                state,
+                            )
+                        ),
+                        "customer_name": (
+                            state.customer_name
+                        ),
+                        "customer_id": (
+                            state.customer_id
+                        ),
+                        "location": {
+                            "id": (
+                                selected_location.id
+                            ),
+                            "name": (
+                                selected_location.customer_name
+                            ),
+                            "toast_name": (
+                                selected_location.toast_name
+                            ),
+                        },
+                    }
 
                 state.status = "waiting_product"
 
@@ -957,7 +1268,7 @@ class ConversationService:
             }
 
         # ====================================================
-        # 4. YA TENEMOS SEDE
+        # 5. YA TENEMOS SEDE
         # ====================================================
 
         if not state.items:
@@ -988,7 +1299,7 @@ class ConversationService:
             }
 
         # ====================================================
-        # 5. PROCESAR INTENT
+        # 6. PROCESAR INTENT
         # ====================================================
 
         if (

@@ -54,6 +54,7 @@ BASE_ALIASES = {
     "AREPA": "AREPA",
     "AREPAS": "AREPA",
     "PATACON": "PATACON",
+    "PATACÓN": "PATACON",
     "PATACONES": "PATACON",
     "MADURO": "MADURO",
     "MADUROS": "MADURO",
@@ -123,10 +124,6 @@ def parse_customer_message(
 
     combo_requested = _contains_combo_request(text)
 
-    # --------------------------------------------------------
-    # PAPAS SOLICITADAS COMO PRODUCTO INDEPENDIENTE
-    # --------------------------------------------------------
-
     has_papas = any(
         item.product == "PAPAS A LA FRANCESA"
         for item in items
@@ -140,10 +137,6 @@ def parse_customer_message(
             needs_combo_offer=False,
             needs_beverage=False,
         )
-
-    # --------------------------------------------------------
-    # COMBO
-    # --------------------------------------------------------
 
     combo_product = _first_combo_eligible_product(
         items,
@@ -175,10 +168,6 @@ def parse_customer_message(
             needs_combo_offer=True,
             needs_beverage=False,
         )
-
-    # --------------------------------------------------------
-    # PEDIDO NORMAL
-    # --------------------------------------------------------
 
     return IntentResult(
         status="ready",
@@ -450,17 +439,6 @@ def _detect_quantity_before_product(
     text: str,
     product_alias: str,
 ) -> int:
-    """
-    Detecta cantidades escritas como:
-
-        2 Perros del Barrio
-        dos Perros del Barrio
-        3 Arepas de Pollo
-        tres Arepas de Pollo
-        un Perro del Barrio
-
-    Si no existe cantidad explícita, devuelve 1.
-    """
 
     position = text.find(
         product_alias,
@@ -475,10 +453,6 @@ def _detect_quantity_before_product(
 
     if not before_product:
         return 1
-
-    # --------------------------------------------------------
-    # CANTIDAD NUMÉRICA
-    # --------------------------------------------------------
 
     digit_match = re.search(
         r"(\d+)\s*$",
@@ -495,10 +469,6 @@ def _detect_quantity_before_product(
             return quantity
 
         return 1
-
-    # --------------------------------------------------------
-    # CANTIDAD EN PALABRAS
-    # --------------------------------------------------------
 
     word_match = re.search(
         r"([A-ZÁÉÍÓÚÜÑ]+)\s*$",
@@ -560,31 +530,21 @@ def _detect_modifications(
 
     # ========================================================
     # REMOVE
-    # ========================================================
     #
-    # El patrón termina cuando aparece otra instrucción
-    # conversacional: Y, PERO, EN, CON o el final del mensaje.
+    # Acepta final de frase con o sin puntuación:
+    #   SIN CEBOLLA
+    #   SIN CEBOLLA.
+    #   SIN CEBOLLA!
+    #   SIN CEBOLLA,
     #
-    # IMPORTANTE:
-    # No usamos un segundo patrón "SIN ...$". El patrón principal
-    # ya cubre correctamente el final del mensaje. Mantener otro
-    # patrón abierto hasta "$" provoca que una frase como:
-    #
-    #   "sin salsa de tomate en patacon"
-    #
-    # pueda interpretarse dos veces:
-    #
-    #   REMOVE SALSA DE TOMATE
-    #   REMOVE SALSA DE TOMATE EN PATACON
-    #
-    # La base "PATACON" debe ser procesada exclusivamente por
-    # BASE_CHANGE.
+    # También mantiene el corte por Y/PERO/EN/CON para evitar
+    # consumir instrucciones posteriores.
     # ========================================================
 
     remove_patterns = (
-        r"\bSIN\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|EN|CON|$))",
-        r"\bQUITAR\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|EN|CON|$))",
-        r"\bQUITA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|EN|CON|$))",
+        r"\bSIN\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]*?)(?=\s+(?:Y|PERO|EN|CON)\b|[.,;:!?]*$)",
+        r"\bQUITAR\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]*?)(?=\s+(?:Y|PERO|EN|CON)\b|[.,;:!?]*$)",
+        r"\bQUITA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]*?)(?=\s+(?:Y|PERO|EN|CON)\b|[.,;:!?]*$)",
     )
 
     for pattern in remove_patterns:
@@ -611,10 +571,10 @@ def _detect_modifications(
     # ========================================================
 
     add_patterns = (
-        r"\bCON\s+EXTRA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN|$))",
-        r"\bCON\s+(?!BASE\s+DE\b)(?!COMBO\b)(?!QUESO\b)([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN|$))",
-        r"\bAGREGAR\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN|$))",
-        r"\bAGREGA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN|$))",
+        r"\bCON\s+EXTRA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN)\b|[.,;:!?]*$)",
+        r"\bCON\s+(?!BASE\s+DE\b)(?!COMBO\b)(?!QUESO\b)([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN)\b|[.,;:!?]*$)",
+        r"\bAGREGAR\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN)\b|[.,;:!?]*$)",
+        r"\bAGREGA\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]+?)(?=\s+(?:Y|PERO|SIN|EN)\b|[.,;:!?]*$)",
     )
 
     for pattern in add_patterns:
@@ -667,53 +627,38 @@ def _detect_modifications(
 
     base_patterns = (
 
-        # "con base de patacon"
         r"\bCON\s+BASE\s+DE\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)"
-        r"(?=\s+(?:SIN|CON|PERO|Y|$))",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)"
+        r"(?=\s+(?:SIN|CON|PERO|Y)\b|[.,;:!?]*$)",
 
-        # "base de patacon"
         r"\bBASE\s+DE\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)"
-        r"(?=\s+(?:SIN|CON|PERO|Y|$))",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)"
+        r"(?=\s+(?:SIN|CON|PERO|Y)\b|[.,;:!?]*$)",
 
-        # "cambiar la base a patacon"
         r"\bCAMBIAR\s+LA\s+BASE\s+A\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)"
-        r"(?=\s+(?:SIN|CON|PERO|Y|$))",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)"
+        r"(?=\s+(?:SIN|CON|PERO|Y)\b|[.,;:!?]*$)",
 
-        # "cambia la base a patacon"
         r"\bCAMBIA\s+LA\s+BASE\s+A\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)"
-        r"(?=\s+(?:SIN|CON|PERO|Y|$))",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)"
+        r"(?=\s+(?:SIN|CON|PERO|Y)\b|[.,;:!?]*$)",
 
-        # "cambiada por patacon"
-        # "cambiado por patacon"
-        # "cambiadas por patacon"
-        # "cambiados por patacon"
-        #
-        # El parser reconoce la intención y captura cualquier
-        # destino. La validación de si esa base está permitida
-        # pertenece a modification_service.
         r"\bCAMBIAD[AO]S?\s+POR\s+"
         r"([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s]*?)"
-        r"(?=\s+(?:SIN|CON|PERO|Y|EN)\b|$)",
+        r"(?=\s+(?:SIN|CON|PERO|Y|EN)\b|[.,;:!?]*$)",
 
-        # "en patacon"
         r"\bEN\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)\b",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)\b",
 
-        # "en vez de pan dame patacon"
         r"\bEN\s+VEZ\s+DE\s+"
-        r"(?:PAN|AREPA|PATACON|MADURO|MADUROS)\s+"
+        r"(?:PAN|AREPA|PATACON|PATACÓN|MADURO|MADUROS)\s+"
         r"(?:DAME|QUIERO|PONME|PON)\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)\b",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)\b",
 
-        # "en vez de pan con patacon"
         r"\bEN\s+VEZ\s+DE\s+"
-        r"(?:PAN|AREPA|PATACON|MADURO|MADUROS)"
+        r"(?:PAN|AREPA|PATACON|PATACÓN|MADURO|MADUROS)"
         r"(?:\s+QUIERO|\s+DAME|\s+PONME|\s+CON)?\s+"
-        r"(AREPA|AREPAS|PATACON|PATACONES|MADURO|MADUROS)\b",
+        r"(AREPA|AREPAS|PATACON|PATACÓN|PATACONES|MADURO|MADUROS)\b",
     )
 
     for pattern in base_patterns:
@@ -752,14 +697,25 @@ def _normalize_add_ingredient(
         value,
     )
 
-    aliases = {
-        "QUESO": "QUESO MOZZARELLA",
-    }
+    # Todas las formas de pedir queso deben representar una sola
+    # adición: QUESO MOZZARELLA.
+    #
+    # Esto incluye:
+    #   CON QUESO
+    #   CON EXTRA QUESO
+    #   CON EXTRA QUESO MOZZARELLA
+    #
+    # "EXTRA" describe la petición; no convierte el nombre en
+    # un ingrediente diferente para efectos de la orden.
+    if ingredient in (
+        "QUESO",
+        "EXTRA QUESO",
+        "EXTRA QUESO MOZZARELLA",
+        "QUESO MOZZARELLA",
+    ):
+        return "QUESO MOZZARELLA"
 
-    return aliases.get(
-        ingredient,
-        ingredient,
-    )
+    return ingredient
 
 
 def _normalize_base(
@@ -903,10 +859,10 @@ def _normalize(
     replacements = {
         "Ã": "A",
         "Ã‰": "E",
-        "Ã": "I",
         "Ã“": "O",
         "Ãš": "U",
         "Ãœ": "U",
+        "Ã‘": "Ñ",
     }
 
     for source, target in replacements.items():
