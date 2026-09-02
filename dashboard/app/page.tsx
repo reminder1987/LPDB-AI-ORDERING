@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { getOrders, type Order } from "@/lib/api";
+import { getOrder, getOrders, type Order } from "@/lib/api";
 
 const menuItems = [
   { label: "Pedidos", active: true },
@@ -11,7 +11,11 @@ const menuItems = [
   { label: "Sedes", active: false },
 ];
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number | null) {
+  if (value === null) {
+    return "—";
+  }
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -36,6 +40,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadOrders() {
       try {
@@ -58,6 +66,51 @@ export default function Home() {
 
     loadOrders();
   }, []);
+
+  useEffect(() => {
+    if (!selectedOrder && !detailLoading) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedOrder(null);
+        setDetailError(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [selectedOrder, detailLoading]);
+
+  async function handleOpenOrder(orderId: number) {
+    try {
+      setDetailLoading(true);
+      setDetailError(null);
+      setSelectedOrder(null);
+
+      const response = await getOrder(orderId);
+
+      setSelectedOrder(response.order);
+    } catch (err) {
+      setSelectedOrder(null);
+      setDetailError(
+        err instanceof Error
+          ? err.message
+          : "No fue posible cargar el detalle del pedido.",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function handleCloseOrder() {
+    setSelectedOrder(null);
+    setDetailError(null);
+  }
 
   const createdOrders = orders.filter(
     (order) => order.status === "created",
@@ -275,7 +328,19 @@ export default function Home() {
                           .map((order) => (
                             <tr
                               key={order.id}
-                              className="border-b border-zinc-100 last:border-b-0"
+                              tabIndex={0}
+                              role="button"
+                              onClick={() => handleOpenOrder(order.id)}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === "Enter" ||
+                                  event.key === " "
+                                ) {
+                                  event.preventDefault();
+                                  handleOpenOrder(order.id);
+                                }
+                              }}
+                              className="cursor-pointer border-b border-zinc-100 transition last:border-b-0 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zinc-300"
                             >
                               <td className="px-5 py-4 font-semibold">
                                 #{order.id}
@@ -317,6 +382,244 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {(selectedOrder || detailLoading || detailError) && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/20"
+          onClick={handleCloseOrder}
+        >
+          <aside
+            className="flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                  Detalle
+                </p>
+
+                <h4 className="mt-1 text-lg font-semibold">
+                  {selectedOrder
+                    ? `Pedido #${selectedOrder.id}`
+                    : "Pedido"}
+                </h4>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseOrder}
+                className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {detailLoading && (
+              <div className="flex flex-1 items-center justify-center p-6">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-zinc-600">
+                    Cargando pedido
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Consultando el backend LPDB.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!detailLoading && detailError && (
+              <div className="flex flex-1 items-center justify-center p-6">
+                <div className="max-w-sm text-center">
+                  <p className="text-sm font-medium text-red-600">
+                    No fue posible cargar el pedido
+                  </p>
+
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    {detailError}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleCloseOrder}
+                    className="mt-5 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!detailLoading && !detailError && selectedOrder && (
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 border-b border-zinc-200">
+                  <div className="border-r border-zinc-200 p-5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                      Cliente
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold">
+                      {selectedOrder.customer_name || "Sin cliente"}
+                    </p>
+                  </div>
+
+                  <div className="p-5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                      Estado
+                    </p>
+
+                    <span className="mt-1 inline-flex rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                      {formatStatus(selectedOrder.status)}
+                    </span>
+                  </div>
+
+                  <div className="border-r border-t border-zinc-200 p-5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                      Sede
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold">
+                      {selectedOrder.location_id
+                        ? `Sede ${selectedOrder.location_id}`
+                        : "Sin sede"}
+                    </p>
+                  </div>
+
+                  <div className="border-t border-zinc-200 p-5">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                      Total
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold">
+                      {formatCurrency(selectedOrder.total)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-b border-zinc-200 p-5">
+                  <h5 className="text-sm font-semibold">
+                    Productos
+                  </h5>
+
+                  <div className="mt-4 space-y-4">
+                    {selectedOrder.items.map((item, index) => (
+                      <div
+                        key={`${selectedOrder.id}-${item.product}-${index}`}
+                        className="rounded-xl border border-zinc-200 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">
+                              {item.product}
+                            </p>
+
+                            <p className="mt-1 text-xs text-zinc-500">
+                              Cantidad: {item.quantity}
+                            </p>
+                          </div>
+
+                          <p className="shrink-0 text-sm font-semibold">
+                            {formatCurrency(item.subtotal)}
+                          </p>
+                        </div>
+
+                        {item.modifications.length > 0 && (
+                          <div className="mt-4 border-t border-zinc-200 pt-4">
+                            <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                              Modificaciones
+                            </p>
+
+                            <div className="mt-2 space-y-1.5">
+                              {item.modifications.map(
+                                (modification, modificationIndex) => (
+                                  <p
+                                    key={`${modification.type}-${modification.ingredient}-${modificationIndex}`}
+                                    className="text-sm text-zinc-600"
+                                  >
+                                    {modification.type === "REMOVE"
+                                      ? "Sin"
+                                      : modification.type}
+                                    {modification.ingredient
+                                      ? ` ${modification.ingredient}`
+                                      : ""}
+                                    {modification.new_base
+                                      ? ` → ${modification.new_base}`
+                                      : ""}
+                                  </p>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {item.combo && (
+                          <div className="mt-4 border-t border-zinc-200 pt-4">
+                            <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                              Combo
+                            </p>
+
+                            <p className="mt-2 text-sm text-zinc-600">
+                              Solicitado:{" "}
+                              {item.combo.requested ? "Sí" : "No"}
+                            </p>
+
+                            {item.combo.fries && (
+                              <p className="mt-1 text-sm text-zinc-600">
+                                Papas: {item.combo.fries}
+                              </p>
+                            )}
+
+                            {item.combo.beverage && (
+                              <p className="mt-1 text-sm text-zinc-600">
+                                Bebida: {item.combo.beverage.product}
+                              </p>
+                            )}
+
+                            {item.combo.price !== null && (
+                              <p className="mt-1 text-sm text-zinc-600">
+                                Precio combo:{" "}
+                                {formatCurrency(item.combo.price)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 text-xs text-zinc-500">
+                          <span>Precio unitario</span>
+
+                          <span className="font-medium text-zinc-700">
+                            {formatCurrency(item.unit_price)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-zinc-50 p-5">
+                  <div className="ml-auto max-w-xs space-y-2">
+                    <div className="flex items-center justify-between text-sm text-zinc-500">
+                      <span>Subtotal</span>
+
+                      <span>
+                        {formatCurrency(selectedOrder.subtotal)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-zinc-200 pt-3 text-base font-bold">
+                      <span>Total</span>
+
+                      <span>
+                        {formatCurrency(selectedOrder.total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
     </main>
   );
 }

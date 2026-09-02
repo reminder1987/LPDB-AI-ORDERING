@@ -3,43 +3,59 @@ const API_BASE_URL =
 
 const TENANT = "lpdb";
 
-export interface OrderItemModification {
-  modification_type: string;
-  ingredient_name: string | null;
+export interface OrderModification {
+  type: string;
+  ingredient: string | null;
   new_base: string | null;
   price: number | null;
 }
 
-export interface OrderItem {
-  id: number;
+export interface OrderBeverage {
   product_id: number;
-  product_name: string;
+  product: string;
+}
+
+export interface OrderCombo {
+  requested: boolean;
+  fries: string;
+  beverage: OrderBeverage | null;
+  price: number | null;
+}
+
+export interface OrderItem {
+  product: string;
   quantity: number;
-  unit_price: number;
-  subtotal: number;
-  combo_requested: boolean;
-  beverage_product_id: number | null;
-  beverage_product_name: string | null;
-  modifications: OrderItemModification[];
+  modifications: OrderModification[];
+  combo: OrderCombo | null;
+  unit_price: number | null;
+  subtotal: number | null;
 }
 
 export interface Order {
   id: number;
   status: string;
-  tenant_id: number | null;
-  customer_id: number | null;
-  customer_name: string | null;
+  customer_name: string;
   location_id: number | null;
+
+  product: string;
+  quantity: number;
+  modifications: OrderModification[];
+  combo: OrderCombo | null;
+
   items: OrderItem[];
-  subtotal: number;
-  total: number;
-  created_at: string | null;
-  updated_at: string | null;
+
+  subtotal: number | null;
+  total: number | null;
+}
+
+export interface OrderResponseWrapper {
+  status: string;
+  order: Order;
 }
 
 export interface OrderListResponse {
+  status: string;
   orders: Order[];
-  total: number;
 }
 
 async function apiFetch<T>(
@@ -69,4 +85,10 @@ async function apiFetch<T>(
 
 export async function getOrders(): Promise<OrderListResponse> {
   return apiFetch<OrderListResponse>("/orders/");
+}
+
+export async function getOrder(
+  orderId: number,
+): Promise<OrderResponseWrapper> {
+  return apiFetch<OrderResponseWrapper>(`/orders/${orderId}`);
 }
