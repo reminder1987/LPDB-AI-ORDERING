@@ -24,6 +24,8 @@ from app.models.conversation_session_db import (
 from app.models.customer_db import CustomerDB
 from app.models.customer_identity_db import CustomerIdentityDB
 
+from app.models.channel_integration_db import ChannelIntegrationDB
+
 from app.models.external_mapping_db import ExternalMappingDB
 
 from app.models.ingredient_db import IngredientDB
