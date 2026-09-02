@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { getOrder, getOrders, type Order } from "@/lib/api";
+import {
+  getOrder,
+  getOrders,
+  updateOrderStatus,
+  type Order,
+} from "@/lib/api";
 
 const menuItems = [
   { label: "Pedidos", active: true },
@@ -44,6 +49,9 @@ export default function Home() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadOrders() {
       try {
@@ -76,6 +84,7 @@ export default function Home() {
       if (event.key === "Escape") {
         setSelectedOrder(null);
         setDetailError(null);
+        setStatusError(null);
       }
     }
 
@@ -90,6 +99,7 @@ export default function Home() {
     try {
       setDetailLoading(true);
       setDetailError(null);
+      setStatusError(null);
       setSelectedOrder(null);
 
       const response = await getOrder(orderId);
@@ -107,9 +117,43 @@ export default function Home() {
     }
   }
 
+  async function handleUpdateOrderStatus(
+    orderId: number,
+    newStatus: string,
+  ) {
+    try {
+      setStatusUpdating(true);
+      setStatusError(null);
+
+      const response = await updateOrderStatus(
+        orderId,
+        newStatus,
+      );
+
+      setSelectedOrder(response.order);
+
+      setOrders((currentOrders) =>
+        currentOrders.map((order) =>
+          order.id === response.order.id
+            ? response.order
+            : order,
+        ),
+      );
+    } catch (err) {
+      setStatusError(
+        err instanceof Error
+          ? err.message
+          : "No fue posible actualizar el estado del pedido.",
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
+
   function handleCloseOrder() {
     setSelectedOrder(null);
     setDetailError(null);
+    setStatusError(null);
   }
 
   const createdOrders = orders.filter(
@@ -594,6 +638,98 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="border-b border-zinc-200 p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="text-sm font-semibold">
+                        Acciones
+                      </h5>
+
+                      <p className="mt-1 text-xs text-zinc-400">
+                        Las transiciones son validadas por el backend.
+                      </p>
+                    </div>
+                  </div>
+
+                  {statusError && (
+                    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                      <p className="text-sm font-medium text-red-700">
+                        No fue posible actualizar el pedido
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-red-600">
+                        {statusError}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === "created" && (
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() =>
+                          handleUpdateOrderStatus(
+                            selectedOrder.id,
+                            "confirmed",
+                          )
+                        }
+                        className="flex-1 rounded-lg bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {statusUpdating
+                          ? "Actualizando..."
+                          : "Confirmar pedido"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() =>
+                          handleUpdateOrderStatus(
+                            selectedOrder.id,
+                            "cancelled",
+                          )
+                        }
+                        className="flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Cancelar pedido
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedOrder.status === "confirmed" && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        disabled={statusUpdating}
+                        onClick={() =>
+                          handleUpdateOrderStatus(
+                            selectedOrder.id,
+                            "cancelled",
+                          )
+                        }
+                        className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {statusUpdating
+                          ? "Actualizando..."
+                          : "Cancelar pedido"}
+                      </button>
+                    </div>
+                  )}
+
+                  {(selectedOrder.status === "submitting" ||
+                    selectedOrder.status === "submitted" ||
+                    selectedOrder.status === "failed" ||
+                    selectedOrder.status === "cancelled") && (
+                    <div className="mt-4 rounded-lg bg-zinc-50 px-4 py-3">
+                      <p className="text-sm font-medium text-zinc-600">
+                        No hay acciones manuales disponibles para este
+                        estado.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-zinc-50 p-5">

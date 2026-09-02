@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_tenant_context
 from app.core.tenant_context import TenantContext
@@ -13,8 +14,15 @@ from app.services.order_service import (
     get_orders,
     get_order_by_id,
     update_order,
+    update_order_status,
     delete_order,
 )
+
+
+class OrderStatusUpdate(BaseModel):
+    status: str = Field(
+        min_length=1,
+    )
 
 
 router = APIRouter(
@@ -133,6 +141,59 @@ def get_order_endpoint(
     return {
         "status": "ok",
         "order": order,
+    }
+
+
+@router.patch(
+    "/{order_id}/status",
+    response_model=OrderResponseWrapper,
+    summary="Cambiar el estado de un pedido",
+    description=(
+        "Cambia el estado interno de un pedido respetando "
+        "las transiciones permitidas por el ciclo de vida de LPDB."
+    ),
+    responses={
+        400: {
+            "description": (
+                "El nuevo estado no es válido o la transición "
+                "solicitada no está permitida."
+            ),
+        },
+        404: {
+            "description": (
+                "El pedido que se desea actualizar no existe."
+            ),
+        },
+    },
+)
+def update_order_status_endpoint(
+    order_id: int,
+    payload: OrderStatusUpdate,
+    tenant: TenantContext = Depends(get_tenant_context),
+):
+    try:
+        updated_order = update_order_status(
+            order_id,
+            payload.status,
+            tenant,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    if updated_order is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Pedido no encontrado",
+        )
+
+    return {
+        "status": "ok",
+        "message": "Estado del pedido actualizado correctamente",
+        "order": updated_order,
     }
 
 

@@ -92,3 +92,18 @@ export async function getOrder(
 ): Promise<OrderResponseWrapper> {
   return apiFetch<OrderResponseWrapper>(`/orders/${orderId}`);
 }
+
+export async function updateOrderStatus(
+  orderId: number,
+  status: string,
+): Promise<OrderResponseWrapper> {
+  return apiFetch<OrderResponseWrapper>(
+    `/orders/${orderId}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        status,
+      }),
+    },
+  );
+}
