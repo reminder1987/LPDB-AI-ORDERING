@@ -26,6 +26,7 @@ from app.models.tenant_db import TenantDB
 
 from app.services import conversation_service
 from app.services import customer_service
+from app.services import location_service
 from app.services import order_service
 from app.services import recipe_service
 from app.services import tenant_service
@@ -72,6 +73,12 @@ def setup_test_database(monkeypatch):
 
     monkeypatch.setattr(
         conversation_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        location_service,
         "SessionLocal",
         TestingSessionLocal,
     )
@@ -174,21 +181,45 @@ def setup_test_database(monkeypatch):
         db.flush()
 
         # ====================================================
-        # SEDE
+        # SEDES
         # ====================================================
 
-        location = LocationDB(
+        dirty_rabbit = LocationDB(
             id=1,
             tenant_id=tenant.id,
-            customer_name="Test Location",
-            toast_name="Test Location",
-            city="Miami",
-            address="Test Address",
+            customer_name="Dirty Rabbit",
+            toast_name="Dirty Rabbit",
+            city="Wynwood, Miami",
+            address="Test Address 1",
             active=True,
         )
 
-        db.add(
-            location,
+        wynwood_location = LocationDB(
+            id=2,
+            tenant_id=tenant.id,
+            customer_name="Wynwood LPDB",
+            toast_name="Wynwood LPDB",
+            city="Wynwood, Miami",
+            address="Test Address 2",
+            active=True,
+        )
+
+        sunrise = LocationDB(
+            id=3,
+            tenant_id=tenant.id,
+            customer_name="SUNRISE",
+            toast_name="SUNRISE",
+            city="Fort Lauderdale",
+            address="Test Address 3",
+            active=True,
+        )
+
+        db.add_all(
+            [
+                dirty_rabbit,
+                wynwood_location,
+                sunrise,
+            ]
         )
 
         db.flush()
@@ -278,7 +309,7 @@ def setup_test_database(monkeypatch):
 
         pizza_availability = ProductAvailabilityDB(
             product_id=pizza.id,
-            location_id=location.id,
+            location_id=dirty_rabbit.id,
             available=True,
             manual_override=False,
             source="LOCAL",
@@ -287,7 +318,7 @@ def setup_test_database(monkeypatch):
 
         perro_availability = ProductAvailabilityDB(
             product_id=perro_del_barrio.id,
-            location_id=location.id,
+            location_id=dirty_rabbit.id,
             available=True,
             manual_override=False,
             source="LOCAL",
@@ -296,7 +327,7 @@ def setup_test_database(monkeypatch):
 
         hamburguesa_availability = ProductAvailabilityDB(
             product_id=hamburguesa.id,
-            location_id=location.id,
+            location_id=dirty_rabbit.id,
             available=True,
             manual_override=False,
             source="LOCAL",
