@@ -388,3 +388,192 @@ def test_create_order_invalid_empty_product():
     )
 
     assert response.status_code == 422
+
+def test_update_order_status_created_to_confirmed():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Status Transition Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["order"]["id"]
+
+    response = client.patch(
+        f"/orders/{order_id}/status",
+        json={
+            "status": "confirmed",
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["status"] == "confirmed"
+
+def test_update_order_status_confirmed_to_submitting():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Submitting Status Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["order"]["id"]
+
+    confirm_response = client.patch(
+        f"/orders/{order_id}/status",
+        json={
+            "status": "confirmed",
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert confirm_response.status_code == 200
+
+    response = client.patch(
+        f"/orders/{order_id}/status",
+        json={
+            "status": "submitting",
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["status"] == "submitting"
+
+def test_update_order_status_submitting_to_submitted():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Submitted Status Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["order"]["id"]
+
+    confirm_response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "confirmed"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert confirm_response.status_code == 200
+
+    submitting_response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "submitting"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert submitting_response.status_code == 200
+
+    response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "submitted"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["status"] == "submitted"
+
+def test_update_order_status_submitting_to_failed():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Failed Status Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["order"]["id"]
+
+    confirm_response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "confirmed"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert confirm_response.status_code == 200
+
+    submitting_response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "submitting"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert submitting_response.status_code == 200
+
+    response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "failed"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert data["order"]["id"] == order_id
+    assert data["order"]["status"] == "failed"
+def test_update_order_status_rejects_invalid_transition():
+    create_response = client.post(
+        "/orders/",
+        json={
+            "customer_name": "Invalid Transition Test",
+            "location_id": 1,
+            "product": "Pizza",
+            "quantity": 1,
+        },
+        headers=TENANT_HEADERS,
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["order"]["id"]
+
+    response = client.patch(
+        f"/orders/{order_id}/status",
+        json={"status": "submitted"},
+        headers=TENANT_HEADERS,
+    )
+
+    assert response.status_code == 400
