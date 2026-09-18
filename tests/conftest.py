@@ -14,9 +14,7 @@ from app.models.category_db import (
 )
 from app.models.ingredient_db import IngredientDB
 from app.models.location_db import LocationDB
-from app.models.product_availability_db import (
-    ProductAvailabilityDB,
-)
+from app.models.product_availability_db import ProductAvailabilityDB
 from app.models.product_db import ProductDB
 from app.models.recipe_db import (
     RecipeDB,
@@ -24,16 +22,18 @@ from app.models.recipe_db import (
 )
 from app.models.tenant_db import TenantDB
 
+from app.services import channel_integration_service
 from app.services import conversation_service
 from app.services import customer_service
+from app.services import external_mapping_service
 from app.services import location_service
 from app.services import order_service
 from app.services import recipe_service
+from app.services import submission_service
 from app.services import tenant_service
 
 
 TEST_DATABASE_URL = "sqlite:///./test_lpdb.sqlite"
-
 
 engine = create_engine(
     TEST_DATABASE_URL,
@@ -41,7 +41,6 @@ engine = create_engine(
         "check_same_thread": False,
     },
 )
-
 
 TestingSessionLocal = sessionmaker(
     bind=engine,
@@ -53,17 +52,13 @@ TestingSessionLocal = sessionmaker(
 @pytest.fixture(autouse=True)
 def setup_test_database(monkeypatch):
 
-    # --------------------------------------------------------
-    # CREAR TODAS LAS TABLAS DE PRUEBA
-    # --------------------------------------------------------
+    Base.metadata.drop_all(
+        bind=engine,
+    )
 
     Base.metadata.create_all(
         bind=engine,
     )
-
-    # --------------------------------------------------------
-    # USAR SQLITE DE PRUEBAS EN TODOS LOS SERVICIOS
-    # --------------------------------------------------------
 
     monkeypatch.setattr(
         order_service,
@@ -95,24 +90,29 @@ def setup_test_database(monkeypatch):
         TestingSessionLocal,
     )
 
-    # --------------------------------------------------------
-    # CUSTOMER SERVICE
-    #
-    # customer_service importa SessionLocal desde
-    # app.core.database.
-    #
-    # Por eso se parchea la fuente real.
-    # --------------------------------------------------------
+    monkeypatch.setattr(
+        submission_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        external_mapping_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        channel_integration_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
 
     monkeypatch.setattr(
         database_module,
         "SessionLocal",
         TestingSessionLocal,
     )
-
-    # --------------------------------------------------------
-    # DATOS BASE DE PRUEBA
-    # --------------------------------------------------------
 
     db = TestingSessionLocal()
 
@@ -129,11 +129,14 @@ def setup_test_database(monkeypatch):
             active=True,
         )
 
-        db.add(tenant)
+        db.add(
+            tenant,
+        )
+
         db.flush()
 
         # ====================================================
-        # CATEGORÍAS DE PRODUCTO
+        # CATEGORÍAS DE PRODUCTOS
         # ====================================================
 
         hot_dogs_category = ProductCategoryDB(
@@ -154,11 +157,18 @@ def setup_test_database(monkeypatch):
             name="HAMBURGUESAS",
         )
 
+        bebidas_category = ProductCategoryDB(
+            id=4,
+            tenant_id=tenant.id,
+            name="BEBIDAS",
+        )
+
         db.add_all(
             [
                 hot_dogs_category,
                 perros_category,
                 hamburguesas_category,
+                bebidas_category,
             ]
         )
 
@@ -252,18 +262,33 @@ def setup_test_database(monkeypatch):
             price=Decimal("9.99"),
         )
 
+        # ----------------------------------------------------
+        # Bebida permitida para combo
+        #
+        # order_service.py permite IDs 71-79.
+        # ----------------------------------------------------
+
+        coca_cola = ProductDB(
+            id=71,
+            tenant_id=tenant.id,
+            name="Coca Cola",
+            category_id=bebidas_category.id,
+            price=Decimal("2.99"),
+        )
+
         db.add_all(
             [
                 pizza,
                 perro_del_barrio,
                 hamburguesa,
+                coca_cola,
             ]
         )
 
         db.flush()
 
         # ====================================================
-        # INGREDIENTE
+        # INGREDIENTES
         # ====================================================
 
         tocineta = IngredientDB(
@@ -273,14 +298,30 @@ def setup_test_database(monkeypatch):
             category_id=toppings_category.id,
         )
 
-        db.add(
-            tocineta,
+        # ----------------------------------------------------
+        # Ingrediente obligatorio para combos.
+        #
+        # order_service.py exige ID 23.
+        # ----------------------------------------------------
+
+        papas = IngredientDB(
+            id=23,
+            tenant_id=tenant.id,
+            name="PAPAS A LA FRANCESA",
+            category_id=toppings_category.id,
+        )
+
+        db.add_all(
+            [
+                tocineta,
+                papas,
+            ]
         )
 
         db.flush()
 
         # ====================================================
-        # RECETA DE PERRO DEL BARRIO
+        # RECETA
         # ====================================================
 
         recipe = RecipeDB(
@@ -334,11 +375,21 @@ def setup_test_database(monkeypatch):
             reason=None,
         )
 
+        coca_cola_availability = ProductAvailabilityDB(
+            product_id=coca_cola.id,
+            location_id=dirty_rabbit.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
         db.add_all(
             [
                 pizza_availability,
                 perro_availability,
                 hamburguesa_availability,
+                coca_cola_availability,
             ]
         )
 
@@ -355,10 +406,6 @@ def setup_test_database(monkeypatch):
         db.close()
 
     yield
-
-    # --------------------------------------------------------
-    # LIMPIAR DATOS DESPUÉS DE CADA TEST
-    # --------------------------------------------------------
 
     Base.metadata.drop_all(
         bind=engine,
