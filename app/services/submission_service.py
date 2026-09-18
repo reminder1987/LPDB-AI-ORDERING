@@ -6,6 +6,7 @@ from app.core.order_status import (
     ORDER_STATUS_SUBMITTING,
     transition_order_status,
 )
+from app.core.tenant_context import TenantContext
 from app.models.order_db import OrderDB
 from app.services.external_mapping_service import (
     create_external_mapping,
@@ -17,16 +18,20 @@ from app.services.external_order_service import (
     ExternalOrderResult,
     ExternalOrderService,
 )
-from app.core.tenant_context import TenantContext
 
 
 class SubmissionService:
     """
-    Orquesta el envÃƒÂ­o de una orden confirmada
+    Orquesta el envío de una orden confirmada
     hacia un proveedor externo.
 
     El proveedor concreto se recibe como dependencia
     para mantener esta capa independiente de Toast.
+
+    La orden se bloquea a nivel de fila durante la
+    transición inicial para evitar que dos solicitudes
+    concurrentes puedan enviar simultáneamente la misma
+    orden al proveedor externo.
     """
 
     def __init__(
@@ -48,26 +53,22 @@ class SubmissionService:
         db = SessionLocal()
 
         try:
-
-            # ------------------------------------------------
-            # 1. Buscar la orden dentro del tenant
-            # ------------------------------------------------
-
-            order = db.query(OrderDB).filter(
-                OrderDB.id == order_id,
-                OrderDB.tenant_id
-                == tenant.tenant_id,
-            ).first()
+            order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id,
+                    OrderDB.tenant_id
+                    == tenant.tenant_id,
+                )
+                .with_for_update()
+                .first()
+            )
 
             if order is None:
                 return ExternalOrderResult(
                     success=False,
                     error="Orden no encontrada.",
                 )
-
-            # ------------------------------------------------
-            # 2. La orden debe estar CONFIRMED
-            # ------------------------------------------------
 
             if order.status != ORDER_STATUS_CONFIRMED:
                 return ExternalOrderResult(
@@ -78,10 +79,6 @@ class SubmissionService:
                     ),
                 )
 
-            # ------------------------------------------------
-            # 3. CONFIRMED -> SUBMITTING
-            # ------------------------------------------------
-
             order.status = transition_order_status(
                 current_status=order.status,
                 new_status=ORDER_STATUS_SUBMITTING,
@@ -90,17 +87,9 @@ class SubmissionService:
             db.commit()
             db.refresh(order)
 
-            # ------------------------------------------------
-            # 4. Construir payload externo neutral
-            # ------------------------------------------------
-
             payload = build_external_order_payload(
                 order,
             )
-
-            # ------------------------------------------------
-            # 5. Enviar al proveedor
-            # ------------------------------------------------
 
             result = (
                 self.external_order_service.submit_order(
@@ -111,12 +100,7 @@ class SubmissionService:
                 )
             )
 
-            # ------------------------------------------------
-            # 6. Proveedor rechazÃƒÂ³ / fallÃƒÂ³
-            # ------------------------------------------------
-
             if not result.success:
-
                 order.status = transition_order_status(
                     current_status=order.status,
                     new_status=ORDER_STATUS_FAILED,
@@ -125,10 +109,6 @@ class SubmissionService:
                 db.commit()
 
                 return result
-
-            # ------------------------------------------------
-            # 7. Guardar mapping internal -> external
-            # ------------------------------------------------
 
             if not result.external_order_id:
                 order.status = transition_order_status(
@@ -141,7 +121,7 @@ class SubmissionService:
                 return ExternalOrderResult(
                     success=False,
                     error=(
-                        "El proveedor externo respondiÃƒÂ³ "
+                        "El proveedor externo respondió "
                         "sin external_order_id."
                     ),
                 )
@@ -154,10 +134,6 @@ class SubmissionService:
                 external_id=result.external_order_id,
             )
 
-            # ------------------------------------------------
-            # 8. SUBMITTING -> SUBMITTED
-            # ------------------------------------------------
-
             order.status = transition_order_status(
                 current_status=order.status,
                 new_status=ORDER_STATUS_SUBMITTED,
@@ -168,12 +144,8 @@ class SubmissionService:
             return result
 
         except Exception:
-
             db.rollback()
-
             raise
 
         finally:
-
             db.close()
-
