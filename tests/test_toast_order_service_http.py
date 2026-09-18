@@ -1,3 +1,9 @@
+from app.services.toast_configuration import (
+    ToastConfiguration,
+)
+from app.services.toast_http_transport import (
+    ToastHttpTransport,
+)
 from app.services.toast_order_service import (
     ToastOrderService,
 )
@@ -56,21 +62,23 @@ def test_toast_order_service_uses_http_transport():
         response=response,
     )
 
-    from app.services.toast_http_transport import (
-        ToastHttpTransport,
+    configuration = ToastConfiguration(
+        base_url="https://toast.test",
+        access_token="test-token",
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
     )
 
     transport = ToastHttpTransport(
-        base_url="https://toast.test",
-        access_token="test-token",
+        configuration=configuration,
         http_client=http_client,
     )
 
     service = ToastOrderService(
-        restaurant_external_id=(
-            "toast-restaurant-001"
-        ),
+        configuration=configuration,
         transport=transport,
+        tenant_id=1,
         product_mappings={
             2: "toast-product-perro",
         },

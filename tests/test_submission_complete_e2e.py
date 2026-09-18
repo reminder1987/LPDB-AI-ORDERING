@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import select
 
 from app.core import database as database_module
@@ -526,7 +528,7 @@ def test_submission_service_reaches_toast_adapter(
                 "toast-product-coca-cola"
             ),
             "quantity": 2,
-            "price": 6.99,
+            "price": Decimal("6.99"),
         }
 
         # ====================================================
@@ -581,3 +583,4 @@ def test_submission_service_reaches_toast_adapter(
             session_id=session_id,
             tenant_id=tenant.tenant_id,
         )
+
