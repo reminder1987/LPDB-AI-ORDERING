@@ -51,6 +51,11 @@ class ChannelIntegrationDB(Base):
         nullable=False,
     )
 
+    webhook_secret: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
     active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

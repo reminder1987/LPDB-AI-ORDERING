@@ -1,5 +1,7 @@
 """Resolución y administración de integraciones de canales por tenant."""
 
+import secrets
+
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
@@ -127,6 +129,7 @@ class ChannelIntegrationService:
                 channel=normalized_channel,
                 provider=normalized_provider,
                 external_id=normalized_external_id,
+                webhook_secret=secrets.token_urlsafe(32),
                 active=True,
             )
 
