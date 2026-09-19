@@ -1,10 +1,20 @@
+from decimal import Decimal
+
 from sqlalchemy import select
 
 from app.core import database as database_module
 from app.core.tenant_context import TenantContext
+from app.models.category_db import (
+    IngredientCategoryDB,
+    ProductCategoryDB,
+)
 from app.models.customer_db import CustomerDB
 from app.models.external_mapping_db import ExternalMappingDB
+from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
+from app.models.order_item_combo_db import OrderItemComboDB
+from app.models.order_item_db import OrderItemDB
+from app.models.product_db import ProductDB
 from app.services import external_mapping_service
 from app.services import order_service
 
@@ -353,3 +363,258 @@ def test_external_mapping_database_rows_remain_tenant_scoped():
 
         db.commit()
         db.close()
+
+
+def test_combo_serialization_isolated_by_tenant():
+    db = database_module.SessionLocal()
+
+    order_id = None
+    order_item_id = None
+    lpdb_product_id = None
+    other_product_id = None
+    lpdb_product_category_id = None
+    other_product_category_id = None
+    lpdb_ingredient_category_id = None
+    other_ingredient_category_id = None
+    lpdb_fries_id = None
+    other_fries_id = None
+
+    try:
+        lpdb_product_category = ProductCategoryDB(
+            tenant_id=TENANT_LPDB,
+            name="TEST PRODUCT CATEGORY LPDB",
+        )
+
+        other_product_category = ProductCategoryDB(
+            tenant_id=TENANT_OTHER,
+            name="TEST PRODUCT CATEGORY OTHER",
+        )
+
+        lpdb_ingredient_category = IngredientCategoryDB(
+            tenant_id=TENANT_LPDB,
+            name="TEST INGREDIENT CATEGORY LPDB",
+        )
+
+        other_ingredient_category = IngredientCategoryDB(
+            tenant_id=TENANT_OTHER,
+            name="TEST INGREDIENT CATEGORY OTHER",
+        )
+
+        db.add_all(
+            [
+                lpdb_product_category,
+                other_product_category,
+                lpdb_ingredient_category,
+                other_ingredient_category,
+            ]
+        )
+
+        db.commit()
+
+        db.refresh(lpdb_product_category)
+        db.refresh(other_product_category)
+        db.refresh(lpdb_ingredient_category)
+        db.refresh(other_ingredient_category)
+
+        lpdb_product = ProductDB(
+            tenant_id=TENANT_LPDB,
+            name="COMBO TEST",
+            category_id=lpdb_product_category.id,
+            price=Decimal("10.00"),
+        )
+
+        other_product = ProductDB(
+            tenant_id=TENANT_OTHER,
+            name="GASEOSA OTHER",
+            category_id=other_product_category.id,
+            price=Decimal("3.00"),
+        )
+
+        lpdb_fries = IngredientDB(
+            tenant_id=TENANT_LPDB,
+            name="PAPAS LPDB",
+            category_id=lpdb_ingredient_category.id,
+        )
+
+        other_fries = IngredientDB(
+            tenant_id=TENANT_OTHER,
+            name="PAPAS OTHER",
+            category_id=other_ingredient_category.id,
+        )
+
+        db.add_all(
+            [
+                lpdb_product,
+                other_product,
+                lpdb_fries,
+                other_fries,
+            ]
+        )
+
+        db.commit()
+
+        db.refresh(lpdb_product)
+        db.refresh(other_product)
+        db.refresh(lpdb_fries)
+        db.refresh(other_fries)
+
+        order = OrderDB(
+            tenant_id=TENANT_LPDB,
+            customer_name="Tenant One Combo",
+            location_id=1,
+            product="COMBO TEST",
+            quantity=1,
+            status="created",
+        )
+
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+
+        order_item = OrderItemDB(
+            order_id=order.id,
+            product_id=lpdb_product.id,
+            quantity=1,
+        )
+
+        db.add(order_item)
+        db.commit()
+        db.refresh(order_item)
+
+        combo = OrderItemComboDB(
+            order_item_id=order_item.id,
+            fries_ingredient_id=other_fries.id,
+            beverage_product_id=other_product.id,
+            quantity=1,
+            combo_price=Decimal("15.00"),
+      )
+
+        db.add(combo)
+        db.commit()
+
+        order_id = order.id
+        order_item_id = order_item.id
+        lpdb_product_id = lpdb_product.id
+        other_product_id = other_product.id
+        lpdb_product_category_id = (
+            lpdb_product_category.id
+        )
+        other_product_category_id = (
+            other_product_category.id
+        )
+        lpdb_ingredient_category_id = (
+            lpdb_ingredient_category.id
+        )
+        other_ingredient_category_id = (
+            other_ingredient_category.id
+        )
+        lpdb_fries_id = lpdb_fries.id
+        other_fries_id = other_fries.id
+
+    finally:
+        db.close()
+
+    tenant_one = build_lpdb_tenant()
+
+    try:
+        serialized_order = order_service.get_order_by_id(
+            order_id=order_id,
+            tenant=tenant_one,
+        )
+
+        assert serialized_order is not None
+        assert len(serialized_order["items"]) == 1
+
+        serialized_item = serialized_order["items"][0]
+        serialized_combo = serialized_item["combo"]
+
+        assert serialized_combo is not None
+        assert serialized_combo["requested"] is True
+
+        assert (
+            serialized_combo["fries"]
+            == "PAPAS A LA FRANCESA"
+        )
+
+        assert serialized_combo["beverage"] is None
+
+    finally:
+        db = database_module.SessionLocal()
+
+        try:
+            if order_item_id is not None:
+                db.query(OrderItemComboDB).filter(
+                    OrderItemComboDB.order_item_id
+                    == order_item_id,
+                ).delete()
+
+                db.query(OrderItemDB).filter(
+                    OrderItemDB.id == order_item_id,
+                ).delete()
+
+            if order_id is not None:
+                db.query(OrderDB).filter(
+                    OrderDB.id == order_id,
+                    OrderDB.tenant_id == TENANT_LPDB,
+                ).delete()
+
+            if lpdb_product_id is not None:
+                db.query(ProductDB).filter(
+                    ProductDB.id == lpdb_product_id,
+                    ProductDB.tenant_id == TENANT_LPDB,
+                ).delete()
+
+            if other_product_id is not None:
+                db.query(ProductDB).filter(
+                    ProductDB.id == other_product_id,
+                    ProductDB.tenant_id == TENANT_OTHER,
+                ).delete()
+
+            if lpdb_fries_id is not None:
+                db.query(IngredientDB).filter(
+                    IngredientDB.id == lpdb_fries_id,
+                    IngredientDB.tenant_id == TENANT_LPDB,
+                ).delete()
+
+            if other_fries_id is not None:
+                db.query(IngredientDB).filter(
+                    IngredientDB.id == other_fries_id,
+                    IngredientDB.tenant_id == TENANT_OTHER,
+                ).delete()
+
+            if lpdb_product_category_id is not None:
+                db.query(ProductCategoryDB).filter(
+                    ProductCategoryDB.id
+                    == lpdb_product_category_id,
+                    ProductCategoryDB.tenant_id
+                    == TENANT_LPDB,
+                ).delete()
+
+            if other_product_category_id is not None:
+                db.query(ProductCategoryDB).filter(
+                    ProductCategoryDB.id
+                    == other_product_category_id,
+                    ProductCategoryDB.tenant_id
+                    == TENANT_OTHER,
+                ).delete()
+
+            if lpdb_ingredient_category_id is not None:
+                db.query(IngredientCategoryDB).filter(
+                    IngredientCategoryDB.id
+                    == lpdb_ingredient_category_id,
+                    IngredientCategoryDB.tenant_id
+                    == TENANT_LPDB,
+                ).delete()
+
+            if other_ingredient_category_id is not None:
+                db.query(IngredientCategoryDB).filter(
+                    IngredientCategoryDB.id
+                    == other_ingredient_category_id,
+                    IngredientCategoryDB.tenant_id
+                    == TENANT_OTHER,
+                ).delete()
+
+            db.commit()
+
+        finally:
+            db.close()

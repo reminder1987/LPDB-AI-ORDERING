@@ -828,6 +828,7 @@ def create_order(
         return _serialize_order(
             saved_order,
             db,
+            tenant,
         )
 
     except Exception:
@@ -908,6 +909,7 @@ def update_order_status(
         return _serialize_order(
             order,
             db,
+            tenant,
         )
 
     except Exception:
@@ -946,6 +948,7 @@ def get_orders(
             _serialize_order(
                 order,
                 db,
+                tenant,
             )
             for order in orders
         ]
@@ -983,6 +986,7 @@ def get_order_by_id(
         return _serialize_order(
             order,
             db,
+            tenant,
         )
 
     finally:
@@ -1356,6 +1360,7 @@ def update_order(
         return _serialize_order(
             order_db,
             db,
+            tenant,
         )
 
     except Exception:
@@ -1677,6 +1682,7 @@ def _serialize_modifications(
 def _serialize_combo(
     db,
     combo,
+    tenant: TenantContext,
 ):
 
     if combo is None:
@@ -1686,14 +1692,18 @@ def _serialize_combo(
     fries = db.scalar(
         select(IngredientDB).where(
             IngredientDB.id
-            == combo.fries_ingredient_id
+            == combo.fries_ingredient_id,
+            IngredientDB.tenant_id
+            == tenant.tenant_id,
         )
     )
 
     beverage = db.scalar(
         select(ProductDB).where(
             ProductDB.id
-            == combo.beverage_product_id
+            == combo.beverage_product_id,
+            ProductDB.tenant_id
+            == tenant.tenant_id,
         )
     )
 
@@ -1732,6 +1742,7 @@ def _serialize_combo(
 def _serialize_order(
     order: OrderDB,
     db,
+    tenant: TenantContext,
 ):
 
     items = db.scalars(
@@ -1866,6 +1877,7 @@ def _serialize_order(
                     _serialize_combo(
                         db,
                         combo,
+                        tenant,
                     )
                 ),
 
