@@ -12,6 +12,85 @@ TENANT_HEADERS = {
 }
 
 
+def get_admin_headers(monkeypatch):
+    from app import api as app_api
+    from app.api import auth as auth_api
+    from app.api import dependencies as dependencies_api
+    from app.core import database as database_module
+    from app.models.user_tenant_db import UserTenantDB
+    from app.services.user_service import user_service
+
+    monkeypatch.setattr(
+        auth_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        email = "orders-admin@example.com"
+
+        existing_user = user_service.get_by_email(
+            db,
+            email,
+        )
+
+        if existing_user is None:
+            user = user_service.create_user(
+                db,
+                email,
+                "PruebaSegura123!",
+            )
+        else:
+            user = existing_user
+
+        existing_access = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == user.id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .first()
+        )
+
+        if existing_access is None:
+            db.add(
+                UserTenantDB(
+                    user_id=user.id,
+                    tenant_id=1,
+                    role="admin",
+                )
+            )
+            db.commit()
+
+    finally:
+        db.close()
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "password": "PruebaSegura123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    token = login_response.json()["access_token"]
+
+    return {
+        **TENANT_HEADERS,
+        "Authorization": f"Bearer {token}",
+    }
+
+
 def test_order_model():
     order = OrderCreate(
         customer_name="Carolina",
@@ -187,10 +266,12 @@ def test_new_order_starts_with_created_status():
         db.close()
 
 
-def test_get_orders_endpoint():
+def test_get_orders_endpoint(monkeypatch):
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.get(
         "/orders/",
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -202,7 +283,7 @@ def test_get_orders_endpoint():
     assert isinstance(data["orders"], list)
 
 
-def test_get_order_by_id():
+def test_get_order_by_id(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -219,9 +300,11 @@ def test_get_order_by_id():
     created_order = create_response.json()["order"]
     order_id = created_order["id"]
 
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.get(
         f"/orders/{order_id}",
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -235,7 +318,7 @@ def test_get_order_by_id():
     assert data["order"]["quantity"] == 2
 
 
-def test_delete_order():
+def test_delete_order(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -251,15 +334,17 @@ def test_delete_order():
 
     order_id = create_response.json()["order"]["id"]
 
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.delete(
         f"/orders/{order_id}",
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 204
 
 
-def test_update_order():
+def test_update_order(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -275,6 +360,8 @@ def test_update_order():
 
     order_id = create_response.json()["order"]["id"]
 
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.put(
         f"/orders/{order_id}",
         json={
@@ -283,7 +370,7 @@ def test_update_order():
             "product": "Hamburguesa",
             "quantity": 3,
         },
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -297,16 +384,20 @@ def test_update_order():
     assert data["order"]["quantity"] == 3
 
 
-def test_get_order_not_found():
+def test_get_order_not_found(monkeypatch):
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.get(
         "/orders/9999",
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 404
 
 
-def test_update_order_not_found():
+def test_update_order_not_found(monkeypatch):
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.put(
         "/orders/9999",
         json={
@@ -315,16 +406,18 @@ def test_update_order_not_found():
             "product": "Pizza",
             "quantity": 2,
         },
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 404
 
 
-def test_delete_order_not_found():
+def test_delete_order_not_found(monkeypatch):
+    admin_headers = get_admin_headers(monkeypatch)
+
     response = client.delete(
         "/orders/9999",
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 404
@@ -389,7 +482,8 @@ def test_create_order_invalid_empty_product():
 
     assert response.status_code == 422
 
-def test_update_order_status_created_to_confirmed():
+
+def test_update_order_status_created_to_confirmed(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -404,13 +498,12 @@ def test_update_order_status_created_to_confirmed():
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
+    admin_headers = get_admin_headers(monkeypatch)
 
     response = client.patch(
         f"/orders/{order_id}/status",
-        json={
-            "status": "confirmed",
-        },
-        headers=TENANT_HEADERS,
+        json={"status": "confirmed"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -421,7 +514,8 @@ def test_update_order_status_created_to_confirmed():
     assert data["order"]["id"] == order_id
     assert data["order"]["status"] == "confirmed"
 
-def test_update_order_status_confirmed_to_submitting():
+
+def test_update_order_status_confirmed_to_submitting(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -436,23 +530,20 @@ def test_update_order_status_confirmed_to_submitting():
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
+    admin_headers = get_admin_headers(monkeypatch)
 
     confirm_response = client.patch(
         f"/orders/{order_id}/status",
-        json={
-            "status": "confirmed",
-        },
-        headers=TENANT_HEADERS,
+        json={"status": "confirmed"},
+        headers=admin_headers,
     )
 
     assert confirm_response.status_code == 200
 
     response = client.patch(
         f"/orders/{order_id}/status",
-        json={
-            "status": "submitting",
-        },
-        headers=TENANT_HEADERS,
+        json={"status": "submitting"},
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -463,7 +554,8 @@ def test_update_order_status_confirmed_to_submitting():
     assert data["order"]["id"] == order_id
     assert data["order"]["status"] == "submitting"
 
-def test_update_order_status_submitting_to_submitted():
+
+def test_update_order_status_submitting_to_submitted(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -478,11 +570,12 @@ def test_update_order_status_submitting_to_submitted():
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
+    admin_headers = get_admin_headers(monkeypatch)
 
     confirm_response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "confirmed"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert confirm_response.status_code == 200
@@ -490,7 +583,7 @@ def test_update_order_status_submitting_to_submitted():
     submitting_response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "submitting"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert submitting_response.status_code == 200
@@ -498,7 +591,7 @@ def test_update_order_status_submitting_to_submitted():
     response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "submitted"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -509,7 +602,8 @@ def test_update_order_status_submitting_to_submitted():
     assert data["order"]["id"] == order_id
     assert data["order"]["status"] == "submitted"
 
-def test_update_order_status_submitting_to_failed():
+
+def test_update_order_status_submitting_to_failed(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -524,11 +618,12 @@ def test_update_order_status_submitting_to_failed():
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
+    admin_headers = get_admin_headers(monkeypatch)
 
     confirm_response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "confirmed"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert confirm_response.status_code == 200
@@ -536,7 +631,7 @@ def test_update_order_status_submitting_to_failed():
     submitting_response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "submitting"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert submitting_response.status_code == 200
@@ -544,7 +639,7 @@ def test_update_order_status_submitting_to_failed():
     response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "failed"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 200
@@ -554,7 +649,9 @@ def test_update_order_status_submitting_to_failed():
     assert data["status"] == "ok"
     assert data["order"]["id"] == order_id
     assert data["order"]["status"] == "failed"
-def test_update_order_status_rejects_invalid_transition():
+
+
+def test_update_order_status_rejects_invalid_transition(monkeypatch):
     create_response = client.post(
         "/orders/",
         json={
@@ -569,11 +666,12 @@ def test_update_order_status_rejects_invalid_transition():
     assert create_response.status_code == 201
 
     order_id = create_response.json()["order"]["id"]
+    admin_headers = get_admin_headers(monkeypatch)
 
     response = client.patch(
         f"/orders/{order_id}/status",
         json={"status": "submitted"},
-        headers=TENANT_HEADERS,
+        headers=admin_headers,
     )
 
     assert response.status_code == 400

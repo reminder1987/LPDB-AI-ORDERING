@@ -22,10 +22,12 @@ from app.models.recipe_db import (
 )
 from app.models.tenant_db import TenantDB
 
+from app.services import availability_service
 from app.services import channel_integration_service
 from app.services import conversation_service
 from app.services import customer_service
 from app.services import external_mapping_service
+from app.services import ingredient_availability_service
 from app.services import location_service
 from app.services import order_service
 from app.services import recipe_service
@@ -35,12 +37,14 @@ from app.services import tenant_service
 
 TEST_DATABASE_URL = "sqlite:///./test_lpdb.sqlite"
 
+
 engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={
         "check_same_thread": False,
     },
 )
+
 
 TestingSessionLocal = sessionmaker(
     bind=engine,
@@ -60,8 +64,30 @@ def setup_test_database(monkeypatch):
         bind=engine,
     )
 
+    # ========================================================
+    # SERVICIOS QUE DEBEN USAR LA BASE DE DATOS DE TEST
+    # ========================================================
+
+    monkeypatch.setattr(
+        database_module,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
     monkeypatch.setattr(
         order_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        availability_service,
+        "SessionLocal",
+        TestingSessionLocal,
+    )
+
+    monkeypatch.setattr(
+        ingredient_availability_service,
         "SessionLocal",
         TestingSessionLocal,
     )
@@ -108,11 +134,9 @@ def setup_test_database(monkeypatch):
         TestingSessionLocal,
     )
 
-    monkeypatch.setattr(
-        database_module,
-        "SessionLocal",
-        TestingSessionLocal,
-    )
+    # ========================================================
+    # DATOS BASE DEL TENANT
+    # ========================================================
 
     db = TestingSessionLocal()
 

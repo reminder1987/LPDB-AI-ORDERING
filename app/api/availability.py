@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.authorization import require_permission
 from app.api.dependencies import get_tenant_context
+from app.core.permissions import Permission
+from app.core.tenant_access_context import TenantAccessContext
 from app.core.tenant_context import TenantContext
 from app.services.availability_service import (
     get_product_availability,
@@ -51,7 +54,8 @@ def get_product_availability_endpoint(
     summary="Actualizar disponibilidad de un producto",
     description=(
         "Actualiza manualmente la disponibilidad de un producto "
-        "en una sede."
+        "en una sede. Requiere permiso administrativo "
+        "MANAGE_AVAILABILITY dentro del tenant."
     ),
 )
 def set_product_availability_endpoint(
@@ -59,14 +63,16 @@ def set_product_availability_endpoint(
     product_id: int,
     available: bool,
     reason: str | None = None,
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.MANAGE_AVAILABILITY)
+    ),
 ):
     try:
         availability = set_product_availability(
             product_id=product_id,
             location_id=location_id,
             available=available,
-            tenant_id=tenant.tenant_id,
+            tenant_id=access_context.tenant.tenant_id,
             manual_override=True,
             source="LOCAL",
             reason=reason,

@@ -25,16 +25,6 @@ class Settings(BaseSettings):
     # ============================================================
     # TOAST
     # ============================================================
-    #
-    # Las credenciales de Toast viven exclusivamente en .env.
-    # Nunca deben escribirse directamente en el código.
-    #
-    # Por ahora dejamos únicamente la configuración necesaria
-    # para identificar el entorno de integración.
-    #
-    # Los valores reales de autenticación y URLs se definirán
-    # cuando implementemos el cliente de Toast.
-    # ============================================================
 
     toast_api_base_url: str = (
         "https://ws-api.toasttab.com"
@@ -45,6 +35,18 @@ class Settings(BaseSettings):
     toast_client_secret: str | None = None
 
     toast_management_group_guid: str | None = None
+
+    # ============================================================
+    # AUTHENTICATION
+    # ============================================================
+
+    jwt_secret_key: str
+
+    jwt_algorithm: str = "HS256"
+
+    jwt_expire_minutes: int = 60
+
+    # ============================================================
 
     model_config = SettingsConfigDict(
         env_file=".env",

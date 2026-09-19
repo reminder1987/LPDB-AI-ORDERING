@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from app.api.authorization import require_permission
 from app.api.dependencies import get_tenant_context
+from app.core.permissions import Permission
+from app.core.tenant_access_context import TenantAccessContext
 from app.core.tenant_context import TenantContext
 from app.schemas.order import (
     OrderCreate,
@@ -99,12 +102,14 @@ def create_order_endpoint(
     ),
 )
 def get_orders_endpoint(
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.VIEW_ORDERS)
+    ),
 ):
     return {
         "status": "ok",
         "orders": get_orders(
-            tenant,
+            access_context.tenant,
         ),
     }
 
@@ -125,11 +130,13 @@ def get_orders_endpoint(
 )
 def get_order_endpoint(
     order_id: int,
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.VIEW_ORDERS)
+    ),
 ):
     order = get_order_by_id(
         order_id,
-        tenant,
+        access_context.tenant,
     )
 
     if order is None:
@@ -169,13 +176,15 @@ def get_order_endpoint(
 def update_order_status_endpoint(
     order_id: int,
     payload: OrderStatusUpdate,
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.MANAGE_ORDERS)
+    ),
 ):
     try:
         updated_order = update_order_status(
             order_id,
             payload.status,
-            tenant,
+            access_context.tenant,
         )
 
     except ValueError as exc:
@@ -223,13 +232,15 @@ def update_order_status_endpoint(
 def update_order_endpoint(
     order_id: int,
     order: OrderCreate,
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.MANAGE_ORDERS)
+    ),
 ):
     try:
         updated_order = update_order(
             order_id,
             order,
-            tenant,
+            access_context.tenant,
         )
 
     except ValueError as exc:
@@ -268,11 +279,13 @@ def update_order_endpoint(
 )
 def delete_order_endpoint(
     order_id: int,
-    tenant: TenantContext = Depends(get_tenant_context),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.MANAGE_ORDERS)
+    ),
 ):
     deleted = delete_order(
         order_id,
-        tenant,
+        access_context.tenant,
     )
 
     if not deleted:
