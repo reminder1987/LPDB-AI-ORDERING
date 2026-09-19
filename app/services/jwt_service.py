@@ -40,8 +40,13 @@ def decode_access_token(
     """
     Valida un JWT y devuelve el user_id contenido en el token.
 
-    Lanza jwt.InvalidTokenError si el token no es válido
-    o está expirado.
+    El token debe contener explícitamente los claims:
+    - sub
+    - iat
+    - exp
+
+    Lanza jwt.InvalidTokenError si el token no es válido,
+    está expirado o no contiene los claims requeridos.
     """
 
     payload = jwt.decode(
@@ -50,6 +55,13 @@ def decode_access_token(
         algorithms=[
             settings.jwt_algorithm,
         ],
+        options={
+            "require": [
+                "sub",
+                "iat",
+                "exp",
+            ],
+        },
     )
 
     subject = payload.get("sub")
