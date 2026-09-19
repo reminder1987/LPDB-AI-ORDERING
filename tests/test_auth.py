@@ -1,10 +1,16 @@
+from datetime import datetime, timedelta, timezone
+
+import jwt
 from fastapi.testclient import TestClient
 
 from app.api import auth as auth_api
 from app.api import dependencies as dependencies_api
 from app.core import database as database_module
+from app.core.config import settings
 from app.main import app
+from app.models.user_db import UserDB
 from app.models.user_tenant_db import UserTenantDB
+from app.services.jwt_service import create_access_token
 from app.services.user_service import user_service
 
 
@@ -146,6 +152,213 @@ def test_protected_me_rejects_invalid_token(
         "/auth/me",
         headers={
             "Authorization": "Bearer token-invalido",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_expired_token(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": "1",
+        "iat": now - timedelta(minutes=2),
+        "exp": now - timedelta(minutes=1),
+    }
+
+    token = jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_token_signed_with_wrong_secret(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": "1",
+        "iat": now,
+        "exp": now + timedelta(minutes=60),
+    }
+
+    token = jwt.encode(
+        payload,
+        "secreto-completamente-diferente",
+        algorithm=settings.jwt_algorithm,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_token_without_subject(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "iat": now,
+        "exp": now + timedelta(minutes=60),
+    }
+
+    token = jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_token_with_invalid_subject(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": "usuario-invalido",
+        "iat": now,
+        "exp": now + timedelta(minutes=60),
+    }
+
+    token = jwt.encode(
+        payload,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_nonexistent_user(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    token = create_access_token(
+        user_id=999999999,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_protected_me_rejects_inactive_user(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "inactive-user@example.com",
+            "PruebaSegura123!",
+        )
+
+        user_id = user.id
+
+        user.active = False
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    token = create_access_token(
+        user_id=user_id,
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": f"Bearer {token}",
         },
     )
 
