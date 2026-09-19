@@ -1,8 +1,10 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.models.tenant_db import TenantDB
 from app.models.user_db import UserDB
 from app.models.user_tenant_db import UserTenantDB
+from app.services.password_service import hash_password
 from app.services.tenant_provisioning_service import (
     TenantProvisioningError,
     tenant_provisioning_service,
@@ -221,6 +223,84 @@ def test_provision_tenant_rejects_invalid_required_data():
 
             except TenantProvisioningError as exc:
                 assert str(exc) == case["expected"]
+
+    finally:
+        db.close()
+
+
+def test_tenant_provisioning_transaction_rolls_back():
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+
+    slug = "transaction-rollback-test"
+    email = "transaction-rollback@example.com"
+
+    try:
+        tenant = TenantDB(
+            slug=slug,
+            name="Transaction Rollback Test",
+            active=True,
+        )
+
+        db.add(tenant)
+        db.flush()
+
+        user = UserDB(
+            email=email,
+            password_hash=hash_password("TestPassword123!"),
+            active=True,
+        )
+
+        db.add(user)
+        db.flush()
+
+        first_link = UserTenantDB(
+            user_id=user.id,
+            tenant_id=tenant.id,
+            role="owner",
+        )
+
+        db.add(first_link)
+        db.flush()
+
+        duplicate_link = UserTenantDB(
+            user_id=user.id,
+            tenant_id=tenant.id,
+            role="owner",
+        )
+
+        db.add(duplicate_link)
+
+        try:
+            db.flush()
+            assert False, "Expected duplicate UserTenant integrity error"
+
+        except IntegrityError:
+            db.rollback()
+
+        persisted_tenant = db.scalar(
+            select(TenantDB).where(
+                TenantDB.slug == slug
+            )
+        )
+
+        persisted_user = db.scalar(
+            select(UserDB).where(
+                UserDB.email == email
+            )
+        )
+
+        persisted_link = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == user.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        assert persisted_tenant is None
+        assert persisted_user is None
+        assert persisted_link is None
 
     finally:
         db.close()
