@@ -36,6 +36,9 @@ class Settings(BaseSettings):
 
     toast_management_group_guid: str | None = None
 
+    owner_email: str | None = None
+    owner_password: str | None = None
+
     # ============================================================
     # AUTHENTICATION
     # ============================================================
