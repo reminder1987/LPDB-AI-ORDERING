@@ -1,0 +1,40 @@
+﻿services:
+  db:
+    image: postgres:16
+    container_name: lpdb-postgres
+    environment:
+      POSTGRES_DB: lpdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lpdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: lpdb-ai-ordering:local
+    container_name: lpdb-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: lpdb
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OWNER_EMAIL: ${OWNER_EMAIL}
+      OWNER_PASSWORD: ${OWNER_PASSWORD}
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:

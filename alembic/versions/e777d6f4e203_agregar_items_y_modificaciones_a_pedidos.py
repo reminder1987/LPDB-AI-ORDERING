@@ -1,7 +1,7 @@
-"""Agregar items y modificaciones a pedidos
+﻿"""Agregar items y modificaciones a pedidos
 
 Revision ID: e777d6f4e203
-Revises: 540fa5d8b3f9
+Revises: create_orders_base
 Create Date: 2026-08-24 11:05:07.608170
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "e777d6f4e203"
-down_revision: Union[str, Sequence[str], None] = "540fa5d8b3f9"
+down_revision: Union[str, Sequence[str], None] = "create_orders_base"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -110,3 +110,5 @@ def downgrade() -> None:
 
     op.drop_table("order_item_modifications")
     op.drop_table("order_items")
+
+
