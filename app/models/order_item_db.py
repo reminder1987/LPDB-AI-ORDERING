@@ -1,6 +1,7 @@
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy import ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -38,6 +39,31 @@ class OrderItemDB(Base):
         Integer,
         nullable=False,
     )
+
+    # --------------------------------------------------------
+    # Snapshot monetario
+    #
+    # Estos valores congelan el precio utilizado cuando la
+    # orden fue creada o actualizada. No dependen de cambios
+    # posteriores en el catálogo.
+    #
+    # Nullable temporalmente para compatibilidad con órdenes
+    # históricas anteriores a los snapshots.
+    # --------------------------------------------------------
+
+    unit_price: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+    )
+
+    subtotal: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+    )
+
+    # --------------------------------------------------------
+    # Relaciones
+    # --------------------------------------------------------
 
     order: Mapped["OrderDB"] = relationship(
         back_populates="items",

@@ -706,6 +706,7 @@ def create_order(
                     "item"
                 ].quantity
             ),
+            total=order_total,
         )
 
         db.add(saved_order)
@@ -738,10 +739,14 @@ def create_order(
                 ]
             )
 
+            price_data = prepared["price_data"]
+
             order_item = OrderItemDB(
                 order_id=saved_order.id,
                 product_id=final_product.id,
                 quantity=item.quantity,
+                unit_price=price_data["unit_price"],
+                subtotal=price_data["subtotal"],
             )
 
             db.add(order_item)
@@ -1230,6 +1235,8 @@ def update_order(
             ].quantity
         )
 
+        order_db.total = order_total
+
         # ----------------------------------------------------
         # Eliminar items anteriores
         # ----------------------------------------------------
@@ -1270,10 +1277,14 @@ def update_order(
                 ]
             )
 
+            price_data = prepared["price_data"]
+
             order_item = OrderItemDB(
                 order_id=order_db.id,
                 product_id=final_product.id,
                 quantity=item.quantity,
+                unit_price=price_data["unit_price"],
+                subtotal=price_data["subtotal"],
             )
 
             db.add(order_item)
@@ -1784,72 +1795,77 @@ def _serialize_order(
         )
 
         # ----------------------------------------------------
-        # Precio del producto final
+        # Precio
+        #
+        # Las órdenes nuevas usan el snapshot persistido para
+        # conservar el precio histórico aunque cambie el catálogo.
+        #
+        # Las órdenes legacy sin snapshot mantienen el cálculo
+        # dinámico anterior como compatibilidad.
         # ----------------------------------------------------
 
-        product_price = Decimal(
-            str(
-                item.product.price
-            )
-        )
-
-        # ----------------------------------------------------
-        # Preparar modificaciones
-        # ----------------------------------------------------
-
-        modifications_for_price = []
-
-        for modification in (
-            modifications
+        if (
+            item.unit_price is not None
+            and item.subtotal is not None
         ):
 
-            modifications_for_price.append(
-                {
-                    "type": modification[
-                        "type"
-                    ],
-                    "price": modification[
-                        "price"
-                    ],
-                }
+            unit_price = Decimal(
+                str(item.unit_price)
             )
 
-        # ----------------------------------------------------
-        # Combo
-        # ----------------------------------------------------
-
-        combo_requested = (
-            combo is not None
-        )
-
-        # ----------------------------------------------------
-        # Precio unitario
-        # ----------------------------------------------------
-
-        unit_price = (
-            calculate_item_unit_price(
-                product_price=(
-                    product_price
-                ),
-                modifications=(
-                    modifications_for_price
-                ),
-                combo_requested=(
-                    combo_requested
-                ),
+            subtotal = Decimal(
+                str(item.subtotal)
             )
-        )
 
-        # ----------------------------------------------------
-        # Subtotal
-        # ----------------------------------------------------
+        else:
 
-        subtotal = (
-            calculate_item_subtotal(
-                unit_price=unit_price,
-                quantity=item.quantity,
+            product_price = Decimal(
+                str(
+                    item.product.price
+                )
             )
-        )
+
+            modifications_for_price = []
+
+            for modification in (
+                modifications
+            ):
+
+                modifications_for_price.append(
+                    {
+                        "type": modification[
+                            "type"
+                        ],
+                        "price": modification[
+                            "price"
+                        ],
+                    }
+                )
+
+            combo_requested = (
+                combo is not None
+            )
+
+            unit_price = (
+                calculate_item_unit_price(
+                    product_price=(
+                        product_price
+                    ),
+                    modifications=(
+                        modifications_for_price
+                    ),
+                    combo_requested=(
+                        combo_requested
+                    ),
+                )
+            )
+
+            subtotal = (
+                calculate_item_subtotal(
+                    unit_price=unit_price,
+                    quantity=item.quantity,
+                )
+            )
 
         item_subtotals.append(
             subtotal,
@@ -1896,7 +1912,11 @@ def _serialize_order(
     # ========================================================
 
     order_total = (
-        calculate_order_total(
+        Decimal(
+            str(order.total)
+        )
+        if order.total is not None
+        else calculate_order_total(
             item_subtotals,
         )
     )
