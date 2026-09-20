@@ -14,10 +14,18 @@ from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
 from app.models.order_item_db import OrderItemDB
 from app.models.order_item_combo_db import OrderItemComboDB
-from app.models.order_item_modification_db import OrderItemModificationDB
-from app.models.product_availability_db import ProductAvailabilityDB
+from app.models.order_item_modification_db import (
+    OrderItemModificationDB,
+)
+from app.models.payment_db import PaymentDB
+from app.models.product_availability_db import (
+    ProductAvailabilityDB,
+)
 from app.models.product_db import ProductDB
-from app.models.recipe_db import RecipeDB, RecipeIngredientDB
+from app.models.recipe_db import (
+    RecipeDB,
+    RecipeIngredientDB,
+)
 from app.models.tenant_db import TenantDB
 
 
@@ -33,6 +41,7 @@ __all__ = [
     "OrderItemDB",
     "OrderItemComboDB",
     "OrderItemModificationDB",
+    "PaymentDB",
     "ProductAvailabilityDB",
     "ProductDB",
     "RecipeDB",
