@@ -7,11 +7,14 @@ from app.core.database import SessionLocal
 from app.models.ingredient_db import IngredientDB
 from app.models.product_db import ProductDB
 from app.models.recipe_db import RecipeDB, RecipeIngredientDB
+from app.models.tenant_db import TenantDB
 
 
 SOURCE_DIR = Path(__file__).resolve().parent / "data"
 
 SOURCE_FILE = SOURCE_DIR / "LPDB_Recipe_Engine_v1.xlsx"
+
+TENANT_SLUG = "lpdb"
 
 
 PRODUCT_NAME_MAP = {
@@ -23,6 +26,22 @@ PRODUCT_NAME_MAP = {
     "PANDEBONO": "PANDEBONO (X 3 UNIDADES)",
     "PAPAS 3 XL": "PAPAS 3 XL  (LAS COCHINAS)",
 }
+
+
+def get_tenant_id(db) -> int:
+    tenant = db.scalar(
+        select(TenantDB).where(
+            TenantDB.slug == TENANT_SLUG,
+            TenantDB.active.is_(True),
+        )
+    )
+
+    if tenant is None:
+        raise RuntimeError(
+            f"Tenant activo no encontrado: {TENANT_SLUG}"
+        )
+
+    return tenant.id
 
 
 def read_recipes() -> dict[str, set[str]]:
@@ -65,17 +84,23 @@ def seed_recipes() -> None:
     db = SessionLocal()
 
     try:
+        tenant_id = get_tenant_id(db)
+
         products = {
             product.name: product
             for product in db.execute(
-                select(ProductDB)
+                select(ProductDB).where(
+                    ProductDB.tenant_id == tenant_id
+                )
             ).scalars()
         }
 
         ingredients = {
             ingredient.name: ingredient
             for ingredient in db.execute(
-                select(IngredientDB)
+                select(IngredientDB).where(
+                    IngredientDB.tenant_id == tenant_id
+                )
             ).scalars()
         }
 

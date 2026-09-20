@@ -11,12 +11,31 @@ from app.models.category_db import (
 )
 from app.models.ingredient_db import IngredientDB
 from app.models.product_db import ProductDB
+from app.models.tenant_db import TenantDB
 
 
 SOURCE_DIR = Path(__file__).resolve().parent / "data"
 
 PRODUCT_SOURCE = SOURCE_DIR / "LPDB_MASTER_SPEC_v3.xlsx"
 INGREDIENT_SOURCE = SOURCE_DIR / "LPDB_Recipe_Engine_v1.xlsx"
+
+TENANT_SLUG = "lpdb"
+
+
+def get_tenant_id(db) -> int:
+    tenant = db.scalar(
+        select(TenantDB).where(
+            TenantDB.slug == TENANT_SLUG,
+            TenantDB.active.is_(True),
+        )
+    )
+
+    if tenant is None:
+        raise RuntimeError(
+            f"Tenant activo no encontrado: {TENANT_SLUG}"
+        )
+
+    return tenant.id
 
 
 def read_product_categories() -> list[str]:
@@ -123,6 +142,7 @@ def read_products() -> list[dict]:
 
 def get_or_create_product_categories(
     db,
+    tenant_id: int,
     names: list[str],
 ) -> dict[str, ProductCategoryDB]:
     categories = {}
@@ -130,12 +150,14 @@ def get_or_create_product_categories(
     for name in names:
         category = db.scalar(
             select(ProductCategoryDB).where(
-                ProductCategoryDB.name == name
+                ProductCategoryDB.tenant_id == tenant_id,
+                ProductCategoryDB.name == name,
             )
         )
 
         if category is None:
             category = ProductCategoryDB(
+                tenant_id=tenant_id,
                 name=name,
             )
             db.add(category)
@@ -148,6 +170,7 @@ def get_or_create_product_categories(
 
 def get_or_create_ingredient_categories(
     db,
+    tenant_id: int,
     names: list[str],
 ) -> dict[str, IngredientCategoryDB]:
     categories = {}
@@ -155,12 +178,14 @@ def get_or_create_ingredient_categories(
     for name in names:
         category = db.scalar(
             select(IngredientCategoryDB).where(
-                IngredientCategoryDB.name == name
+                IngredientCategoryDB.tenant_id == tenant_id,
+                IngredientCategoryDB.name == name,
             )
         )
 
         if category is None:
             category = IngredientCategoryDB(
+                tenant_id=tenant_id,
                 name=name,
             )
             db.add(category)
@@ -178,13 +203,17 @@ def seed_categories() -> None:
     db = SessionLocal()
 
     try:
+        tenant_id = get_tenant_id(db)
+
         get_or_create_product_categories(
             db,
+            tenant_id,
             product_categories,
         )
 
         get_or_create_ingredient_categories(
             db,
+            tenant_id,
             ingredient_categories,
         )
 
@@ -204,10 +233,14 @@ def seed_ingredients() -> None:
     db = SessionLocal()
 
     try:
+        tenant_id = get_tenant_id(db)
+
         category_by_name = {
             category.name: category
             for category in db.execute(
-                select(IngredientCategoryDB)
+                select(IngredientCategoryDB).where(
+                    IngredientCategoryDB.tenant_id == tenant_id
+                )
             ).scalars()
         }
 
@@ -222,13 +255,15 @@ def seed_ingredients() -> None:
 
             existing = db.scalar(
                 select(IngredientDB).where(
-                    IngredientDB.name == ingredient_name
+                    IngredientDB.tenant_id == tenant_id,
+                    IngredientDB.name == ingredient_name,
                 )
             )
 
             if existing is None:
                 db.add(
                     IngredientDB(
+                        tenant_id=tenant_id,
                         name=ingredient_name,
                         category_id=category.id,
                     )
@@ -250,10 +285,14 @@ def seed_products() -> None:
     db = SessionLocal()
 
     try:
+        tenant_id = get_tenant_id(db)
+
         category_by_name = {
             category.name: category
             for category in db.execute(
-                select(ProductCategoryDB)
+                select(ProductCategoryDB).where(
+                    ProductCategoryDB.tenant_id == tenant_id
+                )
             ).scalars()
         }
 
@@ -270,13 +309,15 @@ def seed_products() -> None:
 
             existing = db.scalar(
                 select(ProductDB).where(
-                    ProductDB.name == product["name"]
+                    ProductDB.tenant_id == tenant_id,
+                    ProductDB.name == product["name"],
                 )
             )
 
             if existing is None:
                 db.add(
                     ProductDB(
+                        tenant_id=tenant_id,
                         name=product["name"],
                         category_id=category.id,
                         price=product["price"],
