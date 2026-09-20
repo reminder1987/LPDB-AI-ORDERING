@@ -1,6 +1,14 @@
-from fastapi import APIRouter, Header, HTTPException, Request
-from pydantic import BaseModel, Field
 import json
+
+from fastapi import (
+    APIRouter,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+)
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 
 from app.services.channel_integration_service import (
     ChannelIntegrationNotFoundError,
@@ -11,6 +19,24 @@ from app.services.channels.adapters.whatsapp import (
 )
 from app.services.channels.channel_service import (
     channel_service,
+)
+from app.services.integration_secret_service import (
+    IntegrationSecretError,
+)
+from app.services.meta_whatsapp_configuration_service import (
+    MetaWhatsAppConfigurationError,
+)
+from app.services.meta_whatsapp_integration_service import (
+    meta_whatsapp_integration_service,
+)
+from app.services.meta_whatsapp_service import (
+    MetaWhatsAppPayloadError,
+    parse_meta_whatsapp_message,
+    verify_meta_challenge,
+    verify_meta_signature,
+)
+from app.services.provider_integration_service import (
+    ProviderIntegrationNotFoundError,
 )
 from app.services.webhook_security_service import (
     verify_webhook_signature,
@@ -113,10 +139,12 @@ async def process_whatsapp_webhook(
         )
 
     try:
-        integration = channel_integration_service.get_integration(
-            channel="whatsapp",
-            provider=payload.provider,
-            external_id=payload.business_external_id,
+        integration = (
+            channel_integration_service.get_integration(
+                channel="whatsapp",
+                provider=payload.provider,
+                external_id=payload.business_external_id,
+            )
         )
 
     except ChannelIntegrationNotFoundError as exc:
@@ -151,6 +179,197 @@ async def process_whatsapp_webhook(
             "message": payload.message,
             "phone": payload.phone,
             "email": payload.email,
+        },
+    )
+
+    channel_response = channel_service.process_message(
+        message=channel_message,
+        tenant=tenant,
+    )
+
+    return adapter.build_response(
+        channel_response,
+    )
+
+
+@router.get(
+    "/whatsapp/meta/{phone_number_id}",
+    summary="Verificar webhook de Meta WhatsApp",
+    response_class=PlainTextResponse,
+)
+def verify_meta_whatsapp_webhook(
+    phone_number_id: str,
+    hub_mode: str | None = Query(
+        default=None,
+        alias="hub.mode",
+    ),
+    hub_verify_token: str | None = Query(
+        default=None,
+        alias="hub.verify_token",
+    ),
+    hub_challenge: str | None = Query(
+        default=None,
+        alias="hub.challenge",
+    ),
+):
+    if not (
+        hub_mode
+        and hub_verify_token
+        and hub_challenge
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Parámetros de verificación incompletos.",
+        )
+
+    try:
+        meta_integration = (
+            meta_whatsapp_integration_service.resolve(
+                phone_number_id
+            )
+        )
+
+    except (
+        ChannelIntegrationNotFoundError,
+        ProviderIntegrationNotFoundError,
+    ) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        IntegrationSecretError,
+        MetaWhatsAppConfigurationError,
+        ValueError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Configuración de Meta no disponible.",
+        ) from exc
+
+    if not verify_meta_challenge(
+        mode=hub_mode,
+        verify_token=hub_verify_token,
+        challenge=hub_challenge,
+        expected_verify_token=(
+            meta_integration.configuration.verify_token
+        ),
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Verificación de Meta inválida.",
+        )
+
+    return PlainTextResponse(
+        content=hub_challenge,
+        status_code=200,
+    )
+
+
+@router.post(
+    "/whatsapp/meta/{phone_number_id}",
+    summary="Recibir webhook nativo de Meta WhatsApp",
+)
+async def process_meta_whatsapp_webhook(
+    phone_number_id: str,
+    request: Request,
+    x_hub_signature_256: str | None = Header(
+        default=None,
+        alias="X-Hub-Signature-256",
+    ),
+):
+    raw_body = await request.body()
+
+    if not x_hub_signature_256:
+        raise HTTPException(
+            status_code=401,
+            detail="Firma de Meta requerida.",
+        )
+
+    try:
+        raw_payload = json.loads(raw_body)
+
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Payload de Meta inválido.",
+        ) from exc
+
+    try:
+        meta_message = parse_meta_whatsapp_message(
+            raw_payload
+        )
+
+    except MetaWhatsAppPayloadError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    if meta_message.phone_number_id != phone_number_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "El phone_number_id del payload no coincide "
+                "con la integración del webhook."
+            ),
+        )
+
+    try:
+        meta_integration = (
+            meta_whatsapp_integration_service.resolve(
+                phone_number_id
+            )
+        )
+
+    except (
+        ChannelIntegrationNotFoundError,
+        ProviderIntegrationNotFoundError,
+    ) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        IntegrationSecretError,
+        MetaWhatsAppConfigurationError,
+        ValueError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Configuración de Meta no disponible.",
+        ) from exc
+
+    if not verify_meta_signature(
+        payload=raw_body,
+        app_secret=(
+            meta_integration.configuration.app_secret
+        ),
+        signature=x_hub_signature_256,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Firma de Meta inválida.",
+        )
+
+    tenant = channel_integration_service.resolve_tenant(
+        channel="whatsapp",
+        provider="meta",
+        external_id=phone_number_id,
+    )
+
+    adapter = WhatsAppAdapter()
+
+    channel_message = adapter.parse_message(
+        {
+            "external_id": meta_message.external_id,
+            "session_id": meta_message.session_id,
+            "customer_name": meta_message.customer_name,
+            "message": meta_message.message,
+            "phone": meta_message.phone,
+            "email": None,
         },
     )
 
