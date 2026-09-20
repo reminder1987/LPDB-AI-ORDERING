@@ -1,7 +1,13 @@
 from datetime import time
 
+from sqlalchemy import select
+
 from app.core.database import SessionLocal
 from app.models.location_db import LocationDB, LocationHourDB
+from app.models.tenant_db import TenantDB
+
+
+TENANT_SLUG = "lpdb"
 
 
 LOCATIONS = [
@@ -53,16 +59,35 @@ LOCATIONS = [
 ]
 
 
-def seed_locations():
+def get_tenant_id(db) -> int:
+    tenant = db.scalar(
+        select(TenantDB).where(
+            TenantDB.slug == TENANT_SLUG,
+            TenantDB.active.is_(True),
+        )
+    )
+
+    if tenant is None:
+        raise RuntimeError(
+            f"Tenant activo no encontrado: {TENANT_SLUG}"
+        )
+
+    return tenant.id
+
+
+def seed_locations() -> None:
     db = SessionLocal()
 
     try:
+        tenant_id = get_tenant_id(db)
+
         for location_data in LOCATIONS:
             existing = (
                 db.query(LocationDB)
                 .filter(
+                    LocationDB.tenant_id == tenant_id,
                     LocationDB.customer_name
-                    == location_data["customer_name"]
+                    == location_data["customer_name"],
                 )
                 .first()
             )
@@ -71,6 +96,7 @@ def seed_locations():
                 continue
 
             location = LocationDB(
+                tenant_id=tenant_id,
                 customer_name=location_data["customer_name"],
                 toast_name=location_data["toast_name"],
                 city=location_data["city"],
