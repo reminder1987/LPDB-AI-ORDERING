@@ -876,8 +876,9 @@ class ConversationService:
         # ====================================================
 
         intent = parse_customer_message(
-            message,
-        )
+           message,
+           tenant_id=tenant.tenant_id,
+      )
 
         # ----------------------------------------------------
         # Guardamos inmediatamente el intent interpretado.

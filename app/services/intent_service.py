@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 import re
+import unicodedata
+
+from app.services.product_service import get_products
 
 
 @dataclass
@@ -99,6 +102,7 @@ NUMBER_WORDS = {
 
 def parse_customer_message(
     message: str,
+    tenant_id: int,
 ) -> IntentResult:
 
     text = _normalize(message)
@@ -109,7 +113,10 @@ def parse_customer_message(
             message="¿Qué producto deseas pedir?",
         )
 
-    items = _detect_items(text)
+    items = _detect_items(
+        text=text,
+        tenant_id=tenant_id,
+    )
 
     if not items:
         return IntentResult(
@@ -184,241 +191,61 @@ def parse_customer_message(
 
 def _detect_items(
     text: str,
+    tenant_id: int,
 ) -> list[IntentItem]:
+
+    products = get_products(
+        tenant_id,
+    )
+
+    if not products:
+        return []
+
+    product_aliases = _build_product_aliases(
+        products,
+    )
+
+    matches: list[tuple[int, int, str, str]] = []
+
+    for product_name, aliases in product_aliases.items():
+
+        for alias in aliases:
+
+            normalized_alias = _normalize(
+                alias,
+            )
+
+            if not normalized_alias:
+                continue
+
+            pattern = _build_alias_pattern(
+                normalized_alias,
+            )
+
+            for match in re.finditer(
+                pattern,
+                text,
+            ):
+                matches.append(
+                    (
+                        match.start(),
+                        match.end(),
+                        product_name,
+                        normalized_alias,
+                    )
+                )
+
+    selected_matches = _select_product_matches(
+        matches,
+    )
 
     items: list[IntentItem] = []
 
-    product_aliases = [
+    for start, _, product_name, matched_alias in selected_matches:
 
-        # ----------------------------------------------------
-        # PERROS
-        # ----------------------------------------------------
-
-        (
-            "PERRISIMO",
-            [
-                "PERRISIMO",
-                "PERRÍSIMO",
-                "PERRISIMOS",
-                "PERRÍSIMOS",
-            ],
-        ),
-
-        (
-            "PERRO DEL BARRIO",
-            [
-                "PERRO DEL BARRIO",
-                "PERROS DEL BARRIO",
-            ],
-        ),
-
-        (
-            "PERRO POLLO",
-            [
-                "PERRO POLLO",
-                "PERROS POLLO",
-            ],
-        ),
-
-        (
-            "PERRO DESMECHADO",
-            [
-                "PERRO DESMECHADO",
-                "PERROS DESMECHADOS",
-            ],
-        ),
-
-        (
-            "PERRO HAWAIANO",
-            [
-                "PERRO HAWAIANO",
-                "PERROS HAWAIANOS",
-            ],
-        ),
-
-        (
-            "PERRO NEA",
-            [
-                "PERRO NEA",
-                "PERROS NEA",
-            ],
-        ),
-
-        (
-            "CHORI - PERRO",
-            [
-                "CHORI - PERRO",
-                "CHORI PERRO",
-                "CHORIS - PERRO",
-                "CHORIS PERRO",
-            ],
-        ),
-
-        (
-            "PERRO XL LPDB",
-            [
-                "PERRO XL LPDB",
-                "PERROS XL LPDB",
-            ],
-        ),
-
-        # ----------------------------------------------------
-        # AREPAS
-        # ----------------------------------------------------
-
-        (
-            "AREPA BASICA",
-            [
-                "AREPA BASICA",
-                "AREPA BÁSICA",
-                "AREPAS BASICAS",
-                "AREPAS BÁSICAS",
-            ],
-        ),
-
-        (
-            "AREPA BURGER",
-            [
-                "AREPA BURGER",
-                "AREPAS BURGER",
-            ],
-        ),
-
-        (
-            "AREPA DE CARNE",
-            [
-                "AREPA DE CARNE",
-                "AREPAS DE CARNE",
-            ],
-        ),
-
-        (
-            "AREPA DE POLLO",
-            [
-                "AREPA DE POLLO",
-                "AREPAS DE POLLO",
-            ],
-        ),
-
-        (
-            "AREPA DEL BARRIO",
-            [
-                "AREPA DEL BARRIO",
-                "AREPAS DEL BARRIO",
-            ],
-        ),
-
-        (
-            "AREPA LA MÁS RICA",
-            [
-                "AREPA LA MAS RICA",
-                "AREPA LA MÁS RICA",
-                "AREPAS LA MAS RICA",
-                "AREPAS LA MÁS RICA",
-            ],
-        ),
-
-        (
-            "PORKY AREPA",
-            [
-                "PORKY AREPA",
-                "PORKY AREPAS",
-            ],
-        ),
-
-        # ----------------------------------------------------
-        # PATACONES
-        # ----------------------------------------------------
-
-        (
-            "PATACÓN BÁSICO",
-            [
-                "PATACON BASICO",
-                "PATACÓN BÁSICO",
-                "PATACONES BASICOS",
-                "PATACONES BÁSICOS",
-            ],
-        ),
-
-        (
-            "PATACÓN DE CARNE",
-            [
-                "PATACON DE CARNE",
-                "PATACÓN DE CARNE",
-                "PATACONES DE CARNE",
-            ],
-        ),
-
-        (
-            "PATACÓN DE POLLO",
-            [
-                "PATACON DE POLLO",
-                "PATACÓN DE POLLO",
-                "PATACONES DE POLLO",
-            ],
-        ),
-
-        (
-            "PATACÓN DEL BARRIO",
-            [
-                "PATACON DEL BARRIO",
-                "PATACÓN DEL BARRIO",
-                "PATACONES DEL BARRIO",
-            ],
-        ),
-
-        (
-            "PATACON LA MÁS RICA",
-            [
-                "PATACON LA MAS RICA",
-                "PATACON LA MÁS RICA",
-                "PATACONES LA MAS RICA",
-                "PATACONES LA MÁS RICA",
-            ],
-        ),
-
-        (
-            "PORKY PATACÓN",
-            [
-                "PORKY PATACON",
-                "PORKY PATACÓN",
-                "PORKY PATACONES",
-            ],
-        ),
-
-        # ----------------------------------------------------
-        # PAPAS
-        # ----------------------------------------------------
-
-        (
-            "PAPAS A LA FRANCESA",
-            [
-                "PAPAS A LA FRANCESA",
-                "PAPAS FRITAS",
-                "PAPA A LA FRANCESA",
-                "PAPA FRITA",
-                "PAPAS",
-            ],
-        ),
-    ]
-
-    for product_name, aliases in product_aliases:
-
-        matched_alias = next(
-            (
-                alias
-                for alias in aliases
-                if alias in text
-            ),
-            None,
-        )
-
-        if matched_alias is None:
-            continue
-
-        quantity = _detect_quantity_before_product(
+        quantity = _detect_quantity_before_position(
             text=text,
-            product_alias=matched_alias,
+            position=start,
         )
 
         items.append(
@@ -428,24 +255,243 @@ def _detect_items(
             )
         )
 
-    return _remove_duplicate_items(items)
+    return _remove_duplicate_items(
+        items,
+    )
+
+
+def _build_product_aliases(
+    products,
+) -> dict[str, list[str]]:
+
+    product_aliases: dict[str, list[str]] = {}
+
+    for product in products:
+
+        product_name = product.name.strip()
+
+        if not product_name:
+            continue
+
+        aliases = {
+            product_name,
+            _remove_accents(product_name),
+        }
+
+        normalized_name = _normalize(
+            product_name,
+        )
+
+        # ----------------------------------------------------
+        # Alias plural para productos cuyo nombre empieza
+        # por PERRO.
+        # ----------------------------------------------------
+
+        if normalized_name.startswith("PERRO "):
+            aliases.add(
+                normalized_name.replace(
+                    "PERRO ",
+                    "PERROS ",
+                    1,
+                )
+            )
+
+        # ----------------------------------------------------
+        # Alias plural para AREPA.
+        # ----------------------------------------------------
+
+        if normalized_name.startswith("AREPA "):
+            aliases.add(
+                normalized_name.replace(
+                    "AREPA ",
+                    "AREPAS ",
+                    1,
+                )
+            )
+
+        # ----------------------------------------------------
+        # Alias plural para PATACON.
+        # ----------------------------------------------------
+
+        if normalized_name.startswith("PATACON "):
+            aliases.add(
+                normalized_name.replace(
+                    "PATACON ",
+                    "PATACONES ",
+                    1,
+                )
+            )
+
+        product_aliases[
+            product_name
+        ] = sorted(
+            aliases,
+            key=len,
+            reverse=True,
+        )
+
+    # --------------------------------------------------------
+    # Aliases especiales que ya existían en el parser.
+    #
+    # Solo se agregan si el producto REALMENTE existe
+    # dentro del tenant.
+    # --------------------------------------------------------
+
+    special_aliases = {
+        "PERRISIMO": [
+            "PERRISIMO",
+            "PERRISIMOS",
+        ],
+        "PERRO DEL BARRIO": [
+            "PERRO DEL BARRIO",
+            "PERROS DEL BARRIO",
+        ],
+        "PERRO POLLO": [
+            "PERRO POLLO",
+            "PERROS POLLO",
+        ],
+        "PERRO DESMECHADO": [
+            "PERRO DESMECHADO",
+            "PERROS DESMECHADOS",
+        ],
+        "PERRO HAWAIANO": [
+            "PERRO HAWAIANO",
+            "PERROS HAWAIANOS",
+        ],
+        "PERRO NEA": [
+            "PERRO NEA",
+            "PERROS NEA",
+        ],
+        "CHORI - PERRO": [
+            "CHORI - PERRO",
+            "CHORI PERRO",
+            "CHORIS - PERRO",
+            "CHORIS PERRO",
+        ],
+        "PERRO XL LPDB": [
+            "PERRO XL LPDB",
+            "PERROS XL LPDB",
+        ],
+        "PAPAS A LA FRANCESA": [
+            "PAPAS A LA FRANCESA",
+            "PAPAS FRITAS",
+            "PAPA A LA FRANCESA",
+            "PAPA FRITA",
+        ],
+    }
+
+    existing_products = set(
+        product_aliases.keys(),
+    )
+
+    for product_name, aliases in special_aliases.items():
+
+        if product_name not in existing_products:
+            continue
+
+        product_aliases[
+            product_name
+        ].extend(
+            aliases,
+        )
+
+        product_aliases[
+            product_name
+        ] = sorted(
+            {
+                _normalize(alias)
+                for alias in product_aliases[
+                    product_name
+                ]
+                if alias
+            },
+            key=len,
+            reverse=True,
+        )
+
+    return product_aliases
+
+
+def _build_alias_pattern(
+    alias: str,
+) -> str:
+
+    escaped_alias = re.escape(
+        alias,
+    )
+
+    return (
+        rf"(?<![A-ZÁÉÍÓÚÜÑ0-9])"
+        rf"{escaped_alias}"
+        rf"(?![A-ZÁÉÍÓÚÜÑ0-9])"
+    )
+
+
+def _select_product_matches(
+    matches: list[tuple[int, int, str, str]],
+) -> list[tuple[int, int, str, str]]:
+
+    if not matches:
+        return []
+
+    # Primero priorizamos:
+    # 1. posición en el mensaje
+    # 2. alias más largo
+    #
+    # Esto evita que un alias corto consuma parte de un
+    # producto con nombre más específico.
+    ordered_matches = sorted(
+        matches,
+        key=lambda match: (
+            match[0],
+            -(match[1] - match[0]),
+        ),
+    )
+
+    selected: list[
+        tuple[int, int, str, str]
+    ] = []
+
+    occupied_ranges: list[
+        tuple[int, int]
+    ] = []
+
+    for candidate in ordered_matches:
+
+        start, end, _, _ = candidate
+
+        overlaps = any(
+            start < occupied_end
+            and end > occupied_start
+            for occupied_start, occupied_end
+            in occupied_ranges
+        )
+
+        if overlaps:
+            continue
+
+        selected.append(
+            candidate,
+        )
+
+        occupied_ranges.append(
+            (start, end),
+        )
+
+    return sorted(
+        selected,
+        key=lambda match: match[0],
+    )
 
 
 # ============================================================
 # DETECCIÓN DE CANTIDAD
 # ============================================================
 
-def _detect_quantity_before_product(
+def _detect_quantity_before_position(
     text: str,
-    product_alias: str,
+    position: int,
 ) -> int:
-
-    position = text.find(
-        product_alias,
-    )
-
-    if position < 0:
-        return 1
 
     before_product = text[
         :position
@@ -530,15 +576,6 @@ def _detect_modifications(
 
     # ========================================================
     # REMOVE
-    #
-    # Acepta final de frase con o sin puntuación:
-    #   SIN CEBOLLA
-    #   SIN CEBOLLA.
-    #   SIN CEBOLLA!
-    #   SIN CEBOLLA,
-    #
-    # También mantiene el corte por Y/PERO/EN/CON para evitar
-    # consumir instrucciones posteriores.
     # ========================================================
 
     remove_patterns = (
@@ -686,7 +723,7 @@ def _detect_modifications(
 
 
 # ============================================================
-# NORMALIZACIÓN
+# NORMALIZACIÓN DE INGREDIENTES
 # ============================================================
 
 def _normalize_add_ingredient(
@@ -697,16 +734,6 @@ def _normalize_add_ingredient(
         value,
     )
 
-    # Todas las formas de pedir queso deben representar una sola
-    # adición: QUESO MOZZARELLA.
-    #
-    # Esto incluye:
-    #   CON QUESO
-    #   CON EXTRA QUESO
-    #   CON EXTRA QUESO MOZZARELLA
-    #
-    # "EXTRA" describe la petición; no convierte el nombre en
-    # un ingrediente diferente para efectos de la orden.
     if ingredient in (
         "QUESO",
         "EXTRA QUESO",
@@ -856,20 +883,16 @@ def _normalize(
 
     text = text.strip().upper()
 
-    replacements = {
-        "Ã": "A",
-        "Ã‰": "E",
-        "Ã“": "O",
-        "Ãš": "U",
-        "Ãœ": "U",
-        "Ã‘": "Ñ",
-    }
+    text = unicodedata.normalize(
+        "NFKD",
+        text,
+    )
 
-    for source, target in replacements.items():
-        text = text.replace(
-            source,
-            target,
-        )
+    text = "".join(
+        character
+        for character in text
+        if not unicodedata.combining(character)
+    )
 
     text = re.sub(
         r"\s+",
@@ -878,3 +901,19 @@ def _normalize(
     )
 
     return text
+
+
+def _remove_accents(
+    text: str,
+) -> str:
+
+    normalized = unicodedata.normalize(
+        "NFKD",
+        text,
+    )
+
+    return "".join(
+        character
+        for character in normalized
+        if not unicodedata.combining(character)
+    )
