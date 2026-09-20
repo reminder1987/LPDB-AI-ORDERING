@@ -9,11 +9,7 @@ from app.models.product_db import ProductDB
 from app.models.recipe_db import RecipeDB, RecipeIngredientDB
 
 
-SOURCE_DIR = (
-    Path.home()
-    / "Downloads"
-    / "PROYECTO LPDB API ORDER AGENT"
-)
+SOURCE_DIR = Path(__file__).resolve().parent / "data"
 
 SOURCE_FILE = SOURCE_DIR / "LPDB_Recipe_Engine_v1.xlsx"
 
