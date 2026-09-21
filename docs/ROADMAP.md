@@ -550,7 +550,7 @@ La Fase 13 se considerará terminada cuando:
 
 ## FASE 14 — Pruebas integrales
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Alcance
 
@@ -572,7 +572,7 @@ La Fase 13 se considerará terminada cuando:
 
 ## FASE 15 — Autenticación y seguridad
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Alcance
 
@@ -598,7 +598,7 @@ La Fase 13 se considerará terminada cuando:
 
 ## FASE 16 — Datos y migraciones de producción
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Alcance
 
@@ -622,7 +622,7 @@ La Fase 13 se considerará terminada cuando:
 
 ## FASE 17 — Docker y despliegue
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Alcance
 
@@ -644,7 +644,7 @@ La Fase 13 se considerará terminada cuando:
 
 ## FASE 18 — Staging
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Alcance
 
@@ -929,6 +929,11 @@ FASE 22 — Documentación / entrega                     ⏳
 | Tenant Isolation | COMPLETADO | `333413d` |
 
 | 13 | BASE FUNCIONAL IMPLEMENTADA | Integrada en rama de trabajo |
+| 14 | COMPLETADA | Pruebas E2E, integración, multi-tenant, fallos y state machine versionadas |
+| 15 | COMPLETADA | `54614ef`, `3102918`, `e4fe56a`, `66d1160` |
+| 16 | COMPLETADA | `2b5f000`, `10f0c19`, `5258192`, `9394f26` |
+| 17 | COMPLETADA | `055bc12`, `c17a702` |
+| 18 | COMPLETADA | Cerrada y respaldada antes del inicio de Fase 19 |
 | 19 | EN IMPLEMENTACIÓN AVANZADA | `e1ad2e8` |
 
 ---
