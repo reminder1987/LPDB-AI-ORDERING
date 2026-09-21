@@ -28,6 +28,10 @@ class PaymentOrderNotFoundError(ValueError):
     pass
 
 
+class PaymentOrderPricingUnavailableError(ValueError):
+    pass
+
+
 class PaymentDuplicateError(ValueError):
     pass
 
@@ -37,6 +41,9 @@ class PaymentService:
     Servicio interno para administrar pagos.
 
     Todas las operaciones están aisladas por tenant.
+
+    El monto de un pago siempre se obtiene del snapshot
+    monetario persistido en la orden.
 
     Este servicio no contiene lógica específica de Stripe,
     Wompi u otro proveedor externo.
@@ -48,32 +55,21 @@ class PaymentService:
         tenant_id: int,
         order_id: int,
         provider: str,
-        amount: Decimal,
         currency: str = "USD",
         external_id: str | None = None,
         status: str = PAYMENT_STATUS_PENDING,
     ) -> PaymentDB:
-        normalized_provider = self._normalize_required_string(
+        normalized_provider = self._normalize_provider(
             provider,
-            "provider",
         )
 
         normalized_currency = self._normalize_currency(
             currency,
         )
 
-        normalized_external_id = self._normalize_optional_string(
+        normalized_external_id = self._normalize_optional_external_id(
             external_id,
         )
-
-        normalized_amount = money(
-            Decimal(amount)
-        )
-
-        if normalized_amount <= Decimal("0.00"):
-            raise ValueError(
-                "El monto del pago debe ser mayor que cero."
-            )
 
         if not is_valid_payment_status(status):
             raise ValueError(
@@ -103,6 +99,22 @@ class PaymentService:
             if order is None:
                 raise PaymentOrderNotFoundError(
                     "La orden no existe para este tenant."
+                )
+
+            if order.total is None:
+                raise PaymentOrderPricingUnavailableError(
+                    "La orden no tiene un snapshot monetario "
+                    "persistido y no puede generar un pago."
+                )
+
+            normalized_amount = money(
+                Decimal(str(order.total))
+            )
+
+            if normalized_amount <= Decimal("0.00"):
+                raise PaymentOrderPricingUnavailableError(
+                    "El snapshot monetario de la orden "
+                    "debe ser mayor que cero."
                 )
 
             if normalized_external_id is not None:
@@ -189,14 +201,12 @@ class PaymentService:
         provider: str,
         external_id: str,
     ) -> PaymentDB:
-        normalized_provider = self._normalize_required_string(
+        normalized_provider = self._normalize_provider(
             provider,
-            "provider",
         )
 
-        normalized_external_id = self._normalize_required_string(
+        normalized_external_id = self._normalize_required_external_id(
             external_id,
-            "external_id",
         )
 
         db = SessionLocal()
@@ -267,9 +277,8 @@ class PaymentService:
         payment_id: int,
         external_id: str,
     ) -> PaymentDB:
-        normalized_external_id = self._normalize_required_string(
+        normalized_external_id = self._normalize_required_external_id(
             external_id,
-            "external_id",
         )
 
         db = SessionLocal()
@@ -326,26 +335,43 @@ class PaymentService:
             db.close()
 
     @staticmethod
-    def _normalize_required_string(
+    def _normalize_provider(
         value: Any,
-        field_name: str,
     ) -> str:
         if not isinstance(value, str):
             raise ValueError(
-                f"{field_name} es obligatorio."
+                "provider es obligatorio."
             )
 
         normalized = value.strip().lower()
 
         if not normalized:
             raise ValueError(
-                f"{field_name} es obligatorio."
+                "provider es obligatorio."
             )
 
         return normalized
 
     @staticmethod
-    def _normalize_optional_string(
+    def _normalize_required_external_id(
+        value: Any,
+    ) -> str:
+        if not isinstance(value, str):
+            raise ValueError(
+                "external_id es obligatorio."
+            )
+
+        normalized = value.strip()
+
+        if not normalized:
+            raise ValueError(
+                "external_id es obligatorio."
+            )
+
+        return normalized
+
+    @staticmethod
+    def _normalize_optional_external_id(
         value: Any,
     ) -> str | None:
         if value is None:
@@ -386,6 +412,7 @@ __all__ = [
     "PaymentDuplicateError",
     "PaymentNotFoundError",
     "PaymentOrderNotFoundError",
+    "PaymentOrderPricingUnavailableError",
     "PaymentService",
     "PaymentTenantMismatchError",
     "payment_service",

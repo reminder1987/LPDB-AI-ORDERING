@@ -18,6 +18,7 @@ from app.services.payment_service import (
     PaymentDuplicateError,
     PaymentNotFoundError,
     PaymentOrderNotFoundError,
+    PaymentOrderPricingUnavailableError,
     PaymentService,
 )
 
@@ -68,6 +69,7 @@ def create_order(
     customer_name: str = "Payment Test Customer",
     product: str = "Payment Test Product",
     quantity: int = 1,
+    total: Decimal | None = Decimal("10.00"),
 ) -> OrderDB:
     db = SessionLocal()
 
@@ -78,6 +80,7 @@ def create_order(
             product=product,
             quantity=quantity,
             location_id=2,
+            total=total,
         )
 
         db.add(order)
@@ -128,14 +131,15 @@ def create_second_tenant() -> TenantDB:
         db.close()
 
 
-def test_create_payment(service):
-    order = create_order()
+def test_create_payment_uses_order_total(service):
+    order = create_order(
+        total=Decimal("25.50"),
+    )
 
     payment = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("25.50"),
     )
 
     assert payment.id is not None
@@ -149,53 +153,60 @@ def test_create_payment(service):
 
 
 def test_create_payment_normalizes_provider_and_currency(service):
-    order = create_order()
+    order = create_order(
+        total=Decimal("19.99"),
+    )
 
     payment = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="  STRIPE-TEST  ",
-        amount=Decimal("19.99"),
         currency=" usd ",
     )
 
     assert payment.provider == "stripe-test"
     assert payment.currency == "USD"
+    assert payment.amount == Decimal("19.99")
 
 
-def test_create_payment_rounds_money(service):
-    order = create_order()
+def test_create_payment_uses_persisted_money_snapshot(service):
+    order = create_order(
+        total=Decimal("10.555"),
+    )
 
     payment = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.555"),
     )
 
     assert payment.amount == Decimal("10.56")
 
 
 @pytest.mark.parametrize(
-    "amount",
+    "total",
     [
+        None,
         Decimal("0"),
         Decimal("-1"),
         Decimal("-100.00"),
     ],
 )
-def test_create_payment_rejects_non_positive_amount(
+def test_create_payment_rejects_unavailable_order_pricing(
     service,
-    amount,
+    total,
 ):
-    order = create_order()
+    order = create_order(
+        total=total,
+    )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        PaymentOrderPricingUnavailableError
+    ):
         service.create_payment(
             tenant_id=1,
             order_id=order.id,
             provider="stripe-test",
-            amount=amount,
         )
 
 
@@ -217,7 +228,6 @@ def test_create_payment_rejects_empty_provider(
             tenant_id=1,
             order_id=order.id,
             provider=provider,
-            amount=Decimal("10.00"),
         )
 
 
@@ -240,7 +250,6 @@ def test_create_payment_rejects_invalid_currency(
             tenant_id=1,
             order_id=order.id,
             provider="stripe-test",
-            amount=Decimal("10.00"),
             currency=currency,
         )
 
@@ -253,7 +262,6 @@ def test_create_payment_rejects_invalid_status(service):
             tenant_id=1,
             order_id=order.id,
             provider="stripe-test",
-            amount=Decimal("10.00"),
             status="unknown",
         )
 
@@ -264,7 +272,6 @@ def test_create_payment_rejects_missing_order(service):
             tenant_id=1,
             order_id=999999,
             provider="stripe-test",
-            amount=Decimal("10.00"),
         )
 
 
@@ -277,22 +284,20 @@ def test_create_payment_rejects_cross_tenant_order(service):
             tenant_id=second_tenant.id,
             order_id=order.id,
             provider="stripe-test",
-            amount=Decimal("10.00"),
         )
 
 
-def test_create_payment_with_external_id(service):
+def test_create_payment_with_external_id_preserves_case(service):
     order = create_order()
 
     payment = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
-        external_id="pi_test_123",
+        external_id="  Pi_Test_ABC123  ",
     )
 
-    assert payment.external_id == "pi_test_123"
+    assert payment.external_id == "Pi_Test_ABC123"
 
 
 def test_duplicate_external_id_is_rejected_for_same_tenant_and_provider(
@@ -304,8 +309,7 @@ def test_duplicate_external_id_is_rejected_for_same_tenant_and_provider(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
-        external_id="pi_duplicate",
+        external_id="Pi_Duplicate_ABC",
     )
 
     with pytest.raises(PaymentDuplicateError):
@@ -313,9 +317,30 @@ def test_duplicate_external_id_is_rejected_for_same_tenant_and_provider(
             tenant_id=1,
             order_id=order.id,
             provider="stripe-test",
-            amount=Decimal("10.00"),
-            external_id="pi_duplicate",
+            external_id="Pi_Duplicate_ABC",
         )
+
+
+def test_external_ids_are_case_sensitive(service):
+    order = create_order()
+
+    first = service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+        external_id="Pi_CASE_123",
+    )
+
+    second = service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+        external_id="pi_case_123",
+    )
+
+    assert first.id != second.id
+    assert first.external_id == "Pi_CASE_123"
+    assert second.external_id == "pi_case_123"
 
 
 def test_same_external_id_can_exist_for_different_provider(service):
@@ -325,16 +350,14 @@ def test_same_external_id_can_exist_for_different_provider(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
-        external_id="external_123",
+        external_id="External_123",
     )
 
     wompi_payment = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="wompi-test",
-        amount=Decimal("10.00"),
-        external_id="external_123",
+        external_id="External_123",
     )
 
     assert stripe_payment.id != wompi_payment.id
@@ -347,7 +370,6 @@ def test_get_payment(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     payment = service.get_payment(
@@ -366,7 +388,6 @@ def test_get_payment_rejects_wrong_tenant(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     second_tenant = create_second_tenant()
@@ -378,24 +399,42 @@ def test_get_payment_rejects_wrong_tenant(service):
         )
 
 
-def test_get_payment_by_external_id(service):
+def test_get_payment_by_external_id_preserves_case(service):
     order = create_order()
 
     created = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
-        external_id="pi_lookup",
+        external_id="Pi_Lookup_ABC",
     )
 
     payment = service.get_payment_by_external_id(
         tenant_id=1,
         provider="STRIPE-TEST",
-        external_id="pi_lookup",
+        external_id="Pi_Lookup_ABC",
     )
 
     assert payment.id == created.id
+    assert payment.external_id == "Pi_Lookup_ABC"
+
+
+def test_get_payment_by_external_id_is_case_sensitive(service):
+    order = create_order()
+
+    service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+        external_id="Pi_CaseSensitive_123",
+    )
+
+    with pytest.raises(PaymentNotFoundError):
+        service.get_payment_by_external_id(
+            tenant_id=1,
+            provider="stripe-test",
+            external_id="pi_casesensitive_123",
+        )
 
 
 def test_get_payment_by_external_id_rejects_unknown_payment(service):
@@ -407,23 +446,22 @@ def test_get_payment_by_external_id_rejects_unknown_payment(service):
         )
 
 
-def test_attach_external_id(service):
+def test_attach_external_id_preserves_case(service):
     order = create_order()
 
     created = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     updated = service.attach_external_id(
         tenant_id=1,
         payment_id=created.id,
-        external_id="pi_attached",
+        external_id="  Pi_Attached_ABC  ",
     )
 
-    assert updated.external_id == "pi_attached"
+    assert updated.external_id == "Pi_Attached_ABC"
 
 
 def test_attach_external_id_rejects_duplicate(service):
@@ -433,15 +471,13 @@ def test_attach_external_id_rejects_duplicate(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
-        external_id="pi_existing",
+        external_id="Pi_Existing_ABC",
     )
 
     second = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     assert first.id != second.id
@@ -450,7 +486,7 @@ def test_attach_external_id_rejects_duplicate(service):
         service.attach_external_id(
             tenant_id=1,
             payment_id=second.id,
-            external_id="pi_existing",
+            external_id="Pi_Existing_ABC",
         )
 
 
@@ -461,7 +497,6 @@ def test_payment_status_transition_pending_to_processing(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     updated = service.update_status(
@@ -480,7 +515,6 @@ def test_payment_status_transition_processing_to_paid(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
         status=PAYMENT_STATUS_PROCESSING,
     )
 
@@ -500,7 +534,6 @@ def test_payment_status_transition_pending_to_failed(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
     )
 
     updated = service.update_status(
@@ -519,7 +552,6 @@ def test_invalid_payment_status_transition_is_rejected(service):
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("10.00"),
         status=PAYMENT_STATUS_PAID,
     )
 
@@ -531,14 +563,15 @@ def test_invalid_payment_status_transition_is_rejected(service):
         )
 
 
-def test_payment_is_persisted_in_database(service):
-    order = create_order()
+def test_payment_is_persisted_with_order_snapshot_amount(service):
+    order = create_order(
+        total=Decimal("15.75"),
+    )
 
     created = service.create_payment(
         tenant_id=1,
         order_id=order.id,
         provider="stripe-test",
-        amount=Decimal("15.75"),
     )
 
     db = SessionLocal()
