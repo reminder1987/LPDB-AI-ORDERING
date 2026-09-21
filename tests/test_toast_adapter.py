@@ -1,25 +1,36 @@
-from decimal import Decimal
-
 import pytest
 
-from app.services.toast_order_adapter import ToastOrderAdapter
+from app.services.toast_order_adapter import (
+    ToastOrderAdapter,
+)
 
 
-def test_toast_adapter_builds_basic_order_payload():
-    adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
+def build_basic_adapter():
+    return ToastOrderAdapter(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-001"
+        ),
         product_mappings={
             2: "toast-menu-item-002",
         },
+        product_group_mappings={
+            2: "toast-menu-group-002",
+        },
     )
 
-    payload = {
+
+def build_basic_payload():
+    return {
         "order_id": 100,
         "tenant_id": 1,
         "location_id": 1,
         "customer_name": "Cliente Toast",
         "items": [
             {
+                "order_item_id": 501,
                 "product_id": 2,
                 "quantity": 2,
                 "modifications": [],
@@ -28,220 +39,119 @@ def test_toast_adapter_builds_basic_order_payload():
         ],
     }
 
-    toast_payload = adapter.build_order_payload(payload)
 
-    assert toast_payload["restaurantExternalId"] == (
-        "toast-restaurant-001"
+def test_toast_adapter_builds_real_order_structure():
+    adapter = build_basic_adapter()
+
+    toast_payload = adapter.build_order_payload(
+        build_basic_payload()
     )
 
-    assert "order" in toast_payload
-    assert "items" in toast_payload["order"]
+    assert "restaurantExternalId" not in toast_payload
+    assert "order" not in toast_payload
 
-    assert len(
-        toast_payload["order"]["items"]
-    ) == 1
+    assert toast_payload["externalId"] == (
+        "lpdb-order-1-100"
+    )
+
+    assert toast_payload["diningOption"] == {
+        "guid": "toast-dining-option-001",
+    }
+
+    assert len(toast_payload["checks"]) == 1
+
+    check = toast_payload["checks"][0]
+
+    assert check["externalId"] == (
+        "lpdb-check-1-100"
+    )
+
+    assert len(check["selections"]) == 1
+
+
+def test_toast_adapter_builds_real_selection():
+    adapter = build_basic_adapter()
+
+    toast_payload = adapter.build_order_payload(
+        build_basic_payload()
+    )
+
+    selection = (
+        toast_payload["checks"][0][
+            "selections"
+        ][0]
+    )
+
+    assert selection["externalId"] == (
+        "lpdb-selection-1-501"
+    )
+
+    assert selection["item"] == {
+        "guid": "toast-menu-item-002",
+    }
+
+    assert selection["itemGroup"] == {
+        "guid": "toast-menu-group-002",
+    }
+
+    assert selection["quantity"] == 2
+
+    assert selection["modifiers"] == []
 
 
 def test_toast_adapter_requires_product_mapping():
     adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-001"
+        ),
+        product_group_mappings={
+            2: "toast-menu-group-002",
+        },
     )
-
-    payload = {
-        "order_id": 100,
-        "tenant_id": 1,
-        "location_id": 1,
-        "customer_name": "Cliente Toast",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [],
-                "combo": None,
-            }
-        ],
-    }
 
     with pytest.raises(
         ValueError,
         match="product",
     ):
-        adapter.build_order_payload(payload)
+        adapter.build_order_payload(
+            build_basic_payload()
+        )
 
 
-def test_toast_adapter_uses_external_product_mapping():
+def test_toast_adapter_requires_product_group_mapping():
     adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-001"
+        ),
         product_mappings={
             2: "toast-menu-item-002",
         },
     )
-
-    payload = {
-        "order_id": 100,
-        "tenant_id": 1,
-        "location_id": 1,
-        "customer_name": "Cliente Toast",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 2,
-                "modifications": [],
-                "combo": None,
-            }
-        ],
-    }
-
-    toast_payload = adapter.build_order_payload(
-        payload
-    )
-
-    item = toast_payload["order"]["items"][0]
-
-    assert item["menuItemGuid"] == (
-        "toast-menu-item-002"
-    )
-
-    assert item["quantity"] == 2
-
-
-def test_toast_adapter_maps_modifications():
-    adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
-        product_mappings={
-            2: "toast-menu-item-002",
-        },
-        ingredient_mappings={
-            1: "toast-modifier-001",
-        },
-    )
-
-    payload = {
-        "order_id": 100,
-        "tenant_id": 1,
-        "location_id": 1,
-        "customer_name": "Cliente Toast",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [
-                    {
-                        "type": "REMOVE",
-                        "ingredient_id": 1,
-                        "ingredient_name": "TOCINETA",
-                        "new_base": None,
-                        "price": None,
-                    }
-                ],
-                "combo": None,
-            }
-        ],
-    }
-
-    toast_payload = adapter.build_order_payload(
-        payload
-    )
-
-    modification = (
-        toast_payload["order"]["items"][0][
-            "modifications"
-        ][0]
-    )
-
-    assert modification["modifierGuid"] == (
-        "toast-modifier-001"
-    )
-
-    assert modification["type"] == "REMOVE"
-
-
-def test_toast_adapter_maps_combo_beverage():
-    adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
-        product_mappings={
-            2: "toast-menu-item-002",
-            71: "toast-menu-item-071",
-        },
-        ingredient_mappings={
-            23: "toast-fries-023",
-        },
-    )
-
-    payload = {
-        "order_id": 100,
-        "tenant_id": 1,
-        "location_id": 1,
-        "customer_name": "Cliente Toast",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 2,
-                "modifications": [],
-                "combo": {
-                    "fries_ingredient_id": 23,
-                    "beverage_product_id": 71,
-                    "quantity": 2,
-                    "combo_price": Decimal("6.99"),
-                },
-            }
-        ],
-    }
-
-    toast_payload = adapter.build_order_payload(
-        payload
-    )
-
-    combo = (
-        toast_payload["order"]["items"][0]["combo"]
-    )
-
-    assert combo["friesGuid"] == (
-        "toast-fries-023"
-    )
-
-    assert combo["beverageMenuItemGuid"] == (
-        "toast-menu-item-071"
-    )
-
-    assert combo["quantity"] == 2
-
-    assert combo["price"] == Decimal("6.99")
-
-
-def test_toast_adapter_rejects_missing_beverage_mapping():
-    adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-001",
-        product_mappings={
-            2: "toast-menu-item-002",
-        },
-        ingredient_mappings={
-            23: "toast-fries-023",
-        },
-    )
-
-    payload = {
-        "order_id": 100,
-        "tenant_id": 1,
-        "location_id": 1,
-        "customer_name": "Cliente Toast",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [],
-                "combo": {
-                    "fries_ingredient_id": 23,
-                    "beverage_product_id": 71,
-                    "quantity": 1,
-                    "combo_price": Decimal("6.99"),
-                },
-            }
-        ],
-    }
 
     with pytest.raises(
         ValueError,
-        match="beverage",
+        match="group",
+    ):
+        adapter.build_order_payload(
+            build_basic_payload()
+        )
+
+
+def test_toast_adapter_requires_order_item_id():
+    adapter = build_basic_adapter()
+
+    payload = build_basic_payload()
+
+    del payload["items"][0]["order_item_id"]
+
+    with pytest.raises(
+        ValueError,
+        match="order_item_id",
     ):
         adapter.build_order_payload(payload)

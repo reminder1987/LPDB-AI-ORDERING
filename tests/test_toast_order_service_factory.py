@@ -68,6 +68,9 @@ def build_integration(
             "restaurant_external_id": (
                 f"toast-restaurant-{tenant_id}"
             ),
+            "dining_option_guid": (
+                f"toast-dining-option-{tenant_id}"
+            ),
             "timeout": 15,
         },
         credentials={
@@ -179,6 +182,11 @@ def test_factory_builds_tenant_scoped_order_service():
     )
 
     assert (
+        service.configuration.dining_option_guid
+        == "toast-dining-option-1"
+    )
+
+    assert (
         service.transport.http_client
         is http_client
     )
@@ -266,6 +274,18 @@ def test_factory_does_not_share_authentication_between_tenants():
     )
 
     assert (
+        tenant_one_service.configuration
+        .dining_option_guid
+        == "toast-dining-option-1"
+    )
+
+    assert (
+        tenant_twenty_five_service.configuration
+        .dining_option_guid
+        == "toast-dining-option-25"
+    )
+
+    assert (
         tenant_one_service.transport
         .authentication_service
         is not
@@ -348,6 +368,9 @@ def test_factory_replaces_authentication_when_configuration_changes():
                 "restaurant_external_id": (
                     "toast-restaurant-1"
                 ),
+                "dining_option_guid": (
+                    "toast-dining-option-new"
+                ),
                 "timeout": 20,
             },
             credentials={
@@ -388,4 +411,10 @@ def test_factory_replaces_authentication_when_configuration_changes():
     assert (
         second_service.configuration.timeout
         == 20
+    )
+
+    assert (
+        second_service.configuration
+        .dining_option_guid
+        == "toast-dining-option-new"
     )

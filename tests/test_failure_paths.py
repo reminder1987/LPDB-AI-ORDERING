@@ -10,11 +10,21 @@ from app.models.order_db import OrderDB
 from app.services.external_order_service import (
     ExternalOrderResult,
 )
-from app.services.submission_service import SubmissionService
-from app.services.toast_order_adapter import ToastOrderAdapter
-from app.services.toast_order_service import ToastOrderService
-from app.services.toast_configuration import ToastConfiguration
-from app.services.fake_toast_transport import FakeToastTransport
+from app.services.submission_service import (
+    SubmissionService,
+)
+from app.services.toast_configuration import (
+    ToastConfiguration,
+)
+from app.services.fake_toast_transport import (
+    FakeToastTransport,
+)
+from app.services.toast_order_adapter import (
+    ToastOrderAdapter,
+)
+from app.services.toast_order_service import (
+    ToastOrderService,
+)
 
 
 LPDB_TENANT = TenantContext(
@@ -52,7 +62,8 @@ def _delete_order(order_id):
 
     try:
         db.query(ExternalMappingDB).filter(
-            ExternalMappingDB.internal_id == order_id,
+            ExternalMappingDB.internal_id
+            == order_id,
         ).delete(
             synchronize_session=False,
         )
@@ -81,14 +92,18 @@ def test_submission_failure_marks_order_failed():
             return ExternalOrderResult(
                 success=False,
                 external_order_id=None,
-                error="Proveedor externo no disponible.",
+                error=(
+                    "Proveedor externo no disponible."
+                ),
             )
 
     order_id = _create_confirmed_order()
 
     try:
         service = SubmissionService(
-            external_order_service=FailingExternalService(),
+            external_order_service=(
+                FailingExternalService()
+            ),
             provider="toast",
         )
 
@@ -106,13 +121,20 @@ def test_submission_failure_marks_order_failed():
         db = database_module.SessionLocal()
 
         try:
-            order = db.query(OrderDB).filter(
-                OrderDB.id == order_id,
-                OrderDB.tenant_id == 1,
-            ).first()
+            order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id,
+                    OrderDB.tenant_id == 1,
+                )
+                .first()
+            )
 
             assert order is not None
-            assert order.status == ORDER_STATUS_FAILED
+            assert (
+                order.status
+                == ORDER_STATUS_FAILED
+            )
 
         finally:
             db.close()
@@ -140,7 +162,9 @@ def test_submission_rejects_missing_external_order_id():
 
     try:
         service = SubmissionService(
-            external_order_service=MissingExternalIdService(),
+            external_order_service=(
+                MissingExternalIdService()
+            ),
             provider="toast",
         )
 
@@ -153,18 +177,28 @@ def test_submission_rejects_missing_external_order_id():
         assert result.external_order_id is None
 
         assert result.error is not None
-        assert "external_order_id" in result.error
+        assert (
+            "external_order_id"
+            in result.error
+        )
 
         db = database_module.SessionLocal()
 
         try:
-            order = db.query(OrderDB).filter(
-                OrderDB.id == order_id,
-                OrderDB.tenant_id == 1,
-            ).first()
+            order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id,
+                    OrderDB.tenant_id == 1,
+                )
+                .first()
+            )
 
             assert order is not None
-            assert order.status == ORDER_STATUS_FAILED
+            assert (
+                order.status
+                == ORDER_STATUS_FAILED
+            )
 
         finally:
             db.close()
@@ -175,28 +209,42 @@ def test_submission_rejects_missing_external_order_id():
 
 def test_toast_adapter_rejects_missing_product_mapping():
     adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-test",
+        restaurant_external_id=(
+            "toast-restaurant-test"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-test"
+        ),
         product_mappings={},
-        ingredient_mappings={},
+        product_group_mappings={
+            999999: "toast-group-test",
+        },
     )
 
     payload = {
+        "order_id": 1,
+        "tenant_id": 1,
+        "location_id": 1,
         "items": [
             {
+                "order_item_id": 1,
                 "product_id": 999999,
                 "quantity": 1,
                 "modifications": [],
                 "combo": None,
             }
-        ]
+        ],
     }
 
     try:
-        adapter.build_order_payload(payload)
+        adapter.build_order_payload(
+            payload
+        )
 
         assert False, (
-            "El adapter debía rechazar un producto "
-            "sin mapping de Toast."
+            "El adapter debía rechazar "
+            "un producto sin mapping "
+            "de Toast."
         )
 
     except ValueError as exc:
@@ -206,54 +254,18 @@ def test_toast_adapter_rejects_missing_product_mapping():
         )
 
 
-def test_toast_adapter_rejects_missing_ingredient_mapping():
-    adapter = ToastOrderAdapter(
-        restaurant_external_id="toast-restaurant-test",
-        product_mappings={
-            2: "toast-product-perro-del-barrio",
-        },
-        ingredient_mappings={},
-    )
-
-    payload = {
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [
-                    {
-                        "type": "add",
-                        "ingredient_id": 999999,
-                        "ingredient_name": "Test Ingredient",
-                        "new_base": False,
-                        "price": 1.00,
-                    }
-                ],
-                "combo": None,
-            }
-        ]
-    }
-
-    try:
-        adapter.build_order_payload(payload)
-
-        assert False, (
-            "El adapter debía rechazar un ingrediente "
-            "sin mapping de Toast."
-        )
-
-    except ValueError as exc:
-        assert (
-            "Missing Toast ingredient mapping"
-            in str(exc)
-        )
-
-
 def test_toast_order_service_converts_adapter_error_to_failure():
     configuration = ToastConfiguration(
-        base_url="https://toast.example.com",
+        base_url=(
+            "https://toast.example.com"
+        ),
         access_token="test-token",
-        restaurant_external_id="toast-restaurant-test",
+        restaurant_external_id=(
+            "toast-restaurant-test"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-test"
+        ),
     )
 
     transport = FakeToastTransport()
@@ -263,7 +275,9 @@ def test_toast_order_service_converts_adapter_error_to_failure():
         transport=transport,
         tenant_id=1,
         product_mappings={},
-        ingredient_mappings={},
+        product_group_mappings={
+            999999: "toast-group-test",
+        },
     )
 
     result = service.submit_order(
@@ -271,20 +285,25 @@ def test_toast_order_service_converts_adapter_error_to_failure():
         tenant_id=1,
         location_id=1,
         payload={
+            "order_id": 1,
+            "tenant_id": 1,
+            "location_id": 1,
             "items": [
                 {
+                    "order_item_id": 1,
                     "product_id": 999999,
                     "quantity": 1,
                     "modifications": [],
                     "combo": None,
                 }
-            ]
+            ],
         },
     )
 
     assert result.success is False
     assert result.external_order_id is None
     assert result.error is not None
+
     assert (
         "Missing Toast product mapping"
         in result.error
@@ -309,14 +328,20 @@ def test_submission_does_not_call_provider_for_missing_order():
 
             return ExternalOrderResult(
                 success=True,
-                external_order_id="should-not-exist",
+                external_order_id=(
+                    "should-not-exist"
+                ),
                 error=None,
             )
 
-    external_service = TrackingExternalService()
+    external_service = (
+        TrackingExternalService()
+    )
 
     service = SubmissionService(
-        external_order_service=external_service,
+        external_order_service=(
+            external_service
+        ),
         provider="toast",
     )
 
@@ -326,7 +351,10 @@ def test_submission_does_not_call_provider_for_missing_order():
     )
 
     assert result.success is False
-    assert result.error == "Orden no encontrada."
+    assert (
+        result.error
+        == "Orden no encontrada."
+    )
     assert external_service.calls == 0
 
 
@@ -336,7 +364,9 @@ def test_submission_does_not_submit_already_submitted_order():
     try:
         order = OrderDB(
             tenant_id=1,
-            customer_name="Already Submitted Test",
+            customer_name=(
+                "Already Submitted Test"
+            ),
             location_id=1,
             product="Pizza",
             quantity=1,
@@ -367,15 +397,21 @@ def test_submission_does_not_submit_already_submitted_order():
 
             return ExternalOrderResult(
                 success=True,
-                external_order_id="should-not-exist",
+                external_order_id=(
+                    "should-not-exist"
+                ),
                 error=None,
             )
 
-    external_service = TrackingExternalService()
+    external_service = (
+        TrackingExternalService()
+    )
 
     try:
         service = SubmissionService(
-            external_order_service=external_service,
+            external_order_service=(
+                external_service
+            ),
             provider="toast",
         )
 
@@ -391,13 +427,20 @@ def test_submission_does_not_submit_already_submitted_order():
         db = database_module.SessionLocal()
 
         try:
-            order = db.query(OrderDB).filter(
-                OrderDB.id == order_id,
-                OrderDB.tenant_id == 1,
-            ).first()
+            order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id,
+                    OrderDB.tenant_id == 1,
+                )
+                .first()
+            )
 
             assert order is not None
-            assert order.status == ORDER_STATUS_SUBMITTED
+            assert (
+                order.status
+                == ORDER_STATUS_SUBMITTED
+            )
 
         finally:
             db.close()

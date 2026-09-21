@@ -1,7 +1,5 @@
-from app.core import database as database_module
 from app.services.external_mapping_service import (
     create_external_mapping,
-    get_external_mapping,
 )
 from app.services.toast_mapping_resolver import (
     ToastMappingResolver,
@@ -21,11 +19,27 @@ def test_resolves_product_mapping_by_tenant():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_product(
+    assert resolver.resolve_product(
         internal_id=2,
+    ) == "toast-product-002"
+
+
+def test_resolves_product_group_mapping():
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="product_group",
+        internal_id=2,
+        external_id="toast-product-group-002",
     )
 
-    assert external_id == "toast-product-002"
+    resolver = ToastMappingResolver(
+        tenant_id=1,
+    )
+
+    assert resolver.resolve_product_group(
+        internal_id=2,
+    ) == "toast-product-group-002"
 
 
 def test_resolves_ingredient_mapping_by_tenant():
@@ -41,11 +55,27 @@ def test_resolves_ingredient_mapping_by_tenant():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_ingredient(
+    assert resolver.resolve_ingredient(
         internal_id=1,
+    ) == "toast-modifier-001"
+
+
+def test_resolves_ingredient_group_mapping():
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="ingredient_group",
+        internal_id=1,
+        external_id="toast-modifier-group-001",
     )
 
-    assert external_id == "toast-modifier-001"
+    resolver = ToastMappingResolver(
+        tenant_id=1,
+    )
+
+    assert resolver.resolve_ingredient_group(
+        internal_id=1,
+    ) == "toast-modifier-group-001"
 
 
 def test_resolves_beverage_using_product_mapping():
@@ -61,11 +91,9 @@ def test_resolves_beverage_using_product_mapping():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_beverage(
+    assert resolver.resolve_beverage(
         internal_id=71,
-    )
-
-    assert external_id == "toast-beverage-071"
+    ) == "toast-beverage-071"
 
 
 def test_resolves_location_mapping():
@@ -81,11 +109,9 @@ def test_resolves_location_mapping():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_location(
+    assert resolver.resolve_location(
         internal_id=1,
-    )
-
-    assert external_id == "toast-location-001"
+    ) == "toast-location-001"
 
 
 def test_missing_product_mapping_returns_none():
@@ -93,11 +119,29 @@ def test_missing_product_mapping_returns_none():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_product(
+    assert resolver.resolve_product(
         internal_id=999,
+    ) is None
+
+
+def test_missing_product_group_mapping_returns_none():
+    resolver = ToastMappingResolver(
+        tenant_id=1,
     )
 
-    assert external_id is None
+    assert resolver.resolve_product_group(
+        internal_id=999,
+    ) is None
+
+
+def test_missing_ingredient_group_mapping_returns_none():
+    resolver = ToastMappingResolver(
+        tenant_id=1,
+    )
+
+    assert resolver.resolve_ingredient_group(
+        internal_id=999,
+    ) is None
 
 
 def test_tenant_isolation_for_product_mapping():
@@ -134,6 +178,40 @@ def test_tenant_isolation_for_product_mapping():
     ) == "toast-tenant-2-product-002"
 
 
+def test_tenant_isolation_for_product_group_mapping():
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="product_group",
+        internal_id=2,
+        external_id="toast-tenant-1-group-002",
+    )
+
+    create_external_mapping(
+        tenant_id=2,
+        provider="toast",
+        entity_type="product_group",
+        internal_id=2,
+        external_id="toast-tenant-2-group-002",
+    )
+
+    resolver_tenant_1 = ToastMappingResolver(
+        tenant_id=1,
+    )
+
+    resolver_tenant_2 = ToastMappingResolver(
+        tenant_id=2,
+    )
+
+    assert resolver_tenant_1.resolve_product_group(
+        internal_id=2,
+    ) == "toast-tenant-1-group-002"
+
+    assert resolver_tenant_2.resolve_product_group(
+        internal_id=2,
+    ) == "toast-tenant-2-group-002"
+
+
 def test_toast_mapping_does_not_use_other_provider():
     create_external_mapping(
         tenant_id=1,
@@ -147,8 +225,6 @@ def test_toast_mapping_does_not_use_other_provider():
         tenant_id=1,
     )
 
-    external_id = resolver.resolve_product(
+    assert resolver.resolve_product(
         internal_id=2,
-    )
-
-    assert external_id is None
+    ) is None

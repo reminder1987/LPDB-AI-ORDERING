@@ -9,6 +9,7 @@ class ToastConfiguration:
     access_token: str | None = None
     client_id: str | None = None
     client_secret: str | None = None
+    dining_option_guid: str | None = None
 
     def __post_init__(self) -> None:
         base_url = self.base_url.strip()
@@ -52,6 +53,10 @@ class ToastConfiguration:
 
         client_secret = self._normalize_optional(
             self.client_secret
+        )
+
+        dining_option_guid = self._normalize_optional(
+            self.dining_option_guid
         )
 
         if (
@@ -118,6 +123,12 @@ class ToastConfiguration:
             client_secret,
         )
 
+        object.__setattr__(
+            self,
+            "dining_option_guid",
+            dining_option_guid,
+        )
+
     @staticmethod
     def _normalize_optional(
         value: str | None,
@@ -127,7 +138,7 @@ class ToastConfiguration:
 
         if not isinstance(value, str):
             raise ValueError(
-                "Toast authentication credential "
+                "Toast configuration value "
                 "must be a string."
             )
 

@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from sqlalchemy import select
 
 from app.core import database as database_module
@@ -18,7 +16,9 @@ from app.models.order_item_modification_db import (
     OrderItemModificationDB,
 )
 from app.services import order_service
-from app.services import submission_service as submission_module
+from app.services import (
+    submission_service as submission_module,
+)
 from app.services.channel_integration_service import (
     ChannelIntegrationService,
 )
@@ -51,7 +51,9 @@ def test_submission_service_with_real_toast_order_service(
         database_module.SessionLocal,
     )
 
-    integration_service = ChannelIntegrationService()
+    integration_service = (
+        ChannelIntegrationService()
+    )
 
     integration_service.create_integration(
         tenant_id=1,
@@ -62,12 +64,14 @@ def test_submission_service_with_real_toast_order_service(
         ),
     )
 
-    tenant = integration_service.resolve_tenant(
-        channel="whatsapp",
-        provider="meta",
-        external_id=(
-            "submission-toast-e2e-business-001"
-        ),
+    tenant = (
+        integration_service.resolve_tenant(
+            channel="whatsapp",
+            provider="meta",
+            external_id=(
+                "submission-toast-e2e-business-001"
+            ),
+        )
     )
 
     adapter = WhatsAppAdapter()
@@ -93,9 +97,7 @@ def test_submission_service_with_real_toast_order_service(
                             customer_external_id
                         ),
                         "session_id": session_id,
-                        "customer_name": (
-                            "Carolina"
-                        ),
+                        "customer_name": "Carolina",
                         "message": message,
                         "phone": "3050000044",
                         "email": (
@@ -106,9 +108,11 @@ def test_submission_service_with_real_toast_order_service(
                 )
             )
 
-            return channel_service.process_message(
-                message=channel_message,
-                tenant=tenant,
+            return (
+                channel_service.process_message(
+                    message=channel_message,
+                    tenant=tenant,
+                )
             )
 
         result = send_message(
@@ -146,7 +150,7 @@ def test_submission_service_with_real_toast_order_service(
         assert result.status == "ready"
 
         # ====================================================
-        # 2. OBTENER ORDEN
+        # 2. OBTENER ORDEN Y VALIDAR DOMINIO LPDB
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -181,15 +185,10 @@ def test_submission_service_with_real_toast_order_service(
 
             assert order_item is not None
 
-            assert (
-                order_item.product_id
-                == 2
-            )
+            order_item_id = order_item.id
 
-            assert (
-                order_item.quantity
-                == 2
-            )
+            assert order_item.product_id == 2
+            assert order_item.quantity == 2
 
             modification = db.scalar(
                 select(
@@ -260,7 +259,7 @@ def test_submission_service_with_real_toast_order_service(
         )
 
         # ====================================================
-        # 4. CREAR MAPPINGS TOAST
+        # 4. CREAR MAPPINGS TOAST IMPLEMENTADOS
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -269,7 +268,9 @@ def test_submission_service_with_real_toast_order_service(
             db.add_all(
                 [
                     ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
                         provider="toast",
                         entity_type="product",
                         internal_id=2,
@@ -279,32 +280,17 @@ def test_submission_service_with_real_toast_order_service(
                         ),
                     ),
                     ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
-                        provider="toast",
-                        entity_type="product",
-                        internal_id=71,
-                        external_id=(
-                            "toast-product-"
-                            "coca-cola"
+                        tenant_id=(
+                            tenant.tenant_id
                         ),
-                    ),
-                    ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
                         provider="toast",
-                        entity_type="ingredient",
-                        internal_id=1,
-                        external_id=(
-                            "toast-modifier-"
-                            "tocineta"
+                        entity_type=(
+                            "product_group"
                         ),
-                    ),
-                    ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
-                        provider="toast",
-                        entity_type="ingredient",
-                        internal_id=23,
+                        internal_id=2,
                         external_id=(
-                            "toast-modifier-fries"
+                            "toast-group-"
+                            "hot-dogs"
                         ),
                     ),
                 ]
@@ -325,6 +311,9 @@ def test_submission_service_with_real_toast_order_service(
             restaurant_external_id=(
                 "toast-restaurant-001"
             ),
+            dining_option_guid=(
+                "toast-dining-option-001"
+            ),
         )
 
         # ====================================================
@@ -337,7 +326,9 @@ def test_submission_service_with_real_toast_order_service(
             ToastOrderService(
                 configuration=configuration,
                 transport=transport,
-                tenant_id=tenant.tenant_id,
+                tenant_id=(
+                    tenant.tenant_id
+                ),
             )
         )
 
@@ -373,7 +364,7 @@ def test_submission_service_with_real_toast_order_service(
         )
 
         # ====================================================
-        # 9. VALIDAR REQUEST ENVIADO
+        # 9. VALIDAR REQUEST TOAST REAL
         # ====================================================
 
         assert len(
@@ -392,66 +383,79 @@ def test_submission_service_with_real_toast_order_service(
         toast_payload = request["payload"]
 
         assert (
-            toast_payload[
-                "restaurantExternalId"
-            ]
-            == "toast-restaurant-001"
+            "restaurantExternalId"
+            not in toast_payload
         )
 
-        assert (
-            toast_payload["order"][
-                "orderId"
-            ]
-            == order_id
+        assert toast_payload[
+            "externalId"
+        ] == (
+            f"lpdb-order-"
+            f"{tenant.tenant_id}-"
+            f"{order_id}"
         )
 
-        assert (
-            toast_payload["order"][
-                "customerName"
-            ]
-            == "Carolina"
+        assert toast_payload[
+            "diningOption"
+        ] == {
+            "guid": (
+                "toast-dining-option-001"
+            ),
+        }
+
+        assert len(
+            toast_payload["checks"]
+        ) == 1
+
+        check = toast_payload[
+            "checks"
+        ][0]
+
+        assert check[
+            "externalId"
+        ] == (
+            f"lpdb-check-"
+            f"{tenant.tenant_id}-"
+            f"{order_id}"
         )
 
         assert len(
-            toast_payload["order"]["items"]
+            check["selections"]
         ) == 1
 
-        item = (
-            toast_payload["order"][
-                "items"
-            ][0]
+        selection = (
+            check["selections"][0]
         )
 
-        assert (
-            item["menuItemGuid"]
-            == (
+        assert selection[
+            "externalId"
+        ] == (
+            f"lpdb-selection-"
+            f"{tenant.tenant_id}-"
+            f"{order_item_id}"
+        )
+
+        assert selection["item"] == {
+            "guid": (
                 "toast-product-"
                 "perro-del-barrio"
-            )
-        )
-
-        assert item["quantity"] == 2
-
-        assert item["modifications"] == [
-            {
-                "modifierGuid": (
-                    "toast-modifier-"
-                    "tocineta"
-                ),
-                "type": "REMOVE",
-            }
-        ]
-
-        assert item["combo"] == {
-            "friesGuid": (
-                "toast-modifier-fries"
             ),
-            "beverageMenuItemGuid": (
-                "toast-product-coca-cola"
-            ),
-            "quantity": 2,
-            "price": Decimal("6.99"),
         }
+
+        assert selection[
+            "itemGroup"
+        ] == {
+            "guid": (
+                "toast-group-hot-dogs"
+            ),
+        }
+
+        assert selection["quantity"] == 2
+
+        assert (
+            selection["modifiers"]
+            == []
+        )
 
         # ====================================================
         # 10. VALIDAR ORDEN SUBMITTED
@@ -468,7 +472,10 @@ def test_submission_service_with_real_toast_order_service(
                 )
             )
 
-            assert submitted_order is not None
+            assert (
+                submitted_order
+                is not None
+            )
 
             assert (
                 submitted_order.status
@@ -512,7 +519,8 @@ def test_submission_service_with_real_toast_order_service(
                     == tenant.tenant_id,
                     ChannelIntegrationDB.external_id
                     == (
-                        "submission-toast-e2e-business-001"
+                        "submission-toast-e2e-"
+                        "business-001"
                     ),
                 )
             )

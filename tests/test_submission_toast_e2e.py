@@ -1,17 +1,21 @@
-from decimal import Decimal
-
 from sqlalchemy import select
 
 from app.core import database as database_module
-from app.models.external_mapping_db import ExternalMappingDB
+from app.models.external_mapping_db import (
+    ExternalMappingDB,
+)
 from app.models.order_db import OrderDB
-from app.models.order_item_combo_db import OrderItemComboDB
+from app.models.order_item_combo_db import (
+    OrderItemComboDB,
+)
 from app.models.order_item_db import OrderItemDB
 from app.models.order_item_modification_db import (
     OrderItemModificationDB,
 )
 from app.services import order_service
-from app.services import submission_service as submission_module
+from app.services import (
+    submission_service as submission_module,
+)
 from app.services.channel_integration_service import (
     ChannelIntegrationService,
 )
@@ -44,7 +48,9 @@ def test_submission_service_reaches_toast_adapter(
         database_module.SessionLocal,
     )
 
-    integration_service = ChannelIntegrationService()
+    integration_service = (
+        ChannelIntegrationService()
+    )
 
     integration_service.create_integration(
         tenant_id=1,
@@ -53,10 +59,14 @@ def test_submission_service_reaches_toast_adapter(
         external_id="toast-e2e-business-001",
     )
 
-    tenant = integration_service.resolve_tenant(
-        channel="whatsapp",
-        provider="meta",
-        external_id="toast-e2e-business-001",
+    tenant = (
+        integration_service.resolve_tenant(
+            channel="whatsapp",
+            provider="meta",
+            external_id=(
+                "toast-e2e-business-001"
+            ),
+        )
     )
 
     adapter = WhatsAppAdapter()
@@ -71,32 +81,41 @@ def test_submission_service_reaches_toast_adapter(
 
     try:
         # ====================================================
-        # 1. CLIENTE PIDE 2 PERROS + MODIFICACIÓN
+        # 1. CLIENTE CREA ORDEN
         # ====================================================
 
-        first_message = adapter.parse_message(
-            {
-                "external_id": customer_external_id,
-                "session_id": session_id,
-                "customer_name": "Carolina",
-                "message": (
-                    "2 PERRO DEL BARRIO "
-                    "SIN TOCINETA"
-                ),
-                "phone": "3050000033",
-                "email": "toast-e2e@example.com",
-            }
-        )
-
-        first_response = (
-            channel_service.process_message(
-                message=first_message,
-                tenant=tenant,
+        def send_message(message):
+            channel_message = (
+                adapter.parse_message(
+                    {
+                        "external_id": (
+                            customer_external_id
+                        ),
+                        "session_id": session_id,
+                        "customer_name": "Carolina",
+                        "message": message,
+                        "phone": "3050000033",
+                        "email": (
+                            "toast-e2e@example.com"
+                        ),
+                    }
+                )
             )
+
+            return (
+                channel_service.process_message(
+                    message=channel_message,
+                    tenant=tenant,
+                )
+            )
+
+        first_response = send_message(
+            "2 PERRO DEL BARRIO SIN TOCINETA",
         )
 
-        assert first_response.status == (
-            "needs_input"
+        assert (
+            first_response.status
+            == "needs_input"
         )
 
         customer_id = (
@@ -105,116 +124,44 @@ def test_submission_service_reaches_toast_adapter(
 
         assert customer_id is not None
 
-        # ====================================================
-        # 2. CLIENTE SELECCIONA SEDE
-        # ====================================================
-
-        location_message = adapter.parse_message(
-            {
-                "external_id": customer_external_id,
-                "session_id": session_id,
-                "customer_name": "Carolina",
-                "message": "Dirty Rabbit",
-                "phone": "3050000033",
-                "email": "toast-e2e@example.com",
-            }
+        location_response = send_message(
+            "Dirty Rabbit",
         )
 
-        location_response = (
-            channel_service.process_message(
-                message=location_message,
-                tenant=tenant,
-            )
+        assert (
+            location_response.status
+            == "needs_input"
         )
 
-        assert location_response.status == (
-            "needs_input"
+        combo_response = send_message(
+            "SI",
         )
 
-        # ====================================================
-        # 3. CLIENTE ACEPTA COMBO
-        # ====================================================
-
-        combo_message = adapter.parse_message(
-            {
-                "external_id": customer_external_id,
-                "session_id": session_id,
-                "customer_name": "Carolina",
-                "message": "SI",
-                "phone": "3050000033",
-                "email": "toast-e2e@example.com",
-            }
+        assert (
+            combo_response.status
+            == "needs_input"
         )
 
-        combo_response = (
-            channel_service.process_message(
-                message=combo_message,
-                tenant=tenant,
-            )
+        beverage_response = send_message(
+            "Coca Cola",
         )
 
-        assert combo_response.status == (
-            "needs_input"
+        assert (
+            beverage_response.status
+            == "needs_input"
+        )
+
+        confirmation_response = send_message(
+            "SI",
+        )
+
+        assert (
+            confirmation_response.status
+            == "ready"
         )
 
         # ====================================================
-        # 4. CLIENTE SELECCIONA BEBIDA
-        # ====================================================
-
-        beverage_message = adapter.parse_message(
-            {
-                "external_id": customer_external_id,
-                "session_id": session_id,
-                "customer_name": "Carolina",
-                "message": "Coca Cola",
-                "phone": "3050000033",
-                "email": "toast-e2e@example.com",
-            }
-        )
-
-        beverage_response = (
-            channel_service.process_message(
-                message=beverage_message,
-                tenant=tenant,
-            )
-        )
-
-        assert beverage_response.status == (
-            "needs_input"
-        )
-
-        # ====================================================
-        # 5. CLIENTE CONFIRMA LA ORDEN
-        # ====================================================
-
-        confirmation_message = (
-            adapter.parse_message(
-                {
-                    "external_id": (
-                        customer_external_id
-                    ),
-                    "session_id": session_id,
-                    "customer_name": "Carolina",
-                    "message": "SI",
-                    "phone": "3050000033",
-                    "email": "toast-e2e@example.com",
-                }
-            )
-        )
-
-        confirmation_response = (
-            channel_service.process_message(
-                message=confirmation_message,
-                tenant=tenant,
-            )
-        )
-
-        assert confirmation_response.status == (
-            "ready"
-        )
-
-        # ====================================================
-        # 6. OBTENER ORDEN CREADA
+        # 2. VALIDAR ORDEN INTERNA LPDB
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -237,9 +184,13 @@ def test_submission_service_reaches_toast_adapter(
 
             order_id = order.id
 
-            assert order.tenant_id == 1
-            assert order.customer_id == (
-                customer_id
+            assert (
+                order.tenant_id
+                == tenant.tenant_id
+            )
+            assert (
+                order.customer_id
+                == customer_id
             )
             assert order.location_id == 1
             assert order.status == "created"
@@ -252,6 +203,9 @@ def test_submission_service_reaches_toast_adapter(
             )
 
             assert order_item is not None
+
+            order_item_id = order_item.id
+
             assert order_item.product_id == 2
             assert order_item.quantity == 2
 
@@ -315,7 +269,7 @@ def test_submission_service_reaches_toast_adapter(
             db.close()
 
         # ====================================================
-        # 7. CONFIRMAR ORDEN
+        # 3. CONFIRMAR ORDEN
         # ====================================================
 
         confirmation_result = (
@@ -326,7 +280,10 @@ def test_submission_service_reaches_toast_adapter(
             )
         )
 
-        assert confirmation_result is not None
+        assert (
+            confirmation_result
+            is not None
+        )
 
         assert (
             confirmation_result["status"]
@@ -334,7 +291,7 @@ def test_submission_service_reaches_toast_adapter(
         )
 
         # ====================================================
-        # 8. CREAR MAPPINGS DE TOAST
+        # 4. CREAR MAPPINGS TOAST IMPLEMENTADOS
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -343,7 +300,9 @@ def test_submission_service_reaches_toast_adapter(
             db.add_all(
                 [
                     ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
                         provider="toast",
                         entity_type="product",
                         internal_id=2,
@@ -353,32 +312,16 @@ def test_submission_service_reaches_toast_adapter(
                         ),
                     ),
                     ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
-                        provider="toast",
-                        entity_type="ingredient",
-                        internal_id=1,
-                        external_id=(
-                            "toast-modifier-"
-                            "tocineta"
+                        tenant_id=(
+                            tenant.tenant_id
                         ),
-                    ),
-                    ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
                         provider="toast",
-                        entity_type="ingredient",
-                        internal_id=23,
-                        external_id=(
-                            "toast-modifier-fries"
+                        entity_type=(
+                            "product_group"
                         ),
-                    ),
-                    ExternalMappingDB(
-                        tenant_id=tenant.tenant_id,
-                        provider="toast",
-                        entity_type="product",
-                        internal_id=71,
+                        internal_id=2,
                         external_id=(
-                            "toast-product-"
-                            "coca-cola"
+                            "toast-group-hot-dogs"
                         ),
                     ),
                 ]
@@ -390,7 +333,7 @@ def test_submission_service_reaches_toast_adapter(
             db.close()
 
         # ====================================================
-        # 9. FAKE TOAST PROVIDER
+        # 5. FAKE TOAST PROVIDER
         # ====================================================
 
         class FakeToastProvider:
@@ -409,7 +352,8 @@ def test_submission_service_reaches_toast_adapter(
                 payload,
             ):
                 self.submitted_payload = (
-                    self.adapter.build_order_payload(
+                    self.adapter
+                    .build_order_payload(
                         payload
                     )
                 )
@@ -424,6 +368,9 @@ def test_submission_service_reaches_toast_adapter(
         toast_adapter = ToastOrderAdapter(
             restaurant_external_id=(
                 "toast-restaurant-001"
+            ),
+            dining_option_guid=(
+                "toast-dining-option-001"
             ),
             tenant_id=tenant.tenant_id,
         )
@@ -444,7 +391,7 @@ def test_submission_service_reaches_toast_adapter(
         )
 
         # ====================================================
-        # 10. SUBMIT AL FLUJO TOAST
+        # 6. SUBMIT AL FLUJO TOAST
         # ====================================================
 
         submission_result = (
@@ -454,7 +401,10 @@ def test_submission_service_reaches_toast_adapter(
             )
         )
 
-        assert submission_result.success is True
+        assert (
+            submission_result.success
+            is True
+        )
 
         assert (
             submission_result.external_order_id
@@ -467,7 +417,7 @@ def test_submission_service_reaches_toast_adapter(
         )
 
         # ====================================================
-        # 11. VERIFICAR PAYLOAD TOAST
+        # 7. VALIDAR PAYLOAD TOAST ACTUAL
         # ====================================================
 
         toast_payload = (
@@ -478,72 +428,84 @@ def test_submission_service_reaches_toast_adapter(
         assert toast_payload is not None
 
         assert (
-            toast_payload[
-                "restaurantExternalId"
-            ]
-            == "toast-restaurant-001"
+            "restaurantExternalId"
+            not in toast_payload
         )
 
-        assert (
-            toast_payload["order"]["orderId"]
-            == order_id
+        assert toast_payload[
+            "externalId"
+        ] == (
+            f"lpdb-order-"
+            f"{tenant.tenant_id}-"
+            f"{order_id}"
         )
 
-        assert (
-            toast_payload["order"][
-                "customerName"
-            ]
-            == "Carolina"
+        assert toast_payload[
+            "diningOption"
+        ] == {
+            "guid": (
+                "toast-dining-option-001"
+            ),
+        }
+
+        assert len(
+            toast_payload["checks"]
+        ) == 1
+
+        check = toast_payload[
+            "checks"
+        ][0]
+
+        assert check[
+            "externalId"
+        ] == (
+            f"lpdb-check-"
+            f"{tenant.tenant_id}-"
+            f"{order_id}"
         )
 
         assert len(
-            toast_payload["order"]["items"]
+            check["selections"]
         ) == 1
 
         toast_item = (
-            toast_payload["order"]["items"][0]
+            check["selections"][0]
         )
 
-        assert (
-            toast_item["menuItemGuid"]
-            == "toast-product-perro-del-barrio"
+        assert toast_item[
+            "externalId"
+        ] == (
+            f"lpdb-selection-"
+            f"{tenant.tenant_id}-"
+            f"{order_item_id}"
         )
 
-        assert toast_item["quantity"] == 2
+        assert toast_item["item"] == {
+            "guid": (
+                "toast-product-"
+                "perro-del-barrio"
+            ),
+        }
 
-        assert toast_item["modifications"] == [
-            {
-                "modifierGuid": (
-                    "toast-modifier-tocineta"
-                ),
-                "type": "REMOVE",
-            }
-        ]
+        assert toast_item[
+            "itemGroup"
+        ] == {
+            "guid": (
+                "toast-group-hot-dogs"
+            ),
+        }
 
-        assert (
-            toast_item["combo"]["friesGuid"]
-            == "toast-modifier-fries"
-        )
-
-        assert (
-            toast_item["combo"][
-                "beverageMenuItemGuid"
-            ]
-            == "toast-product-coca-cola"
-        )
+        assert toast_item[
+            "quantity"
+        ] == 2
 
         assert (
-            toast_item["combo"]["quantity"]
-            == 2
-        )
-
-        assert (
-            toast_item["combo"]["price"]
-            == Decimal("6.99")
+            toast_item["modifiers"]
+            == []
         )
 
         # ====================================================
-        # 12. VERIFICAR ESTADO SUBMITTED
+        # 8. VERIFICAR ESTADO SUBMITTED
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -557,7 +519,10 @@ def test_submission_service_reaches_toast_adapter(
                 )
             )
 
-            assert submitted_order is not None
+            assert (
+                submitted_order
+                is not None
+            )
 
             assert (
                 submitted_order.status
@@ -579,7 +544,10 @@ def test_submission_service_reaches_toast_adapter(
                 )
             )
 
-            assert order_mapping is not None
+            assert (
+                order_mapping
+                is not None
+            )
 
             assert (
                 order_mapping.external_id

@@ -58,6 +58,13 @@ class ToastConfigurationService:
             "Toast restaurant_external_id is required.",
         )
 
+        dining_option_guid = self._require_string(
+            configuration.get(
+                "dining_option_guid"
+            ),
+            "Toast dining_option_guid is required.",
+        )
+
         base_url = configuration.get(
             "base_url",
             DEFAULT_TOAST_BASE_URL,
@@ -91,6 +98,9 @@ class ToastConfigurationService:
                 base_url=base_url,
                 restaurant_external_id=(
                     restaurant_external_id
+                ),
+                dining_option_guid=(
+                    dining_option_guid
                 ),
                 timeout=timeout,
                 client_id=client_id,

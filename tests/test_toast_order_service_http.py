@@ -68,6 +68,9 @@ def test_toast_order_service_uses_http_transport():
         restaurant_external_id=(
             "toast-restaurant-001"
         ),
+        dining_option_guid=(
+            "toast-dining-option-001"
+        ),
     )
 
     transport = ToastHttpTransport(
@@ -82,24 +85,23 @@ def test_toast_order_service_uses_http_transport():
         product_mappings={
             2: "toast-product-perro",
         },
-        ingredient_mappings={
-            1: "toast-modifier-tocineta",
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
         },
     )
 
     payload = {
         "order_id": 100,
+        "tenant_id": 1,
+        "location_id": 1,
         "customer_name": "Carolina",
         "items": [
             {
+                "order_item_id": 501,
                 "product_id": 2,
                 "quantity": 2,
-                "modifications": [
-                    {
-                        "ingredient_id": 1,
-                        "type": "REMOVE",
-                    }
-                ],
+                "modifications": [],
+                "combo": None,
             }
         ],
     }
@@ -136,27 +138,39 @@ def test_toast_order_service_uses_http_transport():
     }
 
     assert request["json"] == {
-        "restaurantExternalId": (
-            "toast-restaurant-001"
-        ),
-        "order": {
-            "orderId": 100,
-            "customerName": "Carolina",
-            "items": [
-                {
-                    "menuItemGuid": (
-                        "toast-product-perro"
-                    ),
-                    "quantity": 2,
-                    "modifications": [
-                        {
-                            "modifierGuid": (
-                                "toast-modifier-tocineta"
-                            ),
-                            "type": "REMOVE",
-                        }
-                    ],
-                }
-            ],
+        "externalId": "lpdb-order-1-100",
+        "diningOption": {
+            "guid": "toast-dining-option-001",
         },
+        "checks": [
+            {
+                "externalId": (
+                    "lpdb-check-1-100"
+                ),
+                "selections": [
+                    {
+                        "externalId": (
+                            "lpdb-selection-1-501"
+                        ),
+                        "item": {
+                            "guid": (
+                                "toast-product-perro"
+                            ),
+                        },
+                        "itemGroup": {
+                            "guid": (
+                                "toast-group-hot-dogs"
+                            ),
+                        },
+                        "quantity": 2,
+                        "modifiers": [],
+                    }
+                ],
+            }
+        ],
     }
+
+    assert (
+        "restaurantExternalId"
+        not in request["json"]
+    )

@@ -20,6 +20,9 @@ def test_toast_order_service_exposes_check_as_external_mapping():
         restaurant_external_id=(
             "toast-restaurant-001"
         ),
+        dining_option_guid=(
+            "toast-dining-option-001"
+        ),
     )
 
     service = ToastOrderService(
@@ -29,16 +32,23 @@ def test_toast_order_service_exposes_check_as_external_mapping():
         product_mappings={
             2: "toast-product-001",
         },
+        product_group_mappings={
+            2: "toast-product-group-001",
+        },
     )
 
     payload = {
         "order_id": 123,
+        "tenant_id": 1,
+        "location_id": 1,
         "customer_name": "Carolina",
         "items": [
             {
+                "order_item_id": 501,
                 "product_id": 2,
                 "quantity": 1,
                 "modifications": [],
+                "combo": None,
             }
         ],
     }

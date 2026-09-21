@@ -20,6 +20,9 @@ def build_integration(
             "restaurant_external_id": (
                 "toast-restaurant-001"
             ),
+            "dining_option_guid": (
+                "toast-dining-option-001"
+            ),
         }
 
     if credentials is None:
@@ -74,6 +77,10 @@ def test_builds_configuration_with_defaults():
         "toast-restaurant-001"
     )
 
+    assert result.dining_option_guid == (
+        "toast-dining-option-001"
+    )
+
     assert result.client_id == "test-client-id"
 
     assert result.client_secret == (
@@ -89,6 +96,9 @@ def test_builds_configuration_with_custom_values():
             configuration={
                 "restaurant_external_id": (
                     "toast-restaurant-999"
+                ),
+                "dining_option_guid": (
+                    "toast-dining-option-999"
                 ),
                 "base_url": "https://toast.test/",
                 "timeout": 15,
@@ -106,6 +116,10 @@ def test_builds_configuration_with_custom_values():
         "toast-restaurant-999"
     )
 
+    assert result.dining_option_guid == (
+        "toast-dining-option-999"
+    )
+
 
 def test_requires_restaurant_external_id():
     service = build_service()
@@ -113,12 +127,41 @@ def test_requires_restaurant_external_id():
     try:
         service.build_configuration(
             build_integration(
-                configuration={}
+                configuration={
+                    "dining_option_guid": (
+                        "toast-dining-option-001"
+                    ),
+                }
             )
         )
     except ToastConfigurationError as exc:
         assert str(exc) == (
             "Toast restaurant_external_id "
+            "is required."
+        )
+    else:
+        raise AssertionError(
+            "ToastConfigurationError "
+            "was not raised."
+        )
+
+
+def test_requires_dining_option_guid():
+    service = build_service()
+
+    try:
+        service.build_configuration(
+            build_integration(
+                configuration={
+                    "restaurant_external_id": (
+                        "toast-restaurant-001"
+                    ),
+                }
+            )
+        )
+    except ToastConfigurationError as exc:
+        assert str(exc) == (
+            "Toast dining_option_guid "
             "is required."
         )
     else:
@@ -229,6 +272,9 @@ def test_rejects_invalid_timeout():
                 configuration={
                     "restaurant_external_id": (
                         "toast-restaurant-001"
+                    ),
+                    "dining_option_guid": (
+                        "toast-dining-option-001"
                     ),
                     "timeout": 0,
                 }

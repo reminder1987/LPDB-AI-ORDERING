@@ -27,6 +27,10 @@ def build_external_order_payload(
 
     Los valores financieros usan los snapshots
     persistidos en la orden. No se recalculan aquí.
+
+    Cada item conserva su identificador interno
+    persistente para permitir que los adaptadores
+    externos construyan identificadores estables.
     """
 
     items = []
@@ -66,6 +70,7 @@ def build_external_order_payload(
 
         items.append(
             {
+                "order_item_id": order_item.id,
                 "product_id": order_item.product_id,
                 "quantity": order_item.quantity,
                 "unit_price": _decimal_or_none(

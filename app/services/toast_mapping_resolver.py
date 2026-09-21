@@ -47,6 +47,15 @@ class ToastMappingResolver:
             internal_id=internal_id,
         )
 
+    def resolve_product_group(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        return self._resolve(
+            entity_type="product_group",
+            internal_id=internal_id,
+        )
+
     def resolve_beverage(
         self,
         internal_id: int,
@@ -62,6 +71,15 @@ class ToastMappingResolver:
     ) -> str | None:
         return self._resolve(
             entity_type="ingredient",
+            internal_id=internal_id,
+        )
+
+    def resolve_ingredient_group(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        return self._resolve(
+            entity_type="ingredient_group",
             internal_id=internal_id,
         )
 

@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from app.services.fake_toast_transport import (
     FakeToastTransport,
 )
@@ -15,13 +13,16 @@ def build_service(
     transport,
     tenant_id=None,
     product_mappings=None,
-    ingredient_mappings=None,
+    product_group_mappings=None,
 ):
     configuration = ToastConfiguration(
         base_url="https://toast.test",
         access_token="test-token",
         restaurant_external_id=(
             "toast-restaurant-001"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-001"
         ),
     )
 
@@ -30,55 +31,51 @@ def build_service(
         transport=transport,
         tenant_id=tenant_id,
         product_mappings=product_mappings,
-        ingredient_mappings=ingredient_mappings,
+        product_group_mappings=(
+            product_group_mappings
+        ),
     )
 
 
-def test_toast_order_service_builds_and_sends_order():
+def build_basic_payload(
+    order_id,
+    order_item_id,
+    tenant_id=1,
+):
+    return {
+        "order_id": order_id,
+        "tenant_id": tenant_id,
+        "location_id": 1,
+        "customer_name": "Carolina",
+        "items": [
+            {
+                "order_item_id": order_item_id,
+                "product_id": 2,
+                "quantity": 1,
+                "modifications": [],
+                "combo": None,
+            }
+        ],
+    }
+
+
+def test_toast_order_service_builds_and_sends_real_order():
     transport = FakeToastTransport()
 
     service = build_service(
         transport=transport,
         product_mappings={
-            2: (
-                "toast-product-"
-                "perro-del-barrio"
-            ),
-            71: (
-                "toast-product-"
-                "coca-cola"
-            ),
+            2: "toast-product-perro",
         },
-        ingredient_mappings={
-            1: "toast-modifier-tocineta",
-            23: "toast-modifier-fries",
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
         },
     )
 
-    payload = {
-        "order_id": 123,
-        "customer_name": "Carolina",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 2,
-                "modifications": [
-                    {
-                        "ingredient_id": 1,
-                        "type": "REMOVE",
-                    }
-                ],
-                "combo": {
-                    "fries_ingredient_id": 23,
-                    "beverage_product_id": 71,
-                    "quantity": 2,
-                    "combo_price": Decimal(
-                        "6.99"
-                    ),
-                },
-            }
-        ],
-    }
+    payload = build_basic_payload(
+        order_id=123,
+        order_item_id=501,
+    )
 
     result = service.submit_order(
         order_id=123,
@@ -103,52 +100,44 @@ def test_toast_order_service_builds_and_sends_order():
 
     toast_payload = request["payload"]
 
-    assert toast_payload[
+    assert (
         "restaurantExternalId"
-    ] == "toast-restaurant-001"
-
-    assert toast_payload["order"][
-        "orderId"
-    ] == 123
-
-    assert toast_payload["order"][
-        "customerName"
-    ] == "Carolina"
-
-    assert len(
-        toast_payload["order"]["items"]
-    ) == 1
-
-    item = toast_payload[
-        "order"
-    ]["items"][0]
-
-    assert item["menuItemGuid"] == (
-        "toast-product-"
-        "perro-del-barrio"
+        not in toast_payload
     )
 
-    assert item["quantity"] == 2
+    assert "order" not in toast_payload
 
-    assert item["modifications"] == [
-        {
-            "modifierGuid": (
-                "toast-modifier-tocineta"
-            ),
-            "type": "REMOVE",
-        }
-    ]
+    assert toast_payload["externalId"] == (
+        "lpdb-order-1-123"
+    )
 
-    assert item["combo"] == {
-        "friesGuid": (
-            "toast-modifier-fries"
-        ),
-        "beverageMenuItemGuid": (
-            "toast-product-coca-cola"
-        ),
-        "quantity": 2,
-        "price": Decimal("6.99"),
+    assert toast_payload["diningOption"] == {
+        "guid": "toast-dining-option-001",
     }
+
+    check = toast_payload["checks"][0]
+
+    assert check["externalId"] == (
+        "lpdb-check-1-123"
+    )
+
+    selection = check["selections"][0]
+
+    assert selection["externalId"] == (
+        "lpdb-selection-1-501"
+    )
+
+    assert selection["item"] == {
+        "guid": "toast-product-perro",
+    }
+
+    assert selection["itemGroup"] == {
+        "guid": "toast-group-hot-dogs",
+    }
+
+    assert selection["quantity"] == 1
+
+    assert selection["modifiers"] == []
 
 
 def test_toast_order_service_returns_failure_when_transport_fails():
@@ -159,24 +148,17 @@ def test_toast_order_service_returns_failure_when_transport_fails():
     service = build_service(
         transport=transport,
         product_mappings={
-            2: (
-                "toast-product-"
-                "perro-del-barrio"
-            ),
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
         },
     )
 
-    payload = {
-        "order_id": 456,
-        "customer_name": "Carolina",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [],
-            }
-        ],
-    }
+    payload = build_basic_payload(
+        order_id=456,
+        order_item_id=502,
+    )
 
     result = service.submit_order(
         order_id=456,
@@ -192,6 +174,8 @@ def test_toast_order_service_returns_failure_when_transport_fails():
     assert result.error == (
         "Simulated Toast transport failure."
     )
+
+
 def test_toast_order_service_uses_location_mapping():
     from app.services.external_mapping_service import (
         create_external_mapping,
@@ -202,7 +186,9 @@ def test_toast_order_service_uses_location_mapping():
         provider="toast",
         entity_type="location",
         internal_id=2,
-        external_id="toast-wynwood-restaurant",
+        external_id=(
+            "toast-wynwood-restaurant"
+        ),
     )
 
     transport = FakeToastTransport()
@@ -213,19 +199,17 @@ def test_toast_order_service_uses_location_mapping():
         product_mappings={
             2: "toast-product-perro",
         },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
     )
 
-    payload = {
-        "order_id": 789,
-        "customer_name": "Carolina",
-        "items": [
-            {
-                "product_id": 2,
-                "quantity": 1,
-                "modifications": [],
-            }
-        ],
-    }
+    payload = build_basic_payload(
+        order_id=789,
+        order_item_id=503,
+    )
+
+    payload["location_id"] = 2
 
     result = service.submit_order(
         order_id=789,
@@ -244,6 +228,7 @@ def test_toast_order_service_uses_location_mapping():
         "restaurant_external_id"
     ] == "toast-wynwood-restaurant"
 
-    assert request["payload"][
+    assert (
         "restaurantExternalId"
-    ] == "toast-wynwood-restaurant"
+        not in request["payload"]
+    )

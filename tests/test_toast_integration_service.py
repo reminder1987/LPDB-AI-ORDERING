@@ -49,6 +49,9 @@ def build_integration(
             "restaurant_external_id": (
                 "toast-default-restaurant"
             ),
+            "dining_option_guid": (
+                "toast-dining-option-001"
+            ),
             "timeout": 15,
         },
         credentials={
@@ -118,6 +121,11 @@ def test_resolve_toast_integration_for_tenant():
         == "toast-default-restaurant"
     )
 
+    assert (
+        result.configuration.dining_option_guid
+        == "toast-dining-option-001"
+    )
+
     assert result.configuration.timeout == 15
 
     assert (
@@ -178,6 +186,11 @@ def test_resolve_is_tenant_scoped():
     assert (
         result.configuration.client_secret
         == "test-toast-client-secret"
+    )
+
+    assert (
+        result.configuration.dining_option_guid
+        == "toast-dining-option-001"
     )
 
     assert provider_service.calls == [

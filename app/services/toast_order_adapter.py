@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from app.services.toast_mapping_resolver import (
     ToastMappingResolver,
 )
@@ -12,6 +10,13 @@ class ToastOrderAdapter:
         tenant_id: int | None = None,
         product_mappings: dict[int, str] | None = None,
         ingredient_mappings: dict[int, str] | None = None,
+        dining_option_guid: str | None = None,
+        product_group_mappings: (
+            dict[int, str] | None
+        ) = None,
+        ingredient_group_mappings: (
+            dict[int, str] | None
+        ) = None,
     ) -> None:
         restaurant_external_id = (
             restaurant_external_id.strip()
@@ -27,8 +32,28 @@ class ToastOrderAdapter:
                 "tenant_id must be greater than zero."
             )
 
+        if dining_option_guid is not None:
+            if not isinstance(
+                dining_option_guid,
+                str,
+            ):
+                raise ValueError(
+                    "dining_option_guid must be a string."
+                )
+
+            dining_option_guid = (
+                dining_option_guid.strip()
+            )
+
+            if not dining_option_guid:
+                dining_option_guid = None
+
         self.restaurant_external_id = (
             restaurant_external_id
+        )
+
+        self.dining_option_guid = (
+            dining_option_guid
         )
 
         self.tenant_id = tenant_id
@@ -37,8 +62,16 @@ class ToastOrderAdapter:
             product_mappings or {}
         )
 
+        self.product_group_mappings = dict(
+            product_group_mappings or {}
+        )
+
         self.ingredient_mappings = dict(
             ingredient_mappings or {}
+        )
+
+        self.ingredient_group_mappings = dict(
+            ingredient_group_mappings or {}
         )
 
         self.mapping_resolver = (
@@ -54,7 +87,9 @@ class ToastOrderAdapter:
         internal_id: int,
     ) -> str | None:
         if internal_id in self.product_mappings:
-            return self.product_mappings[internal_id]
+            return self.product_mappings[
+                internal_id
+            ]
 
         if self.mapping_resolver is None:
             return None
@@ -63,11 +98,36 @@ class ToastOrderAdapter:
             internal_id=internal_id,
         )
 
+    def _resolve_product_group(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        if (
+            internal_id
+            in self.product_group_mappings
+        ):
+            return self.product_group_mappings[
+                internal_id
+            ]
+
+        if self.mapping_resolver is None:
+            return None
+
+        return (
+            self.mapping_resolver
+            .resolve_product_group(
+                internal_id=internal_id,
+            )
+        )
+
     def _resolve_ingredient(
         self,
         internal_id: int,
     ) -> str | None:
-        if internal_id in self.ingredient_mappings:
+        if (
+            internal_id
+            in self.ingredient_mappings
+        ):
             return self.ingredient_mappings[
                 internal_id
             ]
@@ -75,18 +135,105 @@ class ToastOrderAdapter:
         if self.mapping_resolver is None:
             return None
 
-        return self.mapping_resolver.resolve_ingredient(
-            internal_id=internal_id,
+        return (
+            self.mapping_resolver
+            .resolve_ingredient(
+                internal_id=internal_id,
+            )
         )
+
+    def _resolve_ingredient_group(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        if (
+            internal_id
+            in self.ingredient_group_mappings
+        ):
+            return (
+                self.ingredient_group_mappings[
+                    internal_id
+                ]
+            )
+
+        if self.mapping_resolver is None:
+            return None
+
+        return (
+            self.mapping_resolver
+            .resolve_ingredient_group(
+                internal_id=internal_id,
+            )
+        )
+
+    def _require_dining_option_guid(
+        self,
+    ) -> str:
+        if self.dining_option_guid is None:
+            raise ValueError(
+                "dining_option_guid is required."
+            )
+
+        return self.dining_option_guid
+
+    @staticmethod
+    def _require_positive_integer(
+        value,
+        field_name: str,
+    ) -> int:
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value <= 0
+        ):
+            raise ValueError(
+                f"{field_name} must be "
+                "a positive integer."
+            )
+
+        return value
 
     def build_order_payload(
         self,
         payload: dict,
     ) -> dict:
-        items = []
+        dining_option_guid = (
+            self._require_dining_option_guid()
+        )
 
-        for item in payload.get("items", []):
-            product_id = item.get("product_id")
+        order_id = (
+            self._require_positive_integer(
+                payload.get("order_id"),
+                "order_id",
+            )
+        )
+
+        tenant_id = (
+            self._require_positive_integer(
+                payload.get("tenant_id"),
+                "tenant_id",
+            )
+        )
+
+        selections = []
+
+        for item in payload.get(
+            "items",
+            [],
+        ):
+            order_item_id = (
+                self._require_positive_integer(
+                    item.get("order_item_id"),
+                    "order_item_id",
+                )
+            )
+
+            product_id = (
+                self._require_positive_integer(
+                    item.get("product_id"),
+                    "product_id",
+                )
+            )
 
             product_external_id = (
                 self._resolve_product(
@@ -100,122 +247,74 @@ class ToastOrderAdapter:
                     f"for product {product_id}."
                 )
 
-            toast_item = {
-                "menuItemGuid": product_external_id,
-                "quantity": item["quantity"],
-                "modifications": [],
+            product_group_external_id = (
+                self._resolve_product_group(
+                    internal_id=product_id,
+                )
+            )
+
+            if (
+                product_group_external_id
+                is None
+            ):
+                raise ValueError(
+                    "Missing Toast product group "
+                    "mapping for product "
+                    f"{product_id}."
+                )
+
+            quantity = item.get("quantity")
+
+            if (
+                not isinstance(
+                    quantity,
+                    (int, float),
+                )
+                or isinstance(quantity, bool)
+                or quantity <= 0
+            ):
+                raise ValueError(
+                    "quantity must be greater "
+                    "than zero."
+                )
+
+            selection = {
+                "externalId": (
+                    "lpdb-selection-"
+                    f"{tenant_id}-"
+                    f"{order_item_id}"
+                ),
+                "item": {
+                    "guid": (
+                        product_external_id
+                    ),
+                },
+                "itemGroup": {
+                    "guid": (
+                        product_group_external_id
+                    ),
+                },
+                "quantity": quantity,
+                "modifiers": [],
             }
 
-            for modification in item.get(
-                "modifications",
-                [],
-            ):
-                ingredient_id = modification.get(
-                    "ingredient_id"
-                )
-
-                ingredient_external_id = (
-                    self._resolve_ingredient(
-                        internal_id=ingredient_id,
-                    )
-                )
-
-                if ingredient_external_id is None:
-                    raise ValueError(
-                        "Missing Toast ingredient "
-                        "mapping for modification "
-                        f"{ingredient_id}."
-                    )
-
-                toast_item[
-                    "modifications"
-                ].append(
-                    {
-                        "modifierGuid": (
-                            ingredient_external_id
-                        ),
-                        "type": modification[
-                            "type"
-                        ],
-                    }
-                )
-
-            combo = item.get("combo")
-
-            if combo is not None:
-                beverage_product_id = combo.get(
-                    "beverage_product_id"
-                )
-
-                beverage_external_id = (
-                    self._resolve_product(
-                        internal_id=(
-                            beverage_product_id
-                        ),
-                    )
-                )
-
-                if beverage_external_id is None:
-                    raise ValueError(
-                        "Missing Toast beverage "
-                        "mapping for product "
-                        f"{beverage_product_id}."
-                    )
-
-                fries_ingredient_id = combo.get(
-                    "fries_ingredient_id"
-                )
-
-                fries_external_id = (
-                    self._resolve_ingredient(
-                        internal_id=(
-                            fries_ingredient_id
-                        ),
-                    )
-                )
-
-                if fries_external_id is None:
-                    raise ValueError(
-                        "Missing Toast ingredient "
-                        "mapping for fries "
-                        f"{fries_ingredient_id}."
-                    )
-
-                combo_price = combo.get(
-                    "combo_price"
-                )
-
-                if combo_price is not None:
-                    combo_price = Decimal(
-                        str(combo_price)
-                    )
-
-                toast_item["combo"] = {
-                    "friesGuid": (
-                        fries_external_id
-                    ),
-                    "beverageMenuItemGuid": (
-                        beverage_external_id
-                    ),
-                    "quantity": combo[
-                        "quantity"
-                    ],
-                    "price": combo_price,
-                }
-
-            items.append(toast_item)
+            selections.append(selection)
 
         return {
-            "restaurantExternalId": (
-                self.restaurant_external_id
+            "externalId": (
+                f"lpdb-order-{tenant_id}-{order_id}"
             ),
-            "order": {
-                "orderId": payload.get(
-                    "order_id"
-                ),
-                "customerName": payload.get(
-                    "customer_name"
-                ),
-                "items": items,
+            "diningOption": {
+                "guid": dining_option_guid,
             },
+            "checks": [
+                {
+                    "externalId": (
+                        "lpdb-check-"
+                        f"{tenant_id}-"
+                        f"{order_id}"
+                    ),
+                    "selections": selections,
+                }
+            ],
         }

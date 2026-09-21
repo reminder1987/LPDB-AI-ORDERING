@@ -55,7 +55,9 @@ def test_toast_order_service_accepts_toast_configuration():
         response=FakeHttpResponse(
             status_code=201,
             body={
-                "guid": "toast-configured-order-001",
+                "guid": (
+                    "toast-configured-order-001"
+                ),
             },
         )
     )
@@ -65,6 +67,9 @@ def test_toast_order_service_accepts_toast_configuration():
         access_token="test-token",
         restaurant_external_id=(
             "toast-restaurant-001"
+        ),
+        dining_option_guid=(
+            "toast-dining-option-001"
         ),
         timeout=45,
     )
@@ -77,27 +82,27 @@ def test_toast_order_service_accepts_toast_configuration():
     service = ToastOrderService(
         configuration=configuration,
         transport=transport,
+        tenant_id=1,
         product_mappings={
             2: "toast-product-perro",
         },
-        ingredient_mappings={
-            1: "toast-modifier-tocineta",
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
         },
     )
 
     payload = {
         "order_id": 100,
+        "tenant_id": 1,
+        "location_id": 1,
         "customer_name": "Carolina",
         "items": [
             {
+                "order_item_id": 501,
                 "product_id": 2,
                 "quantity": 1,
-                "modifications": [
-                    {
-                        "ingredient_id": 1,
-                        "type": "REMOVE",
-                    }
-                ],
+                "modifications": [],
+                "combo": None,
             }
         ],
     }
@@ -124,3 +129,14 @@ def test_toast_order_service_accepts_toast_configuration():
     ] == "toast-restaurant-001"
 
     assert request["timeout"] == 45
+
+    assert (
+        "restaurantExternalId"
+        not in request["json"]
+    )
+
+    assert request["json"][
+        "diningOption"
+    ] == {
+        "guid": "toast-dining-option-001",
+    }

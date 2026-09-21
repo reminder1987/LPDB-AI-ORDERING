@@ -266,3 +266,28 @@ def test_build_external_order_payload_preserves_legacy_null_snapshots():
 
     assert mapped_item["unit_price"] is None
     assert mapped_item["subtotal"] is None
+
+
+def test_build_external_order_payload_preserves_order_item_id():
+    order = OrderDB(
+        id=105,
+        tenant_id=1,
+        customer_name="Cliente Item ID",
+        location_id=1,
+        total=Decimal("10.00"),
+    )
+
+    item = OrderItemDB(
+        id=205,
+        order_id=105,
+        product_id=2,
+        quantity=1,
+        unit_price=Decimal("10.00"),
+        subtotal=Decimal("10.00"),
+    )
+
+    order.items = [item]
+
+    payload = build_external_order_payload(order)
+
+    assert payload["items"][0]["order_item_id"] == 205

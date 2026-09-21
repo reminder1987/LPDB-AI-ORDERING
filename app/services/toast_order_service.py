@@ -23,6 +23,12 @@ class ToastOrderService:
         tenant_id: int | None = None,
         product_mappings: dict[int, str] | None = None,
         ingredient_mappings: dict[int, str] | None = None,
+        product_group_mappings: (
+            dict[int, str] | None
+        ) = None,
+        ingredient_group_mappings: (
+            dict[int, str] | None
+        ) = None,
     ) -> None:
         self.configuration = configuration
         self.tenant_id = tenant_id
@@ -31,9 +37,18 @@ class ToastOrderService:
             restaurant_external_id=(
                 configuration.restaurant_external_id
             ),
+            dining_option_guid=(
+                configuration.dining_option_guid
+            ),
             tenant_id=tenant_id,
             product_mappings=product_mappings,
             ingredient_mappings=ingredient_mappings,
+            product_group_mappings=(
+                product_group_mappings
+            ),
+            ingredient_group_mappings=(
+                ingredient_group_mappings
+            ),
         )
 
         self.mapping_resolver = (
@@ -88,10 +103,6 @@ class ToastOrderService:
                     payload
                 )
             )
-
-            toast_payload[
-                "restaurantExternalId"
-            ] = restaurant_external_id
 
             result = self.transport.create_order(
                 restaurant_external_id=(
