@@ -21,8 +21,14 @@ from app.services.toast_order_service_factory import (
 
 
 class FakeProviderIntegrationService:
-    def __init__(self, integration):
-        self.integration = integration
+    def __init__(self, integrations):
+        if isinstance(integrations, dict):
+            self.integrations = integrations
+        else:
+            self.integrations = {
+                integrations.tenant_id: integrations
+            }
+
         self.calls = []
 
     def get_integration(
@@ -41,7 +47,7 @@ class FakeProviderIntegrationService:
             }
         )
 
-        return self.integration
+        return self.integrations[tenant_id]
 
 
 class FakeHttpClient:
@@ -52,7 +58,7 @@ def build_integration(
     tenant_id=1,
 ):
     return SimpleNamespace(
-        id=10,
+        id=tenant_id * 10,
         tenant_id=tenant_id,
         provider="toast",
         integration_type="pos",
@@ -60,7 +66,7 @@ def build_integration(
         configuration={
             "base_url": "https://toast.test",
             "restaurant_external_id": (
-                "toast-default-restaurant"
+                f"toast-restaurant-{tenant_id}"
             ),
             "timeout": 15,
         },
@@ -75,13 +81,18 @@ def build_integration(
 
 
 def build_integration_service(
-    tenant_id=1,
+    tenant_ids=(1,),
 ):
+    integrations = {
+        tenant_id: build_integration(
+            tenant_id=tenant_id,
+        )
+        for tenant_id in tenant_ids
+    }
+
     provider_service = (
         FakeProviderIntegrationService(
-            build_integration(
-                tenant_id=tenant_id,
-            )
+            integrations
         )
     )
 
@@ -120,7 +131,7 @@ def build_integration_service(
 def test_factory_builds_tenant_scoped_order_service():
     integration_service, provider_service = (
         build_integration_service(
-            tenant_id=1,
+            tenant_ids=(1,),
         )
     )
 
@@ -164,7 +175,7 @@ def test_factory_builds_tenant_scoped_order_service():
 
     assert (
         service.configuration.restaurant_external_id
-        == "toast-default-restaurant"
+        == "toast-restaurant-1"
     )
 
     assert (
@@ -199,31 +210,182 @@ def test_factory_builds_tenant_scoped_order_service():
     ]
 
 
-def test_factory_builds_independent_tenant_services():
-    integration_service, provider_service = (
+def test_factory_reuses_authentication_service_for_same_tenant():
+    integration_service, _ = (
         build_integration_service(
+            tenant_ids=(1,),
+        )
+    )
+
+    factory = ToastOrderServiceFactory(
+        integration_service=integration_service,
+        http_client=FakeHttpClient(),
+    )
+
+    first_service = factory.build(
+        tenant_id=1,
+    )
+
+    second_service = factory.build(
+        tenant_id=1,
+    )
+
+    assert (
+        first_service.transport.authentication_service
+        is second_service.transport.authentication_service
+    )
+
+
+def test_factory_does_not_share_authentication_between_tenants():
+    integration_service, _ = (
+        build_integration_service(
+            tenant_ids=(1, 25),
+        )
+    )
+
+    factory = ToastOrderServiceFactory(
+        integration_service=integration_service,
+        http_client=FakeHttpClient(),
+    )
+
+    tenant_one_service = factory.build(
+        tenant_id=1,
+    )
+
+    tenant_twenty_five_service = (
+        factory.build(
             tenant_id=25,
         )
     )
 
-    http_client = FakeHttpClient()
+    assert tenant_one_service.tenant_id == 1
+
+    assert (
+        tenant_twenty_five_service.tenant_id
+        == 25
+    )
+
+    assert (
+        tenant_one_service.transport
+        .authentication_service
+        is not
+        tenant_twenty_five_service.transport
+        .authentication_service
+    )
+
+
+def test_factory_reuses_only_matching_tenant_authentication():
+    integration_service, _ = (
+        build_integration_service(
+            tenant_ids=(1, 25),
+        )
+    )
 
     factory = ToastOrderServiceFactory(
         integration_service=integration_service,
-        http_client=http_client,
+        http_client=FakeHttpClient(),
     )
 
-    service = factory.build(
+    tenant_one_first = factory.build(
+        tenant_id=1,
+    )
+
+    tenant_twenty_five = factory.build(
         tenant_id=25,
     )
 
-    assert service.tenant_id == 25
-
-    assert isinstance(
-        service.transport.authentication_service,
-        ToastAuthenticationService,
+    tenant_one_second = factory.build(
+        tenant_id=1,
     )
 
-    assert provider_service.calls[0][
-        "tenant_id"
-    ] == 25
+    assert (
+        tenant_one_first.transport
+        .authentication_service
+        is
+        tenant_one_second.transport
+        .authentication_service
+    )
+
+    assert (
+        tenant_one_first.transport
+        .authentication_service
+        is not
+        tenant_twenty_five.transport
+        .authentication_service
+    )
+
+
+def test_factory_replaces_authentication_when_configuration_changes():
+    integration_service, provider_service = (
+        build_integration_service(
+            tenant_ids=(1,),
+        )
+    )
+
+    factory = ToastOrderServiceFactory(
+        integration_service=integration_service,
+        http_client=FakeHttpClient(),
+    )
+
+    first_service = factory.build(
+        tenant_id=1,
+    )
+
+    first_authentication_service = (
+        first_service.transport
+        .authentication_service
+    )
+
+    provider_service.integrations[1] = (
+        SimpleNamespace(
+            id=10,
+            tenant_id=1,
+            provider="toast",
+            integration_type="pos",
+            external_id=None,
+            configuration={
+                "base_url": "https://toast-new.test",
+                "restaurant_external_id": (
+                    "toast-restaurant-1"
+                ),
+                "timeout": 20,
+            },
+            credentials={
+                "client_id": "TOAST_CLIENT_ID",
+                "client_secret": (
+                    "TOAST_CLIENT_SECRET"
+                ),
+            },
+            active=True,
+        )
+    )
+
+    second_service = factory.build(
+        tenant_id=1,
+    )
+
+    second_authentication_service = (
+        second_service.transport
+        .authentication_service
+    )
+
+    assert (
+        second_authentication_service
+        is not first_authentication_service
+    )
+
+    assert (
+        second_authentication_service
+        .configuration
+        is second_service.configuration
+    )
+
+    assert (
+        second_service.configuration.base_url
+        == "https://toast-new.test"
+    )
+
+    assert (
+        second_service.configuration.timeout
+        == 20
+    )

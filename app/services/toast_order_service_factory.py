@@ -3,6 +3,9 @@ from typing import Any
 from app.services.toast_authentication_service import (
     ToastAuthenticationService,
 )
+from app.services.toast_configuration import (
+    ToastConfiguration,
+)
 from app.services.toast_http_transport import (
     ToastHttpTransport,
 )
@@ -29,6 +32,11 @@ class ToastOrderServiceFactory:
 
         self.http_client = http_client
 
+        self._authentication_services: dict[
+            int,
+            ToastAuthenticationService,
+        ] = {}
+
     def build(
         self,
         tenant_id: int,
@@ -47,9 +55,9 @@ class ToastOrderServiceFactory:
             )
 
         authentication_service = (
-            ToastAuthenticationService(
+            self._get_authentication_service(
+                tenant_id=tenant_id,
                 configuration=configuration,
-                http_client=self.http_client,
             )
         )
 
@@ -66,6 +74,37 @@ class ToastOrderServiceFactory:
             transport=transport,
             tenant_id=tenant_id,
         )
+
+    def _get_authentication_service(
+        self,
+        tenant_id: int,
+        configuration: ToastConfiguration,
+    ) -> ToastAuthenticationService:
+        authentication_service = (
+            self._authentication_services.get(
+                tenant_id
+            )
+        )
+
+        if (
+            authentication_service is not None
+            and authentication_service.configuration
+            == configuration
+        ):
+            return authentication_service
+
+        authentication_service = (
+            ToastAuthenticationService(
+                configuration=configuration,
+                http_client=self.http_client,
+            )
+        )
+
+        self._authentication_services[
+            tenant_id
+        ] = authentication_service
+
+        return authentication_service
 
 
 __all__ = [
