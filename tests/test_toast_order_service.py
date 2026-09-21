@@ -192,3 +192,58 @@ def test_toast_order_service_returns_failure_when_transport_fails():
     assert result.error == (
         "Simulated Toast transport failure."
     )
+def test_toast_order_service_uses_location_mapping():
+    from app.services.external_mapping_service import (
+        create_external_mapping,
+    )
+
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="location",
+        internal_id=2,
+        external_id="toast-wynwood-restaurant",
+    )
+
+    transport = FakeToastTransport()
+
+    service = build_service(
+        transport=transport,
+        tenant_id=1,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+    )
+
+    payload = {
+        "order_id": 789,
+        "customer_name": "Carolina",
+        "items": [
+            {
+                "product_id": 2,
+                "quantity": 1,
+                "modifications": [],
+            }
+        ],
+    }
+
+    result = service.submit_order(
+        order_id=789,
+        tenant_id=1,
+        location_id=2,
+        payload=payload,
+    )
+
+    assert result.success is True
+
+    assert len(transport.requests) == 1
+
+    request = transport.requests[0]
+
+    assert request[
+        "restaurant_external_id"
+    ] == "toast-wynwood-restaurant"
+
+    assert request["payload"][
+        "restaurantExternalId"
+    ] == "toast-wynwood-restaurant"
