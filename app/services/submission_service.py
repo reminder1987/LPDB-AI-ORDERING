@@ -22,15 +22,15 @@ from app.services.external_order_service import (
 
 class SubmissionService:
     """
-    Orquesta el envío de una orden confirmada
+    Orquesta el envio de una orden confirmada
     hacia un proveedor externo.
 
     El proveedor concreto se recibe como dependencia
-    para mantener esta capa independiente de Toast.
+    para mantener esta capa independiente del proveedor.
 
     La orden se bloquea a nivel de fila durante la
-    transición inicial para evitar que dos solicitudes
-    concurrentes puedan enviar simultáneamente la misma
+    transicion inicial para evitar que dos solicitudes
+    concurrentes puedan enviar simultaneamente la misma
     orden al proveedor externo.
     """
 
@@ -121,7 +121,7 @@ class SubmissionService:
                 return ExternalOrderResult(
                     success=False,
                     error=(
-                        "El proveedor externo respondió "
+                        "El proveedor externo respondio "
                         "sin external_order_id."
                     ),
                 )
@@ -132,6 +132,11 @@ class SubmissionService:
                 entity_type="order",
                 internal_id=order.id,
                 external_id=result.external_order_id,
+            )
+
+            self._create_additional_mappings(
+                order=order,
+                result=result,
             )
 
             order.status = transition_order_status(
@@ -149,3 +154,56 @@ class SubmissionService:
 
         finally:
             db.close()
+
+    def _create_additional_mappings(
+        self,
+        order: OrderDB,
+        result: ExternalOrderResult,
+    ) -> None:
+        metadata = result.metadata
+
+        if not isinstance(metadata, dict):
+            return
+
+        external_mappings = metadata.get(
+            "external_mappings"
+        )
+
+        if not isinstance(
+            external_mappings,
+            dict,
+        ):
+            return
+
+        for entity_type, external_id in (
+            external_mappings.items()
+        ):
+            if not isinstance(entity_type, str):
+                continue
+
+            if not isinstance(external_id, str):
+                continue
+
+            normalized_entity_type = (
+                entity_type.strip().lower()
+            )
+            normalized_external_id = (
+                external_id.strip()
+            )
+
+            if not normalized_entity_type:
+                continue
+
+            if normalized_entity_type == "order":
+                continue
+
+            if not normalized_external_id:
+                continue
+
+            create_external_mapping(
+                tenant_id=order.tenant_id,
+                provider=self.provider,
+                entity_type=normalized_entity_type,
+                internal_id=order.id,
+                external_id=normalized_external_id,
+            )

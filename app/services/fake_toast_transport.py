@@ -5,8 +5,10 @@ class FakeToastTransport:
     def __init__(
         self,
         should_fail: bool = False,
+        check_guid: str | None = None,
     ) -> None:
         self.should_fail = should_fail
+        self.check_guid = check_guid
         self.requests: list[dict] = []
 
     def create_order(
@@ -28,9 +30,17 @@ class FakeToastTransport:
 
         self.requests.append(request)
 
+        metadata = {}
+
+        if self.check_guid:
+            metadata["check_guid"] = (
+                self.check_guid
+            )
+
         return {
             "success": True,
             "external_order_id": (
                 "toast-fake-order-001"
             ),
+            "metadata": metadata,
         }

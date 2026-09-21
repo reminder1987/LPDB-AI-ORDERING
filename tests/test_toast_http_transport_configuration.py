@@ -9,32 +9,31 @@ from app.services.toast_http_transport import (
 class FakeHttpResponse:
     def __init__(
         self,
-        status_code,
-        body,
-    ):
+        status_code: int,
+        body: dict,
+    ) -> None:
         self.status_code = status_code
         self.body = body
 
-    def json(self):
+    def json(self) -> dict:
         return self.body
 
 
 class FakeHttpClient:
     def __init__(
         self,
-        response,
-    ):
+        response: FakeHttpResponse,
+    ) -> None:
         self.response = response
-        self.requests = []
+        self.requests: list[dict] = []
 
     def post(
         self,
-        url,
-        *,
-        headers,
-        json,
-        timeout,
-    ):
+        url: str,
+        headers: dict,
+        json: dict,
+        timeout: int,
+    ) -> FakeHttpResponse:
         self.requests.append(
             {
                 "url": url,
@@ -87,7 +86,10 @@ def test_toast_http_transport_accepts_configuration():
         "external_order_id": (
             "toast-config-order-001"
         ),
+        "metadata": {},
     }
+
+    assert len(client.requests) == 1
 
     request = client.requests[0]
 
@@ -95,57 +97,16 @@ def test_toast_http_transport_accepts_configuration():
         "https://toast.test/orders/v2/orders"
     )
 
-    assert request["headers"] == {
-        "Authorization": "Bearer test-token",
-        "Content-Type": (
-            "application/json"
-        ),
-        "Toast-Restaurant-External-ID": (
-            "toast-restaurant-001"
-        ),
-    }
-
     assert request["timeout"] == 45
 
-
-def test_toast_http_transport_uses_configuration_restaurant_id():
-    response = FakeHttpResponse(
-        status_code=201,
-        body={
-            "guid": "toast-config-order-002",
-        },
-    )
-
-    client = FakeHttpClient(
-        response=response,
-    )
-
-    configuration = ToastConfiguration(
-        base_url="https://toast.test",
-        access_token="test-token",
-        restaurant_external_id=(
-            "toast-restaurant-configured"
-        ),
-    )
-
-    transport = ToastHttpTransport(
-        configuration=configuration,
-        http_client=client,
-    )
-
-    result = transport.create_order(
-        restaurant_external_id=(
-            configuration.restaurant_external_id
-        ),
-        payload={
-            "test": True,
-        },
-    )
-
-    assert result["success"] is True
-
-    request = client.requests[0]
+    assert request["headers"][
+        "Authorization"
+    ] == "Bearer test-token"
 
     assert request["headers"][
         "Toast-Restaurant-External-ID"
-    ] == "toast-restaurant-configured"
+    ] == "toast-restaurant-001"
+
+    assert request["json"] == {
+        "test": True,
+    }

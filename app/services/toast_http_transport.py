@@ -27,6 +27,7 @@ class ToastHttpTransport:
             return {
                 "success": False,
                 "external_order_id": None,
+                "metadata": {},
                 "error": (
                     "restaurant_external_id "
                     "is required."
@@ -43,9 +44,7 @@ class ToastHttpTransport:
                 "Bearer "
                 f"{self.configuration.access_token}"
             ),
-            "Content-Type": (
-                "application/json"
-            ),
+            "Content-Type": "application/json",
             "Toast-Restaurant-External-ID": (
                 restaurant_external_id
             ),
@@ -62,6 +61,7 @@ class ToastHttpTransport:
             return {
                 "success": False,
                 "external_order_id": None,
+                "metadata": {},
                 "error": str(exc),
             }
 
@@ -78,29 +78,62 @@ class ToastHttpTransport:
             return {
                 "success": False,
                 "external_order_id": None,
+                "metadata": {},
                 "error": error,
             }
 
-        external_order_id = (
-            response_body.get("guid")
+        external_order_id = response_body.get(
+            "guid"
         )
 
         if not external_order_id:
             return {
                 "success": False,
                 "external_order_id": None,
+                "metadata": {},
                 "error": (
                     "Toast response did not "
                     "contain an order guid."
                 ),
             }
 
+        check_guid = self._extract_check_guid(
+            response_body
+        )
+
+        metadata = {}
+
+        if check_guid is not None:
+            metadata["check_guid"] = check_guid
+
         return {
             "success": True,
-            "external_order_id": (
-                external_order_id
-            ),
+            "external_order_id": external_order_id,
+            "metadata": metadata,
         }
+
+    @staticmethod
+    def _extract_check_guid(
+        response_body: dict,
+    ) -> str | None:
+        checks = response_body.get("checks")
+
+        if not isinstance(checks, list):
+            return None
+
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+
+            guid = check.get("guid")
+
+            if isinstance(guid, str):
+                guid = guid.strip()
+
+                if guid:
+                    return guid
+
+        return None
 
     @staticmethod
     def _extract_error(

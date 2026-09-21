@@ -78,11 +78,38 @@ class ToastOrderService:
                     ),
                 )
 
+            transport_metadata = result.get(
+                "metadata"
+            )
+
+            if not isinstance(
+                transport_metadata,
+                dict,
+            ):
+                transport_metadata = {}
+
+            metadata = {}
+
+            check_guid = transport_metadata.get(
+                "check_guid"
+            )
+
+            if isinstance(check_guid, str):
+                check_guid = check_guid.strip()
+
+                if check_guid:
+                    metadata[
+                        "external_mappings"
+                    ] = {
+                        "check": check_guid,
+                    }
+
             return ExternalOrderResult(
                 success=True,
                 external_order_id=(
                     external_order_id
                 ),
+                metadata=metadata,
             )
 
         except Exception as exc:

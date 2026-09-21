@@ -76,6 +76,11 @@ def test_toast_http_transport_sends_create_order_request():
         status_code=201,
         body={
             "guid": "toast-order-001",
+            "checks": [
+                {
+                    "guid": "toast-check-001",
+                }
+            ],
         },
     )
 
@@ -110,6 +115,11 @@ def test_toast_http_transport_sends_create_order_request():
         "external_order_id": (
             "toast-order-001"
         ),
+        "metadata": {
+            "check_guid": (
+                "toast-check-001"
+            ),
+        },
     }
 
     assert len(client.requests) == 1
@@ -129,8 +139,84 @@ def test_toast_http_transport_sends_create_order_request():
     }
 
     assert request["json"] == payload
-
     assert request["timeout"] == 30
+
+
+def test_toast_http_transport_allows_missing_check_guid():
+    response = FakeHttpResponse(
+        status_code=201,
+        body={
+            "guid": "toast-order-001",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(
+        client
+    )
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result == {
+        "success": True,
+        "external_order_id": (
+            "toast-order-001"
+        ),
+        "metadata": {},
+    }
+
+
+def test_toast_http_transport_uses_first_valid_check_guid():
+    response = FakeHttpResponse(
+        status_code=201,
+        body={
+            "guid": "toast-order-001",
+            "checks": [
+                {},
+                {
+                    "guid": "   ",
+                },
+                {
+                    "guid": "toast-check-002",
+                },
+                {
+                    "guid": "toast-check-003",
+                },
+            ],
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(
+        client
+    )
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is True
+    assert result["metadata"] == {
+        "check_guid": "toast-check-002",
+    }
 
 
 def test_toast_http_transport_handles_http_error():
@@ -159,12 +245,9 @@ def test_toast_http_transport_handles_http_error():
     )
 
     assert result["success"] is False
-
     assert result["external_order_id"] is None
-
-    assert result["error"] == (
-        "Invalid order"
-    )
+    assert result["metadata"] == {}
+    assert result["error"] == "Invalid order"
 
 
 def test_toast_http_transport_handles_missing_guid():
@@ -172,6 +255,11 @@ def test_toast_http_transport_handles_missing_guid():
         status_code=201,
         body={
             "status": "created",
+            "checks": [
+                {
+                    "guid": "toast-check-001",
+                }
+            ],
         },
     )
 
@@ -193,9 +281,8 @@ def test_toast_http_transport_handles_missing_guid():
     )
 
     assert result["success"] is False
-
     assert result["external_order_id"] is None
-
+    assert result["metadata"] == {}
     assert result["error"] == (
         "Toast response did not "
         "contain an order guid."
@@ -207,6 +294,7 @@ def test_toast_http_transport_normalizes_base_url():
         status_code=201,
         body={
             "guid": "toast-order-002",
+            "checks": [],
         },
     )
 
@@ -264,9 +352,8 @@ def test_toast_http_transport_handles_timeout():
     )
 
     assert result["success"] is False
-
     assert result["external_order_id"] is None
-
+    assert result["metadata"] == {}
     assert result["error"] == (
         "Request timed out."
     )
@@ -293,9 +380,8 @@ def test_toast_http_transport_handles_connection_error():
     )
 
     assert result["success"] is False
-
     assert result["external_order_id"] is None
-
+    assert result["metadata"] == {}
     assert result["error"] == (
         "Unable to connect to Toast."
     )
@@ -322,9 +408,8 @@ def test_toast_http_transport_handles_unexpected_http_exception():
     )
 
     assert result["success"] is False
-
     assert result["external_order_id"] is None
-
+    assert result["metadata"] == {}
     assert result["error"] == (
         "Unexpected HTTP client failure."
     )
