@@ -11,6 +11,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.ingredient_db import IngredientDB
     from app.models.order_item_db import OrderItemDB
+    from app.models.product_db import ProductDB
 
 
 class OrderItemModificationDB(Base):
@@ -48,6 +49,16 @@ class OrderItemModificationDB(Base):
         nullable=True,
     )
 
+    new_product_id: Mapped[int | None] = mapped_column(
+        ForeignKey("products.id"),
+        nullable=True,
+    )
+
+    new_product_name: Mapped[str | None] = mapped_column(
+        String(150),
+        nullable=True,
+    )
+
     price: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2),
         nullable=True,
@@ -58,3 +69,7 @@ class OrderItemModificationDB(Base):
     )
 
     ingredient: Mapped["IngredientDB | None"] = relationship()
+
+    new_product: Mapped["ProductDB | None"] = relationship(
+        foreign_keys=[new_product_id],
+    )

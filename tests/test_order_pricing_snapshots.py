@@ -3,8 +3,12 @@ from decimal import Decimal
 from app.core.tenant_context import TenantContext
 from app.models.order_db import OrderDB
 from app.models.order_item_db import OrderItemDB
+from app.models.order_item_modification_db import OrderItemModificationDB
 from app.models.product_db import ProductDB
-from app.schemas.order import OrderCreate
+from app.schemas.order import (
+    OrderCreate,
+    OrderModificationCreate,
+)
 from app.services import order_service
 
 from tests.conftest import TestingSessionLocal
@@ -261,3 +265,83 @@ def test_legacy_order_without_snapshot_uses_price_fallback():
     )
 
     assert retrieved["total"] == Decimal("19.98")
+
+
+def test_base_change_target_product_is_persisted_and_serialized():
+    order = OrderCreate(
+        customer_name="Base Change Persistence Test",
+        location_id=1,
+        product="AREPA DE POLLO",
+        quantity=1,
+        modifications=[
+            OrderModificationCreate(
+                type="BASE_CHANGE",
+                new_base="PATACON",
+            )
+        ],
+    )
+
+    created = order_service.create_order(
+        order,
+        TENANT,
+    )
+
+    assert created["product"] == "PATACÓN DE POLLO"
+    assert created["items"][0]["product"] == "PATACÓN DE POLLO"
+
+    modification = created["items"][0]["modifications"][0]
+
+    assert modification["type"] == "BASE_CHANGE"
+    assert modification["new_base"] == "PATACON"
+    assert modification["new_product_id"] == 81
+    assert modification["new_product_name"] == "PATACÓN DE POLLO"
+
+    db = TestingSessionLocal()
+
+    try:
+        saved_item = (
+            db.query(OrderItemDB)
+            .filter(
+                OrderItemDB.order_id
+                == created["id"]
+            )
+            .one()
+        )
+
+        assert saved_item.product_id == 81
+
+        saved_modification = (
+            db.query(OrderItemModificationDB)
+            .filter(
+                OrderItemModificationDB.order_item_id
+                == saved_item.id
+            )
+            .one()
+        )
+
+        assert saved_modification.modification_type == "BASE_CHANGE"
+        assert saved_modification.new_base == "PATACON"
+        assert saved_modification.new_product_id == 81
+        assert saved_modification.new_product_name == "PATACÓN DE POLLO"
+
+    finally:
+        db.close()
+
+    retrieved = order_service.get_order_by_id(
+        created["id"],
+        TENANT,
+    )
+
+    assert retrieved is not None
+
+    retrieved_modification = (
+        retrieved["items"][0]["modifications"][0]
+    )
+
+    assert retrieved_modification["type"] == "BASE_CHANGE"
+    assert retrieved_modification["new_base"] == "PATACON"
+    assert retrieved_modification["new_product_id"] == 81
+    assert (
+        retrieved_modification["new_product_name"]
+        == "PATACÓN DE POLLO"
+    )

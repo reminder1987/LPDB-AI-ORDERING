@@ -31,6 +31,11 @@ def build_external_order_payload(
     Cada item conserva su identificador interno
     persistente para permitir que los adaptadores
     externos construyan identificadores estables.
+
+    Los cambios de base conservan además la identidad
+    del producto equivalente resultante para que el
+    adaptador externo pueda resolver correctamente
+    el producto final.
     """
 
     items = []
@@ -46,6 +51,8 @@ def build_external_order_payload(
                     "ingredient_id": modification.ingredient_id,
                     "ingredient_name": modification.ingredient_name,
                     "new_base": modification.new_base,
+                    "new_product_id": modification.new_product_id,
+                    "new_product_name": modification.new_product_name,
                     "price": _decimal_or_none(
                         modification.price
                     ),

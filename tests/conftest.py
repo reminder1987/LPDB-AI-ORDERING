@@ -160,7 +160,7 @@ def setup_test_database(monkeypatch):
         db.flush()
 
         # ====================================================
-        # CATEGORÍAS DE PRODUCTOS
+        # CATEGORÃAS DE PRODUCTOS
         # ====================================================
 
         hot_dogs_category = ProductCategoryDB(
@@ -187,19 +187,33 @@ def setup_test_database(monkeypatch):
             name="BEBIDAS",
         )
 
+        arepas_category = ProductCategoryDB(
+            id=5,
+            tenant_id=tenant.id,
+            name="AREPAS",
+        )
+
+        patacones_category = ProductCategoryDB(
+            id=6,
+            tenant_id=tenant.id,
+            name="PATACONES",
+        )
+
         db.add_all(
             [
                 hot_dogs_category,
                 perros_category,
                 hamburguesas_category,
                 bebidas_category,
+                arepas_category,
+                patacones_category,
             ]
         )
 
         db.flush()
 
         # ====================================================
-        # CATEGORÍA DE INGREDIENTES
+        # CATEGORÃA DE INGREDIENTES
         # ====================================================
 
         toppings_category = IngredientCategoryDB(
@@ -300,12 +314,30 @@ def setup_test_database(monkeypatch):
             price=Decimal("2.99"),
         )
 
+        arepa_de_pollo = ProductDB(
+            id=80,
+            tenant_id=tenant.id,
+            name="AREPA DE POLLO",
+            category_id=arepas_category.id,
+            price=Decimal("12.99"),
+        )
+
+        patacon_de_pollo = ProductDB(
+            id=81,
+            tenant_id=tenant.id,
+            name="PATACÓN DE POLLO",
+            category_id=patacones_category.id,
+            price=Decimal("12.99"),
+        )
+
         db.add_all(
             [
                 pizza,
                 perro_del_barrio,
                 hamburguesa,
                 coca_cola,
+                arepa_de_pollo,
+                patacon_de_pollo,
             ]
         )
 
@@ -364,8 +396,22 @@ def setup_test_database(monkeypatch):
             ingredient_id=tocineta.id,
         )
 
-        db.add(
-            recipe_tocineta,
+        arepa_recipe = RecipeDB(
+            id=2,
+            product_id=arepa_de_pollo.id,
+        )
+
+        patacon_recipe = RecipeDB(
+            id=3,
+            product_id=patacon_de_pollo.id,
+        )
+
+        db.add_all(
+            [
+                recipe_tocineta,
+                arepa_recipe,
+                patacon_recipe,
+            ]
         )
 
         # ====================================================
@@ -408,12 +454,32 @@ def setup_test_database(monkeypatch):
             reason=None,
         )
 
+        arepa_availability = ProductAvailabilityDB(
+            product_id=arepa_de_pollo.id,
+            location_id=dirty_rabbit.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
+        patacon_availability = ProductAvailabilityDB(
+            product_id=patacon_de_pollo.id,
+            location_id=dirty_rabbit.id,
+            available=True,
+            manual_override=False,
+            source="LOCAL",
+            reason=None,
+        )
+
         db.add_all(
             [
                 pizza_availability,
                 perro_availability,
                 hamburguesa_availability,
                 coca_cola_availability,
+                arepa_availability,
+                patacon_availability,
             ]
         )
 

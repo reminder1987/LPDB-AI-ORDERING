@@ -782,9 +782,19 @@ def create_order(
                             ]
                         ),
                         new_base=(
-                            modification[
+                             modification[
                                 "new_base"
                             ]
+                        ),
+                        new_product_id=(
+                             modification.get(
+                                "new_product_id"
+                            )
+                        ),
+                        new_product_name=(
+                             modification.get(
+                                "new_product_name"
+                            )
                         ),
                         price=(
                             modification[
@@ -1324,6 +1334,16 @@ def update_order(
                                 "new_base"
                             ]
                         ),
+                        new_product_id=(
+                            modification.get(
+                                "new_product_id"
+                            )
+                        ),
+                        new_product_name=(
+                            modification.get(
+                                "new_product_name"
+                            )
+                        ),
                         price=(
                             modification[
                                 "price"
@@ -1669,6 +1689,12 @@ def _serialize_modifications(
                 ),
                 "new_base": (
                     modification.new_base
+                ),
+                "new_product_id": (
+                    modification.new_product_id
+                ),
+                "new_product_name": (
+                    modification.new_product_name
                 ),
                 "price": (
                     Decimal(

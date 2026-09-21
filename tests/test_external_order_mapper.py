@@ -78,6 +78,8 @@ def test_build_external_order_payload_with_modification():
         ingredient_id=1,
         ingredient_name="TOCINETA",
         new_base=None,
+        new_product_id=None,
+        new_product_name=None,
         price=Decimal("2.50"),
     )
 
@@ -103,6 +105,8 @@ def test_build_external_order_payload_with_modification():
     assert mapped_modification["ingredient_id"] == 1
     assert mapped_modification["ingredient_name"] == "TOCINETA"
     assert mapped_modification["new_base"] is None
+    assert mapped_modification["new_product_id"] is None
+    assert mapped_modification["new_product_name"] is None
     assert mapped_modification["price"] == Decimal("2.50")
 
     assert mapped_item["combo"] is None
@@ -185,6 +189,8 @@ def test_build_external_order_payload_with_modification_and_combo():
         ingredient_id=1,
         ingredient_name="TOCINETA",
         new_base=None,
+        new_product_id=None,
+        new_product_name=None,
         price=Decimal("0.00"),
     )
 
@@ -226,6 +232,8 @@ def test_build_external_order_payload_with_modification_and_combo():
     assert mapped_modification["ingredient_id"] == 1
     assert mapped_modification["ingredient_name"] == "TOCINETA"
     assert mapped_modification["new_base"] is None
+    assert mapped_modification["new_product_id"] is None
+    assert mapped_modification["new_product_name"] is None
     assert mapped_modification["price"] == Decimal("0.00")
 
     assert mapped_item["combo"] is not None
@@ -291,3 +299,57 @@ def test_build_external_order_payload_preserves_order_item_id():
     payload = build_external_order_payload(order)
 
     assert payload["items"][0]["order_item_id"] == 205
+
+
+def test_build_external_order_payload_preserves_base_change_target():
+    order = OrderDB(
+        id=106,
+        tenant_id=1,
+        customer_name="Cliente Base Change",
+        location_id=1,
+        total=Decimal("12.99"),
+    )
+
+    item = OrderItemDB(
+        id=206,
+        order_id=106,
+        product_id=81,
+        quantity=1,
+        unit_price=Decimal("12.99"),
+        subtotal=Decimal("12.99"),
+    )
+
+    modification = OrderItemModificationDB(
+        id=306,
+        order_item_id=206,
+        modification_type="BASE_CHANGE",
+        ingredient_id=None,
+        ingredient_name=None,
+        new_base="PATACON",
+        new_product_id=81,
+        new_product_name="PATACÓN DE POLLO",
+        price=Decimal("0.00"),
+    )
+
+    item.modifications = [modification]
+    order.items = [item]
+
+    payload = build_external_order_payload(order)
+
+    mapped_item = payload["items"][0]
+
+    assert mapped_item["product_id"] == 81
+    assert len(mapped_item["modifications"]) == 1
+
+    mapped_modification = mapped_item["modifications"][0]
+
+    assert mapped_modification["type"] == "BASE_CHANGE"
+    assert mapped_modification["ingredient_id"] is None
+    assert mapped_modification["ingredient_name"] is None
+    assert mapped_modification["new_base"] == "PATACON"
+    assert mapped_modification["new_product_id"] == 81
+    assert (
+        mapped_modification["new_product_name"]
+        == "PATACÓN DE POLLO"
+    )
+    assert mapped_modification["price"] == Decimal("0.00")
