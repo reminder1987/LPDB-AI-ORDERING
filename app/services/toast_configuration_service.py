@@ -68,23 +68,33 @@ class ToastConfigurationService:
             DEFAULT_TOAST_TIMEOUT,
         )
 
-        access_token_reference = self._require_string(
-            credentials.get("access_token"),
-            "Toast access_token reference is required.",
+        client_id_reference = self._require_string(
+            credentials.get("client_id"),
+            "Toast client_id reference is required.",
         )
 
-        access_token = self.secret_service.resolve(
-            access_token_reference
+        client_secret_reference = self._require_string(
+            credentials.get("client_secret"),
+            "Toast client_secret reference is required.",
+        )
+
+        client_id = self.secret_service.resolve(
+            client_id_reference
+        )
+
+        client_secret = self.secret_service.resolve(
+            client_secret_reference
         )
 
         try:
             return ToastConfiguration(
                 base_url=base_url,
-                access_token=access_token,
                 restaurant_external_id=(
                     restaurant_external_id
                 ),
                 timeout=timeout,
+                client_id=client_id,
+                client_secret=client_secret,
             )
 
         except (TypeError, ValueError) as exc:

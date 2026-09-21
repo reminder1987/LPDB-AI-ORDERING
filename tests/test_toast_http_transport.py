@@ -52,6 +52,25 @@ class FakeHttpResponse:
         return self.body
 
 
+class FakeAuthenticationService:
+    def __init__(
+        self,
+        token="dynamic-toast-token",
+        exception=None,
+    ):
+        self.token = token
+        self.exception = exception
+        self.calls = 0
+
+    def get_access_token(self):
+        self.calls += 1
+
+        if self.exception is not None:
+            raise self.exception
+
+        return self.token
+
+
 def build_transport(
     client,
     timeout=30,
@@ -68,6 +87,30 @@ def build_transport(
     return ToastHttpTransport(
         configuration=configuration,
         http_client=client,
+    )
+
+
+def build_dynamic_transport(
+    client,
+    authentication_service,
+    timeout=30,
+):
+    configuration = ToastConfiguration(
+        base_url="https://toast.test",
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        timeout=timeout,
+        client_id="test-client-id",
+        client_secret="test-client-secret",
+    )
+
+    return ToastHttpTransport(
+        configuration=configuration,
+        http_client=client,
+        authentication_service=(
+            authentication_service
+        ),
     )
 
 
@@ -140,6 +183,87 @@ def test_toast_http_transport_sends_create_order_request():
 
     assert request["json"] == payload
     assert request["timeout"] == 30
+
+
+def test_toast_http_transport_uses_dynamic_access_token():
+    response = FakeHttpResponse(
+        status_code=201,
+        body={
+            "guid": "toast-order-dynamic",
+            "checks": [],
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    authentication_service = (
+        FakeAuthenticationService(
+            token="dynamic-toast-token",
+        )
+    )
+
+    transport = build_dynamic_transport(
+        client=client,
+        authentication_service=(
+            authentication_service
+        ),
+    )
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is True
+
+    assert authentication_service.calls == 1
+
+    assert client.requests[0]["headers"][
+        "Authorization"
+    ] == "Bearer dynamic-toast-token"
+
+
+def test_toast_http_transport_handles_authentication_failure():
+    client = FakeHttpClient()
+
+    authentication_service = (
+        FakeAuthenticationService(
+            exception=RuntimeError(
+                "Toast authentication failed."
+            )
+        )
+    )
+
+    transport = build_dynamic_transport(
+        client=client,
+        authentication_service=(
+            authentication_service
+        ),
+    )
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["metadata"] == {}
+    assert result["error"] == (
+        "Toast authentication failed."
+    )
+
+    assert len(client.requests) == 0
 
 
 def test_toast_http_transport_allows_missing_check_guid():

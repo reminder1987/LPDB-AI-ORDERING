@@ -1,5 +1,8 @@
 from typing import Any
 
+from app.services.toast_authentication_service import (
+    ToastAuthenticationService,
+)
 from app.services.toast_http_transport import (
     ToastHttpTransport,
 )
@@ -43,9 +46,19 @@ class ToastOrderServiceFactory:
                 "Toast HTTP client is required."
             )
 
+        authentication_service = (
+            ToastAuthenticationService(
+                configuration=configuration,
+                http_client=self.http_client,
+            )
+        )
+
         transport = ToastHttpTransport(
             configuration=configuration,
             http_client=self.http_client,
+            authentication_service=(
+                authentication_service
+            ),
         )
 
         return ToastOrderService(

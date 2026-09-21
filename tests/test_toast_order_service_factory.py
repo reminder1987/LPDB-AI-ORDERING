@@ -3,6 +3,9 @@ from types import SimpleNamespace
 from app.services.integration_secret_service import (
     IntegrationSecretService,
 )
+from app.services.toast_authentication_service import (
+    ToastAuthenticationService,
+)
 from app.services.toast_configuration_service import (
     ToastConfigurationService,
 )
@@ -62,7 +65,10 @@ def build_integration(
             "timeout": 15,
         },
         credentials={
-            "access_token": "TOAST_ACCESS_TOKEN",
+            "client_id": "TOAST_CLIENT_ID",
+            "client_secret": (
+                "TOAST_CLIENT_SECRET"
+            ),
         },
         active=True,
     )
@@ -81,8 +87,11 @@ def build_integration_service(
 
     secret_service = IntegrationSecretService(
         environment={
-            "TOAST_ACCESS_TOKEN": (
-                "test-toast-access-token"
+            "TOAST_CLIENT_ID": (
+                "test-toast-client-id"
+            ),
+            "TOAST_CLIENT_SECRET": (
+                "test-toast-client-secret"
             ),
         }
     )
@@ -139,8 +148,18 @@ def test_factory_builds_tenant_scoped_order_service():
     )
 
     assert (
+        service.configuration.client_id
+        == "test-toast-client-id"
+    )
+
+    assert (
+        service.configuration.client_secret
+        == "test-toast-client-secret"
+    )
+
+    assert (
         service.configuration.access_token
-        == "test-toast-access-token"
+        is None
     )
 
     assert (
@@ -151,6 +170,23 @@ def test_factory_builds_tenant_scoped_order_service():
     assert (
         service.transport.http_client
         is http_client
+    )
+
+    assert isinstance(
+        service.transport.authentication_service,
+        ToastAuthenticationService,
+    )
+
+    assert (
+        service.transport.authentication_service
+        .http_client
+        is http_client
+    )
+
+    assert (
+        service.transport.authentication_service
+        .configuration
+        is service.configuration
     )
 
     assert provider_service.calls == [
@@ -182,6 +218,11 @@ def test_factory_builds_independent_tenant_services():
     )
 
     assert service.tenant_id == 25
+
+    assert isinstance(
+        service.transport.authentication_service,
+        ToastAuthenticationService,
+    )
 
     assert provider_service.calls[0][
         "tenant_id"

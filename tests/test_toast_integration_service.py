@@ -7,8 +7,6 @@ from app.services.toast_configuration_service import (
     ToastConfigurationService,
 )
 from app.services.toast_integration_service import (
-    TOAST_INTEGRATION_TYPE,
-    TOAST_PROVIDER,
     ToastIntegrationService,
 )
 
@@ -47,12 +45,17 @@ def build_integration(
         integration_type="pos",
         external_id=None,
         configuration={
+            "base_url": "https://toast.test",
             "restaurant_external_id": (
                 "toast-default-restaurant"
             ),
+            "timeout": 15,
         },
         credentials={
-            "access_token": "TOAST_ACCESS_TOKEN",
+            "client_id": "TOAST_CLIENT_ID",
+            "client_secret": (
+                "TOAST_CLIENT_SECRET"
+            ),
         },
         active=True,
     )
@@ -61,8 +64,11 @@ def build_integration(
 def build_configuration_service():
     secret_service = IntegrationSecretService(
         environment={
-            "TOAST_ACCESS_TOKEN": (
-                "test-toast-access-token"
+            "TOAST_CLIENT_ID": (
+                "test-toast-client-id"
+            ),
+            "TOAST_CLIENT_SECRET": (
+                "test-toast-client-secret"
             ),
         }
     )
@@ -92,11 +98,19 @@ def test_resolve_toast_integration_for_tenant():
         tenant_id=1,
     )
 
-    assert result.provider_integration.id == 10
-    assert result.provider_integration.tenant_id == 1
+    assert (
+        result.provider_integration.id
+        == 10
+    )
 
-    assert result.configuration.access_token == (
-        "test-toast-access-token"
+    assert (
+        result.provider_integration.tenant_id
+        == 1
+    )
+
+    assert (
+        result.configuration.base_url
+        == "https://toast.test"
     )
 
     assert (
@@ -104,13 +118,28 @@ def test_resolve_toast_integration_for_tenant():
         == "toast-default-restaurant"
     )
 
+    assert result.configuration.timeout == 15
+
+    assert (
+        result.configuration.client_id
+        == "test-toast-client-id"
+    )
+
+    assert (
+        result.configuration.client_secret
+        == "test-toast-client-secret"
+    )
+
+    assert (
+        result.configuration.access_token
+        is None
+    )
+
     assert provider_service.calls == [
         {
             "tenant_id": 1,
-            "provider": TOAST_PROVIDER,
-            "integration_type": (
-                TOAST_INTEGRATION_TYPE
-            ),
+            "provider": "toast",
+            "integration_type": "pos",
             "external_id": None,
         }
     ]
@@ -136,13 +165,51 @@ def test_resolve_is_tenant_scoped():
         tenant_id=25,
     )
 
-    assert result.provider_integration.tenant_id == 25
+    assert (
+        result.provider_integration.tenant_id
+        == 25
+    )
+
+    assert (
+        result.configuration.client_id
+        == "test-toast-client-id"
+    )
+
+    assert (
+        result.configuration.client_secret
+        == "test-toast-client-secret"
+    )
+
+    assert provider_service.calls == [
+        {
+            "tenant_id": 25,
+            "provider": "toast",
+            "integration_type": "pos",
+            "external_id": None,
+        }
+    ]
+
+
+def test_resolve_uses_global_pos_integration():
+    provider_service = (
+        FakeProviderIntegrationService(
+            build_integration(
+                tenant_id=7,
+            )
+        )
+    )
+
+    service = ToastIntegrationService(
+        provider_service=provider_service,
+        configuration_service=(
+            build_configuration_service()
+        ),
+    )
+
+    service.resolve(
+        tenant_id=7,
+    )
 
     assert provider_service.calls[0][
-        "tenant_id"
-    ] == 25
-
-
-def test_toast_constants():
-    assert TOAST_PROVIDER == "toast"
-    assert TOAST_INTEGRATION_TYPE == "pos"
+        "external_id"
+    ] is None
