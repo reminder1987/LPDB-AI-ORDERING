@@ -22,15 +22,15 @@ Este documento es la fuente oficial del orden, alcance y estado de las fases del
 
 # ESTADO ACTUAL
 
-Fase actual: 13 — Canal de cliente, agente IA y dashboard operativo
+Fase actual: 19 — Integraciones externas
 
-Estado: PRÓXIMA IMPLEMENTACIÓN
+Estado: EN IMPLEMENTACIÓN AVANZADA — TOAST
 
-Última fase completada: 12 — Consulta de pedidos
+Base funcional previa: ordering, conversación/agente, multi-tenant, canales y submission E2E ya implementados.
 
 Hito transversal completado: Tenant Isolation
 
-Último checkpoint: 333413d — Enforce tenant context on product and availability APIs
+Último checkpoint funcional antes de esta actualización: e1ad2e8 — persist and propagate base change target products
 
 Rama de trabajo actual: feature/orderdb-tenant
 
@@ -688,45 +688,81 @@ PRODUCCIÓN
 
 ## FASE 19 — Integraciones externas
 
-**Estado:** PENDIENTE
+**Estado:** EN IMPLEMENTACIÓN AVANZADA — TOAST
 
-### Alcance
+### Estado real verificado en GitHub
 
-Integraciones externas necesarias para el producto final:
+La rama `feature/orderdb-tenant` ya contiene integración funcional y pruebas para submission, autenticación y construcción de payloads Toast. La fase no está en preparación inicial.
 
-- WhatsApp.
+### Implementado y versionado
 
-- Toast Orders API.
+- Capa de integración externa separada del núcleo de ordering.
+- Submission service y flujo E2E de envío a Toast.
+- Pruebas de integración Toast, cobertura multi-tenant y rutas de fallo.
+- Configuración Toast runtime por tenant.
+- Autenticación Toast mediante client credentials.
+- Cache de autenticación/token Toast por tenant.
+- Construcción de payload operacional de órdenes Toast.
+- Mapeos de productos y modificadores hacia Toast.
+- Payloads Toast para modificadores.
+- Persistencia de snapshots de precio y preservación del precio histórico.
+- Propagación del identificador persistente de cada order item.
+- Soporte de `BASE_CHANGE` con resolución del producto destino real.
+- Persistencia de `new_product_id` y `new_product_name`.
+- Migración Alembic para producto destino de `BASE_CHANGE`.
+- Serialización y external mapping del producto destino.
+- Fixtures y pruebas AREPA DE POLLO → PATACÓN DE POLLO.
 
-- Toast Payments, según capacidades y autorización del restaurante.
+### Checkpoints recientes verificados
 
-- Toast webhooks.
+- `3a3b6e5` — complete Toast submission E2E integration.
+- `eb17829` — align Toast integration tests.
+- `8586bf5` — add multi-tenant isolation coverage.
+- `420f5b7` — add failure path coverage.
+- `ccbb512` — add multi-tenant Toast runtime configuration.
+- `9c4dae9` — add Toast client credential authentication.
+- `18c9a54` — cache Toast authentication per tenant.
+- `1d11cd2` — build operational Toast order payload.
+- `e58973e` — add Toast modifier mappings and payloads.
+- `e1ad2e8` — persist and propagate base change target products.
 
-- Toast/KDS y fulfillment.
+### Punto exacto de continuidad
 
-- Otras integraciones que sean necesarias.
+Frente activo: **Toast payload fidelity / resolución completa de órdenes externas**.
+
+Después de `e1ad2e8`, continuar validando de extremo a extremo que todos los tipos soportados de item, modificación, combo y `BASE_CHANGE` produzcan el payload Toast correcto. No reconstruir componentes ya terminados.
+
+### Pendiente para cerrar Fase 19
+
+- Endurecer fidelidad del payload Toast para todos los tipos de orden soportados.
+- Validar combinaciones, bebidas y modificadores restantes.
+- Completar manejo de respuestas, errores y reintentos donde falte.
+- Integrar/endurecer webhooks Toast.
+- Completar Payments según capacidades y autorización disponibles.
+- Validar fulfillment/KDS con configuración real de Toast.
+- Completar integración productiva de WhatsApp donde corresponda.
+- Ejecutar suite integral y regresiones.
 
 ### Principio arquitectónico
 
 ```text
-
-LPDB-AI-ORDERING
-
-        ↓
-
+LPDB Core
+   ↓
 Integration Layer
-
-        ↓
-
-Servicios externos
-
+   ├── WhatsApp
+   └── Toast
+          ├── Auth
+          ├── Orders
+          ├── Payments
+          ├── Webhooks
+          └── Fulfillment / KDS
 ```
 
 Las integraciones externas no deben contaminar el núcleo de ordering.
 
 ### Criterio de cierre
 
-Las integraciones definidas para producción deben funcionar con autenticación, manejo de errores, mapeo de datos, estados, reintentos cuando corresponda y pruebas.
+Las integraciones de producción deben funcionar con autenticación, mapeo completo, manejo de errores, estados, reintentos cuando correspondan y pruebas E2E/regresión satisfactorias.
 
 ## FASE 20 — Observabilidad y operación
 
@@ -892,7 +928,26 @@ FASE 22 — Documentación / entrega                     ⏳
 
 | Tenant Isolation | COMPLETADO | `333413d` |
 
-| 13 | EN DEFINICIÓN / PRÓXIMA IMPLEMENTACIÓN | Pendiente |
+| 13 | BASE FUNCIONAL IMPLEMENTADA | Integrada en rama de trabajo |
+| 19 | EN IMPLEMENTACIÓN AVANZADA | `e1ad2e8` |
+
+---
+
+# DISCIPLINA DE CHECKPOINTS Y CONTINUIDAD
+
+Desde este checkpoint, **guardar el trabajo** significa sincronizar código y memoria técnica del proyecto.
+
+En cada cierre de bloque significativo:
+
+1. Ejecutar las pruebas correspondientes.
+2. Confirmar `git status`.
+3. Actualizar este ROADMAP si cambió fase, subfase, alcance, checkpoint o punto de continuidad.
+4. Crear commit del código/documentación.
+5. Hacer push a `feature/orderdb-tenant`.
+6. Confirmar el SHA remoto.
+7. Registrar el siguiente punto exacto de trabajo cuando exista un cambio material.
+
+El historial Git es la evidencia técnica y este ROADMAP es el índice de continuidad. Ambos deben permanecer alineados.
 
 ---
 
