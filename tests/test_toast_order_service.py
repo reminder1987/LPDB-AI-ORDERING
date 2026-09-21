@@ -1,3 +1,6 @@
+from app.services.external_mapping_service import (
+    create_external_mapping,
+)
 from app.services.fake_toast_transport import (
     FakeToastTransport,
 )
@@ -14,6 +17,8 @@ def build_service(
     tenant_id=None,
     product_mappings=None,
     product_group_mappings=None,
+    ingredient_mappings=None,
+    ingredient_group_mappings=None,
 ):
     configuration = ToastConfiguration(
         base_url="https://toast.test",
@@ -33,6 +38,12 @@ def build_service(
         product_mappings=product_mappings,
         product_group_mappings=(
             product_group_mappings
+        ),
+        ingredient_mappings=(
+            ingredient_mappings
+        ),
+        ingredient_group_mappings=(
+            ingredient_group_mappings
         ),
     )
 
@@ -140,6 +151,179 @@ def test_toast_order_service_builds_and_sends_real_order():
     assert selection["modifiers"] == []
 
 
+def test_toast_order_service_builds_add_modifier():
+    transport = FakeToastTransport()
+
+    service = build_service(
+        transport=transport,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
+        ingredient_mappings={
+            10: "toast-modifier-queso",
+        },
+        ingredient_group_mappings={
+            10: "toast-option-group-extras",
+        },
+    )
+
+    payload = build_basic_payload(
+        order_id=124,
+        order_item_id=504,
+    )
+
+    payload["items"][0]["modifications"] = [
+        {
+            "type": "ADD",
+            "ingredient_id": 10,
+            "ingredient_name": "QUESO",
+            "new_base": None,
+            "price": None,
+        }
+    ]
+
+    result = service.submit_order(
+        order_id=124,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is True
+
+    assert len(transport.requests) == 1
+
+    toast_payload = (
+        transport.requests[0]["payload"]
+    )
+
+    selection = (
+        toast_payload["checks"][0][
+            "selections"
+        ][0]
+    )
+
+    assert selection["modifiers"] == [
+        {
+            "item": {
+                "guid": (
+                    "toast-modifier-queso"
+                ),
+            },
+            "optionGroup": {
+                "guid": (
+                    "toast-option-group-extras"
+                ),
+            },
+            "quantity": 1,
+        }
+    ]
+
+
+def test_toast_order_service_resolves_modifier_mappings_from_db():
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="product",
+        internal_id=2,
+        external_id="toast-db-product-perro",
+    )
+
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="product_group",
+        internal_id=2,
+        external_id="toast-db-group-hot-dogs",
+    )
+
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="ingredient",
+        internal_id=10,
+        external_id="toast-db-modifier-queso",
+    )
+
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="ingredient_group",
+        internal_id=10,
+        external_id="toast-db-option-group-extras",
+    )
+
+    transport = FakeToastTransport()
+
+    service = build_service(
+        transport=transport,
+        tenant_id=1,
+    )
+
+    payload = build_basic_payload(
+        order_id=125,
+        order_item_id=505,
+    )
+
+    payload["items"][0]["modifications"] = [
+        {
+            "type": "ADD",
+            "ingredient_id": 10,
+            "ingredient_name": "QUESO",
+            "new_base": None,
+            "price": None,
+        }
+    ]
+
+    result = service.submit_order(
+        order_id=125,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is True
+
+    assert len(transport.requests) == 1
+
+    toast_payload = (
+        transport.requests[0]["payload"]
+    )
+
+    selection = (
+        toast_payload["checks"][0][
+            "selections"
+        ][0]
+    )
+
+    assert selection["item"] == {
+        "guid": "toast-db-product-perro",
+    }
+
+    assert selection["itemGroup"] == {
+        "guid": "toast-db-group-hot-dogs",
+    }
+
+    assert selection["modifiers"] == [
+        {
+            "item": {
+                "guid": (
+                    "toast-db-modifier-queso"
+                ),
+            },
+            "optionGroup": {
+                "guid": (
+                    "toast-db-option-group-extras"
+                ),
+            },
+            "quantity": 1,
+        }
+    ]
+
+
 def test_toast_order_service_returns_failure_when_transport_fails():
     transport = FakeToastTransport(
         should_fail=True,
@@ -177,10 +361,6 @@ def test_toast_order_service_returns_failure_when_transport_fails():
 
 
 def test_toast_order_service_uses_location_mapping():
-    from app.services.external_mapping_service import (
-        create_external_mapping,
-    )
-
     create_external_mapping(
         tenant_id=1,
         provider="toast",

@@ -228,3 +228,60 @@ def test_toast_mapping_does_not_use_other_provider():
     assert resolver.resolve_product(
         internal_id=2,
     ) is None
+
+def test_modifier_mappings_are_isolated_by_tenant():
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="ingredient",
+        internal_id=10,
+        external_id="toast-tenant-1-modifier-010",
+    )
+
+    create_external_mapping(
+        tenant_id=1,
+        provider="toast",
+        entity_type="ingredient_group",
+        internal_id=10,
+        external_id="toast-tenant-1-option-group-010",
+    )
+
+    create_external_mapping(
+        tenant_id=2,
+        provider="toast",
+        entity_type="ingredient",
+        internal_id=10,
+        external_id="toast-tenant-2-modifier-010",
+    )
+
+    create_external_mapping(
+        tenant_id=2,
+        provider="toast",
+        entity_type="ingredient_group",
+        internal_id=10,
+        external_id="toast-tenant-2-option-group-010",
+    )
+
+    resolver_tenant_1 = ToastMappingResolver(
+        tenant_id=1,
+    )
+
+    resolver_tenant_2 = ToastMappingResolver(
+        tenant_id=2,
+    )
+
+    assert resolver_tenant_1.resolve_ingredient(
+        internal_id=10,
+    ) == "toast-tenant-1-modifier-010"
+
+    assert resolver_tenant_1.resolve_ingredient_group(
+        internal_id=10,
+    ) == "toast-tenant-1-option-group-010"
+
+    assert resolver_tenant_2.resolve_ingredient(
+        internal_id=10,
+    ) == "toast-tenant-2-modifier-010"
+
+    assert resolver_tenant_2.resolve_ingredient_group(
+        internal_id=10,
+    ) == "toast-tenant-2-option-group-010"

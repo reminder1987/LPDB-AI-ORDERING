@@ -94,8 +94,11 @@ class ToastOrderAdapter:
         if self.mapping_resolver is None:
             return None
 
-        return self.mapping_resolver.resolve_product(
-            internal_id=internal_id,
+        return (
+            self.mapping_resolver
+            .resolve_product(
+                internal_id=internal_id,
+            )
         )
 
     def _resolve_product_group(
@@ -193,6 +196,118 @@ class ToastOrderAdapter:
 
         return value
 
+    def _build_modifier(
+        self,
+        modification: dict,
+    ) -> dict | None:
+        modification_type = (
+            modification.get("type")
+        )
+
+        if modification_type == "REMOVE":
+            return None
+
+        if modification_type == "BASE_CHANGE":
+            return None
+
+        if modification_type != "ADD":
+            raise ValueError(
+                "Unsupported modification type: "
+                f"{modification_type}."
+            )
+
+        ingredient_id = (
+            self._require_positive_integer(
+                modification.get(
+                    "ingredient_id"
+                ),
+                "ingredient_id",
+            )
+        )
+
+        ingredient_external_id = (
+            self._resolve_ingredient(
+                internal_id=ingredient_id,
+            )
+        )
+
+        if ingredient_external_id is None:
+            raise ValueError(
+                "Missing Toast ingredient mapping "
+                f"for ingredient {ingredient_id}."
+            )
+
+        ingredient_group_external_id = (
+            self._resolve_ingredient_group(
+                internal_id=ingredient_id,
+            )
+        )
+
+        if (
+            ingredient_group_external_id
+            is None
+        ):
+            raise ValueError(
+                "Missing Toast ingredient group "
+                "mapping for ingredient "
+                f"{ingredient_id}."
+            )
+
+        return {
+            "item": {
+                "guid": (
+                    ingredient_external_id
+                ),
+            },
+            "optionGroup": {
+                "guid": (
+                    ingredient_group_external_id
+                ),
+            },
+            "quantity": 1,
+        }
+
+    def _build_modifiers(
+        self,
+        item: dict,
+    ) -> list[dict]:
+        modifiers = []
+
+        modifications = item.get(
+            "modifications",
+            [],
+        )
+
+        if modifications is None:
+            return modifiers
+
+        if not isinstance(
+            modifications,
+            list,
+        ):
+            raise ValueError(
+                "modifications must be a list."
+            )
+
+        for modification in modifications:
+            if not isinstance(
+                modification,
+                dict,
+            ):
+                raise ValueError(
+                    "Each modification must "
+                    "be an object."
+                )
+
+            modifier = self._build_modifier(
+                modification=modification,
+            )
+
+            if modifier is not None:
+                modifiers.append(modifier)
+
+        return modifiers
+
     def build_order_payload(
         self,
         payload: dict,
@@ -278,6 +393,12 @@ class ToastOrderAdapter:
                     "than zero."
                 )
 
+            modifiers = (
+                self._build_modifiers(
+                    item=item,
+                )
+            )
+
             selection = {
                 "externalId": (
                     "lpdb-selection-"
@@ -295,7 +416,7 @@ class ToastOrderAdapter:
                     ),
                 },
                 "quantity": quantity,
-                "modifiers": [],
+                "modifiers": modifiers,
             }
 
             selections.append(selection)
