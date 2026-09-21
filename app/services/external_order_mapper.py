@@ -3,6 +3,15 @@ from decimal import Decimal
 from app.models.order_db import OrderDB
 
 
+def _decimal_or_none(
+    value,
+) -> Decimal | None:
+    if value is None:
+        return None
+
+    return Decimal(str(value))
+
+
 def build_external_order_payload(
     order: OrderDB,
 ) -> dict:
@@ -15,6 +24,9 @@ def build_external_order_payload(
 
     Su función es separar el modelo interno de LPDB
     del contrato de cualquier proveedor externo.
+
+    Los valores financieros usan los snapshots
+    persistidos en la orden. No se recalculan aquí.
     """
 
     items = []
@@ -30,10 +42,8 @@ def build_external_order_payload(
                     "ingredient_id": modification.ingredient_id,
                     "ingredient_name": modification.ingredient_name,
                     "new_base": modification.new_base,
-                    "price": (
-                        Decimal(str(modification.price))
-                        if modification.price is not None
-                        else None
+                    "price": _decimal_or_none(
+                        modification.price
                     ),
                 }
             )
@@ -48,18 +58,9 @@ def build_external_order_payload(
                 "beverage_product_id": (
                     order_item.combo.beverage_product_id
                 ),
-                "quantity": (
-                    order_item.combo.quantity
-                ),
-                "combo_price": (
-                    Decimal(
-                        str(
-                            order_item.combo.combo_price
-                        )
-                    )
-                    if order_item.combo.combo_price
-                    is not None
-                    else None
+                "quantity": order_item.combo.quantity,
+                "combo_price": _decimal_or_none(
+                    order_item.combo.combo_price
                 ),
             }
 
@@ -67,6 +68,12 @@ def build_external_order_payload(
             {
                 "product_id": order_item.product_id,
                 "quantity": order_item.quantity,
+                "unit_price": _decimal_or_none(
+                    order_item.unit_price
+                ),
+                "subtotal": _decimal_or_none(
+                    order_item.subtotal
+                ),
                 "modifications": modifications,
                 "combo": combo,
             }
@@ -77,5 +84,8 @@ def build_external_order_payload(
         "tenant_id": order.tenant_id,
         "customer_name": order.customer_name,
         "location_id": order.location_id,
+        "total": _decimal_or_none(
+            order.total
+        ),
         "items": items,
     }

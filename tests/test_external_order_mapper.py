@@ -19,6 +19,7 @@ def test_build_external_order_payload_simple_item():
         tenant_id=1,
         customer_name="Cliente Test",
         location_id=1,
+        total=Decimal("20.00"),
     )
 
     item = OrderItemDB(
@@ -26,6 +27,8 @@ def test_build_external_order_payload_simple_item():
         order_id=100,
         product_id=2,
         quantity=2,
+        unit_price=Decimal("10.00"),
+        subtotal=Decimal("20.00"),
     )
 
     order.items = [item]
@@ -36,6 +39,7 @@ def test_build_external_order_payload_simple_item():
     assert payload["tenant_id"] == 1
     assert payload["customer_name"] == "Cliente Test"
     assert payload["location_id"] == 1
+    assert payload["total"] == Decimal("20.00")
 
     assert len(payload["items"]) == 1
 
@@ -43,6 +47,8 @@ def test_build_external_order_payload_simple_item():
 
     assert mapped_item["product_id"] == 2
     assert mapped_item["quantity"] == 2
+    assert mapped_item["unit_price"] == Decimal("10.00")
+    assert mapped_item["subtotal"] == Decimal("20.00")
     assert mapped_item["modifications"] == []
     assert mapped_item["combo"] is None
 
@@ -53,6 +59,7 @@ def test_build_external_order_payload_with_modification():
         tenant_id=1,
         customer_name="Cliente Modificacion",
         location_id=1,
+        total=Decimal("12.50"),
     )
 
     item = OrderItemDB(
@@ -60,6 +67,8 @@ def test_build_external_order_payload_with_modification():
         order_id=101,
         product_id=2,
         quantity=1,
+        unit_price=Decimal("12.50"),
+        subtotal=Decimal("12.50"),
     )
 
     modification = OrderItemModificationDB(
@@ -77,10 +86,14 @@ def test_build_external_order_payload_with_modification():
 
     payload = build_external_order_payload(order)
 
+    assert payload["total"] == Decimal("12.50")
+
     mapped_item = payload["items"][0]
 
     assert mapped_item["product_id"] == 2
     assert mapped_item["quantity"] == 1
+    assert mapped_item["unit_price"] == Decimal("12.50")
+    assert mapped_item["subtotal"] == Decimal("12.50")
 
     assert len(mapped_item["modifications"]) == 1
 
@@ -101,6 +114,7 @@ def test_build_external_order_payload_with_combo():
         tenant_id=1,
         customer_name="Cliente Combo",
         location_id=1,
+        total=Decimal("14.00"),
     )
 
     item = OrderItemDB(
@@ -108,6 +122,8 @@ def test_build_external_order_payload_with_combo():
         order_id=102,
         product_id=2,
         quantity=1,
+        unit_price=Decimal("14.00"),
+        subtotal=Decimal("14.00"),
     )
 
     combo = OrderItemComboDB(
@@ -124,10 +140,14 @@ def test_build_external_order_payload_with_combo():
 
     payload = build_external_order_payload(order)
 
+    assert payload["total"] == Decimal("14.00")
+
     mapped_item = payload["items"][0]
 
     assert mapped_item["product_id"] == 2
     assert mapped_item["quantity"] == 1
+    assert mapped_item["unit_price"] == Decimal("14.00")
+    assert mapped_item["subtotal"] == Decimal("14.00")
     assert mapped_item["modifications"] == []
 
     assert mapped_item["combo"] is not None
@@ -146,6 +166,7 @@ def test_build_external_order_payload_with_modification_and_combo():
         tenant_id=1,
         customer_name="Cliente Completo",
         location_id=1,
+        total=Decimal("43.50"),
     )
 
     item = OrderItemDB(
@@ -153,6 +174,8 @@ def test_build_external_order_payload_with_modification_and_combo():
         order_id=103,
         product_id=2,
         quantity=3,
+        unit_price=Decimal("14.50"),
+        subtotal=Decimal("43.50"),
     )
 
     modification = OrderItemModificationDB(
@@ -184,6 +207,7 @@ def test_build_external_order_payload_with_modification_and_combo():
     assert payload["tenant_id"] == 1
     assert payload["customer_name"] == "Cliente Completo"
     assert payload["location_id"] == 1
+    assert payload["total"] == Decimal("43.50")
 
     assert len(payload["items"]) == 1
 
@@ -191,6 +215,8 @@ def test_build_external_order_payload_with_modification_and_combo():
 
     assert mapped_item["product_id"] == 2
     assert mapped_item["quantity"] == 3
+    assert mapped_item["unit_price"] == Decimal("14.50")
+    assert mapped_item["subtotal"] == Decimal("43.50")
 
     assert len(mapped_item["modifications"]) == 1
 
@@ -210,3 +236,33 @@ def test_build_external_order_payload_with_modification_and_combo():
     assert mapped_combo["beverage_product_id"] == 3
     assert mapped_combo["quantity"] == 3
     assert mapped_combo["combo_price"] == Decimal("4.50")
+
+
+def test_build_external_order_payload_preserves_legacy_null_snapshots():
+    order = OrderDB(
+        id=104,
+        tenant_id=1,
+        customer_name="Cliente Legacy",
+        location_id=1,
+        total=None,
+    )
+
+    item = OrderItemDB(
+        id=204,
+        order_id=104,
+        product_id=2,
+        quantity=1,
+        unit_price=None,
+        subtotal=None,
+    )
+
+    order.items = [item]
+
+    payload = build_external_order_payload(order)
+
+    assert payload["total"] is None
+
+    mapped_item = payload["items"][0]
+
+    assert mapped_item["unit_price"] is None
+    assert mapped_item["subtotal"] is None
