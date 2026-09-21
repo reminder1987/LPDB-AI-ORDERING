@@ -196,6 +196,93 @@ class ToastOrderAdapter:
 
         return value
 
+    @staticmethod
+    def _get_modifications(
+        item: dict,
+    ) -> list[dict]:
+        modifications = item.get(
+            "modifications",
+            [],
+        )
+
+        if modifications is None:
+            return []
+
+        if not isinstance(
+            modifications,
+            list,
+        ):
+            raise ValueError(
+                "modifications must be a list."
+            )
+
+        for modification in modifications:
+            if not isinstance(
+                modification,
+                dict,
+            ):
+                raise ValueError(
+                    "Each modification must "
+                    "be an object."
+                )
+
+        return modifications
+
+    def _resolve_effective_product_id(
+        self,
+        item: dict,
+    ) -> int:
+        product_id = (
+            self._require_positive_integer(
+                item.get("product_id"),
+                "product_id",
+            )
+        )
+
+        modifications = (
+            self._get_modifications(
+                item=item,
+            )
+        )
+
+        base_change_product_ids = []
+
+        for modification in modifications:
+            modification_type = (
+                modification.get("type")
+            )
+
+            if modification_type != "BASE_CHANGE":
+                continue
+
+            new_product_id = (
+                self._require_positive_integer(
+                    modification.get(
+                        "new_product_id"
+                    ),
+                    "new_product_id",
+                )
+            )
+
+            base_change_product_ids.append(
+                new_product_id
+            )
+
+        if not base_change_product_ids:
+            return product_id
+
+        unique_product_ids = set(
+            base_change_product_ids
+        )
+
+        if len(unique_product_ids) != 1:
+            raise ValueError(
+                "Conflicting BASE_CHANGE target "
+                "products for order item."
+            )
+
+        return base_change_product_ids[0]
+
     def _build_modifier(
         self,
         modification: dict,
@@ -273,32 +360,13 @@ class ToastOrderAdapter:
     ) -> list[dict]:
         modifiers = []
 
-        modifications = item.get(
-            "modifications",
-            [],
+        modifications = (
+            self._get_modifications(
+                item=item,
+            )
         )
 
-        if modifications is None:
-            return modifiers
-
-        if not isinstance(
-            modifications,
-            list,
-        ):
-            raise ValueError(
-                "modifications must be a list."
-            )
-
         for modification in modifications:
-            if not isinstance(
-                modification,
-                dict,
-            ):
-                raise ValueError(
-                    "Each modification must "
-                    "be an object."
-                )
-
             modifier = self._build_modifier(
                 modification=modification,
             )
@@ -307,6 +375,98 @@ class ToastOrderAdapter:
                 modifiers.append(modifier)
 
         return modifiers
+
+    def _build_selection(
+        self,
+        item: dict,
+        tenant_id: int,
+    ) -> dict:
+        order_item_id = (
+            self._require_positive_integer(
+                item.get("order_item_id"),
+                "order_item_id",
+            )
+        )
+
+        effective_product_id = (
+            self._resolve_effective_product_id(
+                item=item,
+            )
+        )
+
+        product_external_id = (
+            self._resolve_product(
+                internal_id=(
+                    effective_product_id
+                ),
+            )
+        )
+
+        if product_external_id is None:
+            raise ValueError(
+                "Missing Toast product mapping "
+                "for product "
+                f"{effective_product_id}."
+            )
+
+        product_group_external_id = (
+            self._resolve_product_group(
+                internal_id=(
+                    effective_product_id
+                ),
+            )
+        )
+
+        if (
+            product_group_external_id
+            is None
+        ):
+            raise ValueError(
+                "Missing Toast product group "
+                "mapping for product "
+                f"{effective_product_id}."
+            )
+
+        quantity = item.get("quantity")
+
+        if (
+            not isinstance(
+                quantity,
+                (int, float),
+            )
+            or isinstance(quantity, bool)
+            or quantity <= 0
+        ):
+            raise ValueError(
+                "quantity must be greater "
+                "than zero."
+            )
+
+        modifiers = (
+            self._build_modifiers(
+                item=item,
+            )
+        )
+
+        return {
+            "externalId": (
+                "lpdb-selection-"
+                f"{tenant_id}-"
+                f"{order_item_id}"
+            ),
+            "item": {
+                "guid": (
+                    product_external_id
+                ),
+            },
+            "itemGroup": {
+                "guid": (
+                    product_group_external_id
+                ),
+            },
+            "quantity": quantity,
+            "modifiers": modifiers,
+        }
 
     def build_order_payload(
         self,
@@ -330,96 +490,43 @@ class ToastOrderAdapter:
             )
         )
 
-        selections = []
-
-        for item in payload.get(
+        items = payload.get(
             "items",
             [],
+        )
+
+        if items is None:
+            items = []
+
+        if not isinstance(
+            items,
+            list,
         ):
-            order_item_id = (
-                self._require_positive_integer(
-                    item.get("order_item_id"),
-                    "order_item_id",
-                )
+            raise ValueError(
+                "items must be a list."
             )
 
-            product_id = (
-                self._require_positive_integer(
-                    item.get("product_id"),
-                    "product_id",
-                )
-            )
+        selections = []
 
-            product_external_id = (
-                self._resolve_product(
-                    internal_id=product_id,
-                )
-            )
-
-            if product_external_id is None:
-                raise ValueError(
-                    "Missing Toast product mapping "
-                    f"for product {product_id}."
-                )
-
-            product_group_external_id = (
-                self._resolve_product_group(
-                    internal_id=product_id,
-                )
-            )
-
-            if (
-                product_group_external_id
-                is None
+        for item in items:
+            if not isinstance(
+                item,
+                dict,
             ):
                 raise ValueError(
-                    "Missing Toast product group "
-                    "mapping for product "
-                    f"{product_id}."
+                    "Each item must be an object."
                 )
 
-            quantity = item.get("quantity")
-
-            if (
-                not isinstance(
-                    quantity,
-                    (int, float),
-                )
-                or isinstance(quantity, bool)
-                or quantity <= 0
-            ):
-                raise ValueError(
-                    "quantity must be greater "
-                    "than zero."
-                )
-
-            modifiers = (
-                self._build_modifiers(
+            selection = (
+                self._build_selection(
                     item=item,
+                    tenant_id=tenant_id,
                 )
             )
 
-            selection = {
-                "externalId": (
-                    "lpdb-selection-"
-                    f"{tenant_id}-"
-                    f"{order_item_id}"
-                ),
-                "item": {
-                    "guid": (
-                        product_external_id
-                    ),
-                },
-                "itemGroup": {
-                    "guid": (
-                        product_group_external_id
-                    ),
-                },
-                "quantity": quantity,
-                "modifiers": modifiers,
-            }
-
-            selections.append(selection)
+            selections.append(
+                selection
+            )
 
         return {
             "externalId": (
