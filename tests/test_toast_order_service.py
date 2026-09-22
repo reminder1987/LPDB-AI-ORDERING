@@ -521,3 +521,131 @@ def test_toast_order_service_preserves_metadata_when_external_id_missing():
             "toast-request-001"
         ),
     }
+
+
+
+class SuccessfulMetadataTransport:
+    def create_order(
+        self,
+        restaurant_external_id,
+        payload,
+    ):
+        return {
+            "success": True,
+            "external_order_id": (
+                "toast-order-metadata-001"
+            ),
+            "metadata": {
+                "provider_request_id": (
+                    "toast-request-001"
+                ),
+                "check_guid": (
+                    "toast-check-001"
+                ),
+                "response_marker": "created",
+            },
+        }
+
+
+def test_toast_order_service_preserves_success_metadata():
+    transport = SuccessfulMetadataTransport()
+
+    service = build_service(
+        transport=transport,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
+    )
+
+    payload = build_basic_payload(
+        order_id=904,
+        order_item_id=905,
+    )
+
+    result = service.submit_order(
+        order_id=904,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is True
+    assert result.external_order_id == (
+        "toast-order-metadata-001"
+    )
+
+    assert result.metadata == {
+        "provider_request_id": (
+            "toast-request-001"
+        ),
+        "response_marker": "created",
+        "external_mappings": {
+            "check": "toast-check-001",
+        },
+    }
+
+
+class SuccessfulExistingMappingsTransport:
+    def create_order(
+        self,
+        restaurant_external_id,
+        payload,
+    ):
+        return {
+            "success": True,
+            "external_order_id": (
+                "toast-order-metadata-002"
+            ),
+            "metadata": {
+                "check_guid": (
+                    "toast-check-new"
+                ),
+                "external_mappings": {
+                    "payment": (
+                        "toast-payment-001"
+                    ),
+                },
+            },
+        }
+
+
+def test_toast_order_service_merges_check_mapping_with_existing_metadata():
+    transport = (
+        SuccessfulExistingMappingsTransport()
+    )
+
+    service = build_service(
+        transport=transport,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
+    )
+
+    payload = build_basic_payload(
+        order_id=906,
+        order_item_id=907,
+    )
+
+    result = service.submit_order(
+        order_id=906,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is True
+
+    assert result.metadata == {
+        "external_mappings": {
+            "payment": (
+                "toast-payment-001"
+            ),
+            "check": "toast-check-new",
+        },
+    }

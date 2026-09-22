@@ -1,4 +1,4 @@
-﻿from app.services.external_order_service import (
+from app.services.external_order_service import (
     ExternalOrderResult,
 )
 from app.services.toast_configuration import (
@@ -149,21 +149,43 @@ class ToastOrderService:
                     ),
                 )
 
-            metadata = {}
+            metadata = dict(
+                transport_metadata
+            )
 
-            check_guid = transport_metadata.get(
-                "check_guid"
+            check_guid = metadata.pop(
+                "check_guid",
+                None,
             )
 
             if isinstance(check_guid, str):
                 check_guid = check_guid.strip()
 
                 if check_guid:
+                    external_mappings = (
+                        metadata.get(
+                            "external_mappings"
+                        )
+                    )
+
+                    if not isinstance(
+                        external_mappings,
+                        dict,
+                    ):
+                        external_mappings = {}
+
+                    else:
+                        external_mappings = dict(
+                            external_mappings
+                        )
+
+                    external_mappings[
+                        "check"
+                    ] = check_guid
+
                     metadata[
                         "external_mappings"
-                    ] = {
-                        "check": check_guid,
-                    }
+                    ] = external_mappings
 
             return ExternalOrderResult(
                 success=True,
