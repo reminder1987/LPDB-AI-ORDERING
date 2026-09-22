@@ -379,3 +379,208 @@ def test_toast_webhook_duplicate_event_is_idempotent(
     )
     assert second_body["tenant_id"] == 1
     assert second_body["attempt_number"] == 2
+
+
+def test_toast_webhook_full_lifecycle_matches_order_and_is_idempotent(
+    monkeypatch,
+):
+    from uuid import uuid4
+
+    from sqlalchemy import delete
+
+    from app.core import database as database_module
+    from app.models.external_mapping_db import ExternalMappingDB
+    from app.models.provider_webhook_event_db import (
+        ProviderWebhookEventDB,
+    )
+    from app.services.external_mapping_service import (
+        create_external_mapping,
+    )
+
+    install_fakes(monkeypatch)
+
+    import app.services.provider_webhook_event_service as provider_webhook_event_service_module
+
+    monkeypatch.setattr(
+        provider_webhook_event_service_module,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    internal_order_id = 910001
+
+    external_order_id = (
+        "toast-webhook-lifecycle-order-"
+        + uuid4().hex
+    )
+
+    event_guid = (
+        "toast-webhook-lifecycle-event-"
+        + uuid4().hex
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        create_external_mapping(
+            tenant_id=1,
+            provider="toast",
+            entity_type="order",
+            internal_id=internal_order_id,
+            external_id=external_order_id,
+        )
+
+        payload = build_payload(
+            RESTAURANT_A,
+            event_guid=event_guid,
+        )
+
+        payload["details"]["order"]["guid"] = (
+            external_order_id
+        )
+
+        raw_body = encode_payload(payload)
+
+        signature = build_toast_webhook_signature(
+            payload=raw_body,
+            timestamp=payload["timestamp"],
+            secret=SECRET_A,
+        )
+
+        headers = {
+            "Content-Type": "application/json",
+            "Toast-Signature": signature,
+            "Toast-Event-Type": "order_updated",
+            "Toast-Attempt-Number": "1",
+        }
+
+        first = client.post(
+            "/webhooks/toast/orders",
+            content=raw_body,
+            headers=headers,
+        )
+
+        assert first.status_code == 200
+
+        first_body = first.json()
+
+        assert first_body["received"] is True
+        assert first_body["duplicate"] is False
+        assert first_body["processed"] is True
+        assert first_body["matched"] is True
+        assert (
+            first_body["internal_order_id"]
+            == internal_order_id
+        )
+        assert first_body["tenant_id"] == 1
+        assert (
+            first_body["event_guid"]
+            == event_guid
+        )
+        assert (
+            first_body["order_guid"]
+            == external_order_id
+        )
+        assert first_body["attempt_number"] == 1
+
+        verification_db = (
+            database_module.SessionLocal()
+        )
+
+        try:
+            persisted_event = (
+                verification_db
+                .query(ProviderWebhookEventDB)
+                .filter(
+                    ProviderWebhookEventDB.tenant_id == 1,
+                    ProviderWebhookEventDB.provider == "toast",
+                    ProviderWebhookEventDB.event_id == event_guid,
+                )
+                .first()
+            )
+
+            assert persisted_event is not None
+            assert (
+                persisted_event.external_entity_id
+                == external_order_id
+            )
+
+        finally:
+            verification_db.close()
+
+        second_headers = dict(headers)
+        second_headers[
+            "Toast-Attempt-Number"
+        ] = "2"
+
+        second = client.post(
+            "/webhooks/toast/orders",
+            content=raw_body,
+            headers=second_headers,
+        )
+
+        assert second.status_code == 200
+
+        second_body = second.json()
+
+        assert second_body["received"] is True
+        assert second_body["duplicate"] is True
+        assert second_body["processed"] is False
+        assert second_body["matched"] is False
+        assert (
+            second_body["internal_order_id"]
+            is None
+        )
+        assert second_body["tenant_id"] == 1
+        assert (
+            second_body["event_guid"]
+            == event_guid
+        )
+        assert (
+            second_body["order_guid"]
+            == external_order_id
+        )
+        assert second_body["attempt_number"] == 2
+
+        count_db = database_module.SessionLocal()
+
+        try:
+            event_count = (
+                count_db
+                .query(ProviderWebhookEventDB)
+                .filter(
+                    ProviderWebhookEventDB.tenant_id == 1,
+                    ProviderWebhookEventDB.provider == "toast",
+                    ProviderWebhookEventDB.event_id == event_guid,
+                )
+                .count()
+            )
+
+            assert event_count == 1
+
+        finally:
+            count_db.close()
+
+    finally:
+        db.rollback()
+
+        db.execute(
+            delete(ProviderWebhookEventDB).where(
+                ProviderWebhookEventDB.tenant_id == 1,
+                ProviderWebhookEventDB.provider == "toast",
+                ProviderWebhookEventDB.event_id == event_guid,
+            )
+        )
+
+        db.execute(
+            delete(ExternalMappingDB).where(
+                ExternalMappingDB.tenant_id == 1,
+                ExternalMappingDB.provider == "toast",
+                ExternalMappingDB.entity_type == "order",
+                ExternalMappingDB.external_id
+                == external_order_id,
+            )
+        )
+
+        db.commit()
+        db.close()
