@@ -259,7 +259,8 @@ def test_submission_service_with_real_toast_order_service(
         )
 
         # ====================================================
-        # 4. CREAR MAPPINGS TOAST IMPLEMENTADOS
+        # 4. CREAR MAPPINGS TOAST
+        #    PRODUCTO + PAPAS + BEBIDA
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -267,6 +268,7 @@ def test_submission_service_with_real_toast_order_service(
         try:
             db.add_all(
                 [
+                    # Producto principal
                     ExternalMappingDB(
                         tenant_id=(
                             tenant.tenant_id
@@ -291,6 +293,58 @@ def test_submission_service_with_real_toast_order_service(
                         external_id=(
                             "toast-group-"
                             "hot-dogs"
+                        ),
+                    ),
+
+                    # Papas del combo
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type="ingredient",
+                        internal_id=23,
+                        external_id=(
+                            "toast-ingredient-fries"
+                        ),
+                    ),
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type=(
+                            "ingredient_group"
+                        ),
+                        internal_id=23,
+                        external_id=(
+                            "toast-group-combo-fries"
+                        ),
+                    ),
+
+                    # Bebida del combo
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type="product",
+                        internal_id=71,
+                        external_id=(
+                            "toast-product-coca-cola"
+                        ),
+                    ),
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type=(
+                            "product_group"
+                        ),
+                        internal_id=71,
+                        external_id=(
+                            "toast-group-combo-beverages"
                         ),
                     ),
                 ]
@@ -452,10 +506,38 @@ def test_submission_service_with_real_toast_order_service(
 
         assert selection["quantity"] == 2
 
-        assert (
-            selection["modifiers"]
-            == []
-        )
+        # REMOVE no se envía a Toast como modifier.
+        # El combo sí debe enviar papas + bebida.
+        assert selection[
+            "modifiers"
+        ] == [
+            {
+                "item": {
+                    "guid": (
+                        "toast-ingredient-fries"
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        "toast-group-combo-fries"
+                    ),
+                },
+                "quantity": 2,
+            },
+            {
+                "item": {
+                    "guid": (
+                        "toast-product-coca-cola"
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        "toast-group-combo-beverages"
+                    ),
+                },
+                "quantity": 2,
+            },
+        ]
 
         # ====================================================
         # 10. VALIDAR ORDEN SUBMITTED

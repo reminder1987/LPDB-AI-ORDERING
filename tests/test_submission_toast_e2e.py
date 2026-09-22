@@ -188,10 +188,12 @@ def test_submission_service_reaches_toast_adapter(
                 order.tenant_id
                 == tenant.tenant_id
             )
+
             assert (
                 order.customer_id
                 == customer_id
             )
+
             assert order.location_id == 1
             assert order.status == "created"
 
@@ -291,7 +293,8 @@ def test_submission_service_reaches_toast_adapter(
         )
 
         # ====================================================
-        # 4. CREAR MAPPINGS TOAST IMPLEMENTADOS
+        # 4. CREAR MAPPINGS TOAST
+        #    PRODUCTO + PAPAS + BEBIDA
         # ====================================================
 
         db = database_module.SessionLocal()
@@ -299,6 +302,7 @@ def test_submission_service_reaches_toast_adapter(
         try:
             db.add_all(
                 [
+                    # Producto principal
                     ExternalMappingDB(
                         tenant_id=(
                             tenant.tenant_id
@@ -322,6 +326,58 @@ def test_submission_service_reaches_toast_adapter(
                         internal_id=2,
                         external_id=(
                             "toast-group-hot-dogs"
+                        ),
+                    ),
+
+                    # Papas del combo
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type="ingredient",
+                        internal_id=23,
+                        external_id=(
+                            "toast-ingredient-fries"
+                        ),
+                    ),
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type=(
+                            "ingredient_group"
+                        ),
+                        internal_id=23,
+                        external_id=(
+                            "toast-group-combo-fries"
+                        ),
+                    ),
+
+                    # Bebida del combo
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type="product",
+                        internal_id=71,
+                        external_id=(
+                            "toast-product-coca-cola"
+                        ),
+                    ),
+                    ExternalMappingDB(
+                        tenant_id=(
+                            tenant.tenant_id
+                        ),
+                        provider="toast",
+                        entity_type=(
+                            "product_group"
+                        ),
+                        internal_id=71,
+                        external_id=(
+                            "toast-group-combo-beverages"
                         ),
                     ),
                 ]
@@ -499,10 +555,39 @@ def test_submission_service_reaches_toast_adapter(
             "quantity"
         ] == 2
 
-        assert (
-            toast_item["modifiers"]
-            == []
-        )
+        # REMOVE no se envía como modifier.
+        # El combo sí debe llegar a Toast:
+        # papas + bebida.
+        assert toast_item[
+            "modifiers"
+        ] == [
+            {
+                "item": {
+                    "guid": (
+                        "toast-ingredient-fries"
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        "toast-group-combo-fries"
+                    ),
+                },
+                "quantity": 2,
+            },
+            {
+                "item": {
+                    "guid": (
+                        "toast-product-coca-cola"
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        "toast-group-combo-beverages"
+                    ),
+                },
+                "quantity": 2,
+            },
+        ]
 
         # ====================================================
         # 8. VERIFICAR ESTADO SUBMITTED

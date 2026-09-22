@@ -169,6 +169,33 @@ class ToastOrderAdapter:
             )
         )
 
+    def _resolve_beverage(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        if internal_id in self.product_mappings:
+            return self.product_mappings[
+                internal_id
+            ]
+
+        if self.mapping_resolver is None:
+            return None
+
+        return (
+            self.mapping_resolver
+            .resolve_beverage(
+                internal_id=internal_id,
+            )
+        )
+
+    def _resolve_beverage_group(
+        self,
+        internal_id: int,
+    ) -> str | None:
+        return self._resolve_product_group(
+            internal_id=internal_id,
+        )
+
     def _require_dining_option_guid(
         self,
     ) -> str:
@@ -227,6 +254,25 @@ class ToastOrderAdapter:
                 )
 
         return modifications
+
+    @staticmethod
+    def _get_combo(
+        item: dict,
+    ) -> dict | None:
+        combo = item.get("combo")
+
+        if combo is None:
+            return None
+
+        if not isinstance(
+            combo,
+            dict,
+        ):
+            raise ValueError(
+                "combo must be an object."
+            )
+
+        return combo
 
     def _resolve_effective_product_id(
         self,
@@ -376,6 +422,158 @@ class ToastOrderAdapter:
 
         return modifiers
 
+    def _build_combo_modifiers(
+        self,
+        item: dict,
+    ) -> list[dict]:
+        combo = self._get_combo(
+            item=item,
+        )
+
+        if combo is None:
+            return []
+
+        combo_quantity = (
+            self._require_positive_integer(
+                combo.get("quantity"),
+                "combo.quantity",
+            )
+        )
+
+        fries_ingredient_id = (
+            self._require_positive_integer(
+                combo.get(
+                    "fries_ingredient_id"
+                ),
+                "combo.fries_ingredient_id",
+            )
+        )
+
+        beverage_product_id = (
+            self._require_positive_integer(
+                combo.get(
+                    "beverage_product_id"
+                ),
+                "combo.beverage_product_id",
+            )
+        )
+
+        fries_external_id = (
+            self._resolve_ingredient(
+                internal_id=(
+                    fries_ingredient_id
+                ),
+            )
+        )
+
+        if fries_external_id is None:
+            raise ValueError(
+                "Missing Toast ingredient mapping "
+                "for combo fries ingredient "
+                f"{fries_ingredient_id}."
+            )
+
+        fries_group_external_id = (
+            self._resolve_ingredient_group(
+                internal_id=(
+                    fries_ingredient_id
+                ),
+            )
+        )
+
+        if (
+            fries_group_external_id
+            is None
+        ):
+            raise ValueError(
+                "Missing Toast ingredient group "
+                "mapping for combo fries ingredient "
+                f"{fries_ingredient_id}."
+            )
+
+        beverage_external_id = (
+            self._resolve_beverage(
+                internal_id=(
+                    beverage_product_id
+                ),
+            )
+        )
+
+        if beverage_external_id is None:
+            raise ValueError(
+                "Missing Toast beverage mapping "
+                "for product "
+                f"{beverage_product_id}."
+            )
+
+        beverage_group_external_id = (
+            self._resolve_beverage_group(
+                internal_id=(
+                    beverage_product_id
+                ),
+            )
+        )
+
+        if (
+            beverage_group_external_id
+            is None
+        ):
+            raise ValueError(
+                "Missing Toast beverage group "
+                "mapping for product "
+                f"{beverage_product_id}."
+            )
+
+        return [
+            {
+                "item": {
+                    "guid": (
+                        fries_external_id
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        fries_group_external_id
+                    ),
+                },
+                "quantity": combo_quantity,
+            },
+            {
+                "item": {
+                    "guid": (
+                        beverage_external_id
+                    ),
+                },
+                "optionGroup": {
+                    "guid": (
+                        beverage_group_external_id
+                    ),
+                },
+                "quantity": combo_quantity,
+            },
+        ]
+
+    def _build_all_modifiers(
+        self,
+        item: dict,
+    ) -> list[dict]:
+        modifiers = (
+            self._build_modifiers(
+                item=item,
+            )
+        )
+
+        combo_modifiers = (
+            self._build_combo_modifiers(
+                item=item,
+            )
+        )
+
+        return (
+            modifiers
+            + combo_modifiers
+        )
+
     def _build_selection(
         self,
         item: dict,
@@ -443,7 +641,7 @@ class ToastOrderAdapter:
             )
 
         modifiers = (
-            self._build_modifiers(
+            self._build_all_modifiers(
                 item=item,
             )
         )
