@@ -1,4 +1,4 @@
-﻿from typing import Any
+from typing import Any
 
 from app.services.toast_configuration import (
     ToastConfiguration,
@@ -116,6 +116,9 @@ class ToastHttpTransport:
             not isinstance(status_code, int)
             or not 200 <= status_code < 300
         ):
+            if status_code == 401:
+                self._invalidate_access_token()
+
             error = self._extract_error(
                 response_body
             )
@@ -225,6 +228,19 @@ class ToastHttpTransport:
             return "server_error"
 
         return "http_error"
+
+    def _invalidate_access_token(self) -> None:
+        if self.authentication_service is None:
+            return
+
+        invalidate = getattr(
+            self.authentication_service,
+            "invalidate_access_token",
+            None,
+        )
+
+        if callable(invalidate):
+            invalidate()
 
     def _get_access_token(self) -> str:
         if self.authentication_service is not None:

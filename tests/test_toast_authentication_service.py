@@ -222,3 +222,42 @@ def test_authentication_rejects_missing_token():
         raise AssertionError(
             "RuntimeError was not raised."
         )
+
+def test_authentication_invalidates_cached_token():
+    http_client = FakeHttpClient(
+        responses=[
+            FakeResponse(
+                status_code=200,
+                payload={
+                    "token": {
+                        "accessToken": "first-token",
+                        "expiresIn": 3600,
+                    }
+                },
+            ),
+            FakeResponse(
+                status_code=200,
+                payload={
+                    "token": {
+                        "accessToken": "second-token",
+                        "expiresIn": 3600,
+                    }
+                },
+            ),
+        ]
+    )
+
+    service = ToastAuthenticationService(
+        configuration=build_configuration(),
+        http_client=http_client,
+    )
+
+    first_token = service.get_access_token()
+
+    service.invalidate_access_token()
+
+    second_token = service.get_access_token()
+
+    assert first_token == "first-token"
+    assert second_token == "second-token"
+    assert len(http_client.calls) == 2

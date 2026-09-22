@@ -1,4 +1,4 @@
-import time
+﻿import time
 from typing import Any
 
 
@@ -19,6 +19,10 @@ class ToastAuthenticationService:
             return self._access_token  # type: ignore[return-value]
 
         return self._authenticate()
+
+    def invalidate_access_token(self) -> None:
+        self._access_token = None
+        self._expires_at = 0.0
 
     def _has_valid_cached_token(self) -> bool:
         if not self._access_token:

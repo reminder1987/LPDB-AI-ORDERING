@@ -689,3 +689,60 @@ def test_toast_http_transport_classifies_conflict_as_not_retryable():
         "retryable": False,
         "status_code": 409,
     }
+
+
+class InvalidatableAuthenticationService:
+    def __init__(self):
+        self.invalidated = False
+
+    def get_access_token(self):
+        return "cached-token"
+
+    def invalidate_access_token(self):
+        self.invalidated = True
+
+
+def test_toast_http_transport_invalidates_token_on_401():
+    response = FakeHttpResponse(
+        status_code=401,
+        body={
+            "message": "Unauthorized",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    authentication_service = (
+        InvalidatableAuthenticationService()
+    )
+
+    transport = build_dynamic_transport(
+        client=client,
+        authentication_service=(
+            authentication_service
+        ),
+    )
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["error"] == "Unauthorized"
+    assert result["metadata"] == {
+        "error_type": "authentication_error",
+        "retryable": False,
+        "status_code": 401,
+    }
+
+    assert (
+        authentication_service.invalidated
+        is True
+    )
