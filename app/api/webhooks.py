@@ -55,6 +55,9 @@ from app.services.toast_webhook_service import (
     parse_toast_order_webhook,
     verify_toast_webhook_signature,
 )
+from app.services.toast_webhook_processor import (
+    toast_webhook_processor,
+)
 
 
 router = APIRouter(
@@ -581,9 +584,20 @@ async def process_toast_order_webhook(
         )
     )
 
+    processing = toast_webhook_processor.process_order_event(
+        tenant_id=integration.tenant_id,
+        event=event,
+        duplicate=registration.duplicate,
+    )
+
     return {
         "received": True,
         "duplicate": registration.duplicate,
+        "processed": processing.processed,
+        "matched": processing.matched,
+        "internal_order_id": (
+            processing.internal_order_id
+        ),
         "provider": "toast",
         "tenant_id": integration.tenant_id,
         "event_guid": event.event_guid,
