@@ -258,7 +258,10 @@ def test_toast_http_transport_handles_authentication_failure():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "authentication_error",
+        "retryable": False,
+    }
     assert result["error"] == (
         "Toast authentication failed."
     )
@@ -370,7 +373,11 @@ def test_toast_http_transport_handles_http_error():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "bad_request",
+        "retryable": False,
+        "status_code": 400,
+    }
     assert result["error"] == "Invalid order"
 
 
@@ -406,7 +413,11 @@ def test_toast_http_transport_handles_missing_guid():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "invalid_response",
+        "retryable": False,
+        "status_code": 201,
+    }
     assert result["error"] == (
         "Toast response did not "
         "contain an order guid."
@@ -477,7 +488,10 @@ def test_toast_http_transport_handles_timeout():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "timeout",
+        "retryable": True,
+    }
     assert result["error"] == (
         "Request timed out."
     )
@@ -505,7 +519,10 @@ def test_toast_http_transport_handles_connection_error():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "connection_error",
+        "retryable": True,
+    }
     assert result["error"] == (
         "Unable to connect to Toast."
     )
@@ -533,7 +550,142 @@ def test_toast_http_transport_handles_unexpected_http_exception():
 
     assert result["success"] is False
     assert result["external_order_id"] is None
-    assert result["metadata"] == {}
+    assert result["metadata"] == {
+        "error_type": "transport_error",
+        "retryable": False,
+    }
     assert result["error"] == (
         "Unexpected HTTP client failure."
     )
+
+
+def test_toast_http_transport_classifies_rate_limit_as_retryable():
+    response = FakeHttpResponse(
+        status_code=429,
+        body={
+            "message": "Too many requests",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["error"] == "Too many requests"
+    assert result["metadata"] == {
+        "error_type": "rate_limited",
+        "retryable": True,
+        "status_code": 429,
+    }
+
+
+def test_toast_http_transport_classifies_server_error_as_retryable():
+    response = FakeHttpResponse(
+        status_code=503,
+        body={
+            "message": "Service unavailable",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["error"] == "Service unavailable"
+    assert result["metadata"] == {
+        "error_type": "server_error",
+        "retryable": True,
+        "status_code": 503,
+    }
+
+
+def test_toast_http_transport_classifies_unauthorized_as_not_retryable():
+    response = FakeHttpResponse(
+        status_code=401,
+        body={
+            "message": "Unauthorized",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["error"] == "Unauthorized"
+    assert result["metadata"] == {
+        "error_type": "authentication_error",
+        "retryable": False,
+        "status_code": 401,
+    }
+
+
+def test_toast_http_transport_classifies_conflict_as_not_retryable():
+    response = FakeHttpResponse(
+        status_code=409,
+        body={
+            "message": "Order conflict",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["error"] == "Order conflict"
+    assert result["metadata"] == {
+        "error_type": "conflict",
+        "retryable": False,
+        "status_code": 409,
+    }

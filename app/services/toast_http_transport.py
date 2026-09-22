@@ -1,4 +1,4 @@
-from typing import Any
+﻿from typing import Any
 
 from app.services.toast_configuration import (
     ToastConfiguration,
@@ -6,6 +6,15 @@ from app.services.toast_configuration import (
 
 
 class ToastHttpTransport:
+    RETRYABLE_STATUS_CODES = {
+        408,
+        429,
+        500,
+        502,
+        503,
+        504,
+    }
+
     def __init__(
         self,
         configuration: ToastConfiguration,
@@ -28,27 +37,25 @@ class ToastHttpTransport:
         )
 
         if not restaurant_external_id:
-            return {
-                "success": False,
-                "external_order_id": None,
-                "metadata": {},
-                "error": (
+            return self._failure(
+                error=(
                     "restaurant_external_id "
                     "is required."
                 ),
-            }
+                error_type="validation_error",
+                retryable=False,
+            )
 
         try:
             access_token = (
                 self._get_access_token()
             )
         except Exception as exc:
-            return {
-                "success": False,
-                "external_order_id": None,
-                "metadata": {},
-                "error": str(exc),
-            }
+            return self._failure(
+                error=str(exc),
+                error_type="authentication_error",
+                retryable=False,
+            )
 
         url = (
             f"{self.configuration.base_url}"
@@ -72,45 +79,78 @@ class ToastHttpTransport:
                 json=payload,
                 timeout=self.configuration.timeout,
             )
+        except TimeoutError as exc:
+            return self._failure(
+                error=str(exc),
+                error_type="timeout",
+                retryable=True,
+            )
+        except ConnectionError as exc:
+            return self._failure(
+                error=str(exc),
+                error_type="connection_error",
+                retryable=True,
+            )
         except Exception as exc:
-            return {
-                "success": False,
-                "external_order_id": None,
-                "metadata": {},
-                "error": str(exc),
-            }
+            return self._failure(
+                error=str(exc),
+                error_type="transport_error",
+                retryable=False,
+            )
+
+        status_code = getattr(
+            response,
+            "status_code",
+            None,
+        )
 
         try:
             response_body = response.json()
         except Exception:
             response_body = {}
 
-        if not 200 <= response.status_code < 300:
+        if not isinstance(response_body, dict):
+            response_body = {}
+
+        if (
+            not isinstance(status_code, int)
+            or not 200 <= status_code < 300
+        ):
             error = self._extract_error(
                 response_body
             )
 
-            return {
-                "success": False,
-                "external_order_id": None,
-                "metadata": {},
-                "error": error,
-            }
+            return self._failure(
+                error=error,
+                error_type=self._classify_http_error(
+                    status_code
+                ),
+                status_code=status_code,
+                retryable=(
+                    status_code
+                    in self.RETRYABLE_STATUS_CODES
+                ),
+            )
 
         external_order_id = response_body.get(
             "guid"
         )
 
+        if isinstance(external_order_id, str):
+            external_order_id = (
+                external_order_id.strip()
+            )
+
         if not external_order_id:
-            return {
-                "success": False,
-                "external_order_id": None,
-                "metadata": {},
-                "error": (
+            return self._failure(
+                error=(
                     "Toast response did not "
                     "contain an order guid."
                 ),
-            }
+                error_type="invalid_response",
+                status_code=status_code,
+                retryable=False,
+            )
 
         check_guid = self._extract_check_guid(
             response_body
@@ -126,6 +166,65 @@ class ToastHttpTransport:
             "external_order_id": external_order_id,
             "metadata": metadata,
         }
+
+    @staticmethod
+    def _failure(
+        *,
+        error: str,
+        error_type: str,
+        retryable: bool,
+        status_code: int | None = None,
+    ) -> dict:
+        metadata = {
+            "error_type": error_type,
+            "retryable": retryable,
+        }
+
+        if status_code is not None:
+            metadata["status_code"] = status_code
+
+        return {
+            "success": False,
+            "external_order_id": None,
+            "metadata": metadata,
+            "error": error,
+        }
+
+    @staticmethod
+    def _classify_http_error(
+        status_code: int | None,
+    ) -> str:
+        if status_code == 400:
+            return "bad_request"
+
+        if status_code == 401:
+            return "authentication_error"
+
+        if status_code == 403:
+            return "authorization_error"
+
+        if status_code == 404:
+            return "not_found"
+
+        if status_code == 408:
+            return "timeout"
+
+        if status_code == 409:
+            return "conflict"
+
+        if status_code == 422:
+            return "validation_error"
+
+        if status_code == 429:
+            return "rate_limited"
+
+        if (
+            isinstance(status_code, int)
+            and 500 <= status_code < 600
+        ):
+            return "server_error"
+
+        return "http_error"
 
     def _get_access_token(self) -> str:
         if self.authentication_service is not None:
