@@ -123,6 +123,15 @@ class ToastHttpTransport:
                 response_body
             )
 
+            retry_after_seconds = None
+
+            if status_code == 429:
+                retry_after_seconds = (
+                    self._extract_retry_after_seconds(
+                        response
+                    )
+                )
+
             return self._failure(
                 error=error,
                 error_type=self._classify_http_error(
@@ -132,6 +141,9 @@ class ToastHttpTransport:
                 retryable=(
                     status_code
                     in self.RETRYABLE_STATUS_CODES
+                ),
+                retry_after_seconds=(
+                    retry_after_seconds
                 ),
             )
 
@@ -177,6 +189,7 @@ class ToastHttpTransport:
         error_type: str,
         retryable: bool,
         status_code: int | None = None,
+        retry_after_seconds: int | None = None,
     ) -> dict:
         metadata = {
             "error_type": error_type,
@@ -186,12 +199,48 @@ class ToastHttpTransport:
         if status_code is not None:
             metadata["status_code"] = status_code
 
+        if retry_after_seconds is not None:
+            metadata["retry_after_seconds"] = (
+                retry_after_seconds
+            )
+
         return {
             "success": False,
             "external_order_id": None,
             "metadata": metadata,
             "error": error,
         }
+
+    @staticmethod
+    def _extract_retry_after_seconds(
+        response: Any,
+    ) -> int | None:
+        headers = getattr(
+            response,
+            "headers",
+            None,
+        )
+
+        if headers is None:
+            return None
+
+        try:
+            value = headers.get("Retry-After")
+        except Exception:
+            return None
+
+        if value is None:
+            return None
+
+        try:
+            seconds = int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+        if seconds < 0:
+            return None
+
+        return seconds
 
     @staticmethod
     def _classify_http_error(

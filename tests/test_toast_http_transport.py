@@ -44,9 +44,15 @@ class FakeHttpResponse:
         self,
         status_code,
         body,
+        headers=None,
     ):
         self.status_code = status_code
         self.body = body
+        self.headers = (
+            headers
+            if headers is not None
+            else {}
+        )
 
     def json(self):
         return self.body
@@ -746,3 +752,75 @@ def test_toast_http_transport_invalidates_token_on_401():
         authentication_service.invalidated
         is True
     )
+
+
+
+def test_toast_http_transport_propagates_retry_after_on_429():
+    response = FakeHttpResponse(
+        status_code=429,
+        body={
+            "message": "Too many requests",
+        },
+        headers={
+            "Retry-After": "30",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["external_order_id"] is None
+    assert result["error"] == "Too many requests"
+    assert result["metadata"] == {
+        "error_type": "rate_limited",
+        "retryable": True,
+        "status_code": 429,
+        "retry_after_seconds": 30,
+    }
+
+
+def test_toast_http_transport_ignores_invalid_retry_after():
+    response = FakeHttpResponse(
+        status_code=429,
+        body={
+            "message": "Too many requests",
+        },
+        headers={
+            "Retry-After": "invalid",
+        },
+    )
+
+    client = FakeHttpClient(
+        response=response,
+    )
+
+    transport = build_transport(client)
+
+    result = transport.create_order(
+        restaurant_external_id=(
+            "toast-restaurant-001"
+        ),
+        payload={
+            "test": True,
+        },
+    )
+
+    assert result["success"] is False
+    assert result["metadata"] == {
+        "error_type": "rate_limited",
+        "retryable": True,
+        "status_code": 429,
+    }

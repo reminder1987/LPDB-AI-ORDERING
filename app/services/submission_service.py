@@ -10,6 +10,7 @@ from app.core.tenant_context import TenantContext
 from app.models.order_db import OrderDB
 from app.services.external_mapping_service import (
     create_external_mapping,
+    get_external_mapping,
 )
 from app.services.external_order_mapper import (
     build_external_order_payload,
@@ -70,22 +71,55 @@ class SubmissionService:
                     error="Orden no encontrada.",
                 )
 
-            if order.status != ORDER_STATUS_CONFIRMED:
+            if order.status not in {
+                ORDER_STATUS_CONFIRMED,
+                ORDER_STATUS_SUBMITTING,
+            }:
                 return ExternalOrderResult(
                     success=False,
                     error=(
                         "La orden debe estar confirmada "
+                        "o pendiente de recuperacion "
                         "antes de enviarse al proveedor externo."
                     ),
                 )
 
-            order.status = transition_order_status(
-                current_status=order.status,
-                new_status=ORDER_STATUS_SUBMITTING,
-            )
+            if order.status == ORDER_STATUS_SUBMITTING:
+                existing_mapping = get_external_mapping(
+                    tenant_id=order.tenant_id,
+                    provider=self.provider,
+                    entity_type="order",
+                    internal_id=order.id,
+                )
 
-            db.commit()
-            db.refresh(order)
+                if existing_mapping is not None:
+                    external_order_id = (
+                        existing_mapping.external_id
+                    )
+
+                    order.status = transition_order_status(
+                        current_status=order.status,
+                        new_status=ORDER_STATUS_SUBMITTED,
+                    )
+
+                    db.commit()
+
+                    return ExternalOrderResult(
+                        success=True,
+                        external_order_id=external_order_id,
+                        metadata={
+                            "recovered_from_mapping": True,
+                        },
+                    )
+
+            if order.status == ORDER_STATUS_CONFIRMED:
+                order.status = transition_order_status(
+                    current_status=order.status,
+                    new_status=ORDER_STATUS_SUBMITTING,
+                )
+
+                db.commit()
+                db.refresh(order)
 
             payload = build_external_order_payload(
                 order,
@@ -101,6 +135,17 @@ class SubmissionService:
             )
 
             if not result.success:
+                metadata = result.metadata
+
+                retryable = (
+                    isinstance(metadata, dict)
+                    and metadata.get("retryable") is True
+                )
+
+                if retryable:
+                    db.commit()
+                    return result
+
                 order.status = transition_order_status(
                     current_status=order.status,
                     new_status=ORDER_STATUS_FAILED,
