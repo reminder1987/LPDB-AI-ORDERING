@@ -412,3 +412,112 @@ def test_toast_order_service_uses_location_mapping():
         "restaurantExternalId"
         not in request["payload"]
     )
+
+class StructuredFailureTransport:
+    def create_order(
+        self,
+        restaurant_external_id,
+        payload,
+    ):
+        return {
+            "success": False,
+            "external_order_id": None,
+            "error": "Toast service unavailable",
+            "metadata": {
+                "error_type": "server_error",
+                "retryable": True,
+                "status_code": 503,
+            },
+        }
+
+
+def test_toast_order_service_propagates_transport_failure_metadata():
+    transport = StructuredFailureTransport()
+
+    service = build_service(
+        transport=transport,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
+    )
+
+    payload = build_basic_payload(
+        order_id=900,
+        order_item_id=901,
+    )
+
+    result = service.submit_order(
+        order_id=900,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is False
+    assert result.external_order_id is None
+    assert result.error == (
+        "Toast service unavailable"
+    )
+    assert result.metadata == {
+        "error_type": "server_error",
+        "retryable": True,
+        "status_code": 503,
+    }
+
+
+class MissingExternalIdTransport:
+    def create_order(
+        self,
+        restaurant_external_id,
+        payload,
+    ):
+        return {
+            "success": True,
+            "external_order_id": None,
+            "metadata": {
+                "provider_request_id": (
+                    "toast-request-001"
+                ),
+            },
+        }
+
+
+def test_toast_order_service_preserves_metadata_when_external_id_missing():
+    transport = MissingExternalIdTransport()
+
+    service = build_service(
+        transport=transport,
+        product_mappings={
+            2: "toast-product-perro",
+        },
+        product_group_mappings={
+            2: "toast-group-hot-dogs",
+        },
+    )
+
+    payload = build_basic_payload(
+        order_id=902,
+        order_item_id=903,
+    )
+
+    result = service.submit_order(
+        order_id=902,
+        tenant_id=1,
+        location_id=1,
+        payload=payload,
+    )
+
+    assert result.success is False
+    assert result.external_order_id is None
+    assert result.error == (
+        "Toast transport responded "
+        "without external_order_id."
+    )
+    assert result.metadata == {
+        "provider_request_id": (
+            "toast-request-001"
+        ),
+    }

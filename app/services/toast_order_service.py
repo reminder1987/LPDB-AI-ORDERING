@@ -1,4 +1,4 @@
-from app.services.external_order_service import (
+﻿from app.services.external_order_service import (
     ExternalOrderResult,
 )
 from app.services.toast_configuration import (
@@ -111,12 +111,25 @@ class ToastOrderService:
                 payload=toast_payload,
             )
 
+            transport_metadata = result.get(
+                "metadata"
+            )
+
+            if not isinstance(
+                transport_metadata,
+                dict,
+            ):
+                transport_metadata = {}
+
             if not result.get("success"):
                 return ExternalOrderResult(
                     success=False,
                     error=result.get(
                         "error",
                         "Toast transport failed.",
+                    ),
+                    metadata=dict(
+                        transport_metadata
                     ),
                 )
 
@@ -131,17 +144,10 @@ class ToastOrderService:
                         "Toast transport responded "
                         "without external_order_id."
                     ),
+                    metadata=dict(
+                        transport_metadata
+                    ),
                 )
-
-            transport_metadata = result.get(
-                "metadata"
-            )
-
-            if not isinstance(
-                transport_metadata,
-                dict,
-            ):
-                transport_metadata = {}
 
             metadata = {}
 
