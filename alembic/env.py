@@ -28,6 +28,10 @@ from app.models.channel_integration_db import ChannelIntegrationDB
 
 from app.models.external_mapping_db import ExternalMappingDB
 
+from app.models.provider_webhook_event_db import (
+    ProviderWebhookEventDB,
+)
+
 from app.models.ingredient_db import IngredientDB
 from app.models.order_db import OrderDB
 from app.models.order_item_db import OrderItemDB

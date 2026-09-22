@@ -1,4 +1,4 @@
-﻿import json
+import json
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -305,3 +305,77 @@ def test_modified_payload_fails_signature(
     )
 
     assert response.status_code == 401
+
+def test_toast_webhook_duplicate_event_is_idempotent(
+    monkeypatch,
+):
+    from uuid import uuid4
+
+    install_fakes(monkeypatch)
+
+    event_guid = (
+        "toast-http-idempotency-"
+        + uuid4().hex
+    )
+
+    payload = build_payload(
+        RESTAURANT_A,
+        event_guid=event_guid,
+    )
+
+    raw_body = encode_payload(payload)
+
+    signature = build_toast_webhook_signature(
+        payload=raw_body,
+        timestamp=payload["timestamp"],
+        secret=SECRET_A,
+    )
+
+    headers = {
+        "Content-Type": "application/json",
+        "Toast-Signature": signature,
+        "Toast-Event-Type": "order_updated",
+        "Toast-Attempt-Number": "1",
+    }
+
+    first = client.post(
+        "/webhooks/toast/orders",
+        content=raw_body,
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+
+    first_body = first.json()
+
+    assert first_body["received"] is True
+    assert first_body["duplicate"] is False
+    assert first_body["event_guid"] == event_guid
+    assert first_body["tenant_id"] == 1
+    assert first_body["attempt_number"] == 1
+
+    second_headers = dict(headers)
+
+    second_headers[
+        "Toast-Attempt-Number"
+    ] = "2"
+
+    second = client.post(
+        "/webhooks/toast/orders",
+        content=raw_body,
+        headers=second_headers,
+    )
+
+    assert second.status_code == 200
+
+    second_body = second.json()
+
+    assert second_body["received"] is True
+    assert second_body["duplicate"] is True
+    assert second_body["event_guid"] == event_guid
+    assert (
+        second_body["order_guid"]
+        == first_body["order_guid"]
+    )
+    assert second_body["tenant_id"] == 1
+    assert second_body["attempt_number"] == 2

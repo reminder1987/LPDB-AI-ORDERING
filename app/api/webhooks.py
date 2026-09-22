@@ -40,6 +40,9 @@ from app.services.provider_integration_service import (
     ProviderIntegrationNotFoundError,
     provider_integration_service,
 )
+from app.services.provider_webhook_event_service import (
+    provider_webhook_event_service,
+)
 from app.services.webhook_security_service import (
     verify_webhook_signature,
 )
@@ -567,8 +570,20 @@ async def process_toast_order_webhook(
                 ),
             )
 
+    registration = (
+        provider_webhook_event_service.register_event(
+            tenant_id=integration.tenant_id,
+            provider=TOAST_PROVIDER,
+            event_id=event.event_guid,
+            event_type=event.event_type,
+            external_entity_id=event.order_guid,
+            payload=raw_payload,
+        )
+    )
+
     return {
         "received": True,
+        "duplicate": registration.duplicate,
         "provider": "toast",
         "tenant_id": integration.tenant_id,
         "event_guid": event.event_guid,

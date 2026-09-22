@@ -18,6 +18,9 @@ from app.models.order_item_modification_db import (
     OrderItemModificationDB,
 )
 from app.models.payment_db import PaymentDB
+from app.models.provider_webhook_event_db import (
+    ProviderWebhookEventDB,
+)
 from app.models.product_availability_db import (
     ProductAvailabilityDB,
 )
@@ -42,6 +45,7 @@ __all__ = [
     "OrderItemComboDB",
     "OrderItemModificationDB",
     "PaymentDB",
+    "ProviderWebhookEventDB",
     "ProductAvailabilityDB",
     "ProductDB",
     "RecipeDB",
