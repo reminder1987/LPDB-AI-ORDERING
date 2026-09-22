@@ -67,6 +67,82 @@ class ProviderIntegrationService:
         finally:
             db.close()
 
+    def get_integration_by_configuration_value(
+        self,
+        provider: str,
+        integration_type: str,
+        configuration_key: str,
+        configuration_value: str,
+    ) -> ProviderIntegrationDB:
+        normalized_provider = self._normalize_required(
+            provider,
+            "El proveedor es obligatorio",
+        )
+        normalized_type = self._normalize_required(
+            integration_type,
+            "El tipo de integraci?n es obligatorio",
+        )
+        normalized_key = self._normalize_required(
+            configuration_key,
+            "La clave de configuraci?n es obligatoria",
+        )
+        normalized_value = self._normalize_required(
+            configuration_value,
+            "El valor de configuraci?n es obligatorio",
+        )
+
+        db = SessionLocal()
+
+        try:
+            integrations = db.scalars(
+                select(ProviderIntegrationDB).where(
+                    ProviderIntegrationDB.provider
+                    == normalized_provider,
+                    ProviderIntegrationDB.integration_type
+                    == normalized_type,
+                    ProviderIntegrationDB.active.is_(True),
+                )
+            ).all()
+
+            matches = []
+
+            for integration in integrations:
+                configuration = integration.configuration
+
+                if not isinstance(configuration, dict):
+                    continue
+
+                value = configuration.get(
+                    normalized_key
+                )
+
+                if not isinstance(value, str):
+                    continue
+
+                if value.strip() == normalized_value:
+                    matches.append(integration)
+
+            if not matches:
+                raise ProviderIntegrationNotFoundError(
+                    "Integraci?n de proveedor no encontrada "
+                    "o inactiva"
+                )
+
+            if len(matches) > 1:
+                raise ValueError(
+                    "La identidad externa del proveedor "
+                    "es ambigua entre m?ltiples tenants."
+                )
+
+            integration = matches[0]
+
+            db.expunge(integration)
+
+            return integration
+
+        finally:
+            db.close()
+
     def create_integration(
         self,
         tenant_id: int,

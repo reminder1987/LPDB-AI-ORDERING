@@ -260,3 +260,88 @@ def test_required_fields_are_validated(
             provider="test-provider",
             integration_type="   ",
         )
+
+def test_get_integration_by_configuration_value(
+    service,
+    tenant_id,
+):
+    created = service.create_integration(
+        tenant_id=tenant_id,
+        provider="test-provider",
+        integration_type="pos",
+        configuration={
+            "restaurant_external_id": (
+                "toast-restaurant-webhook-001"
+            ),
+        },
+    )
+
+    found = (
+        service.get_integration_by_configuration_value(
+            provider="test-provider",
+            integration_type="pos",
+            configuration_key=(
+                "restaurant_external_id"
+            ),
+            configuration_value=(
+                "toast-restaurant-webhook-001"
+            ),
+        )
+    )
+
+    assert found.id == created.id
+    assert found.tenant_id == tenant_id
+
+
+def test_configuration_lookup_ignores_inactive(
+    service,
+    tenant_id,
+):
+    service.create_integration(
+        tenant_id=tenant_id,
+        provider="test-provider",
+        integration_type="pos",
+        configuration={
+            "restaurant_external_id": (
+                "toast-inactive-restaurant"
+            ),
+        },
+    )
+
+    service.deactivate_integration(
+        tenant_id=tenant_id,
+        provider="test-provider",
+        integration_type="pos",
+    )
+
+    with pytest.raises(
+        ProviderIntegrationNotFoundError
+    ):
+        service.get_integration_by_configuration_value(
+            provider="test-provider",
+            integration_type="pos",
+            configuration_key=(
+                "restaurant_external_id"
+            ),
+            configuration_value=(
+                "toast-inactive-restaurant"
+            ),
+        )
+
+
+def test_configuration_lookup_rejects_unknown_value(
+    service,
+):
+    with pytest.raises(
+        ProviderIntegrationNotFoundError
+    ):
+        service.get_integration_by_configuration_value(
+            provider="test-provider",
+            integration_type="pos",
+            configuration_key=(
+                "restaurant_external_id"
+            ),
+            configuration_value=(
+                "restaurant-does-not-exist"
+            ),
+        )

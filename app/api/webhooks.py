@@ -22,6 +22,7 @@ from app.services.channels.channel_service import (
 )
 from app.services.integration_secret_service import (
     IntegrationSecretError,
+    integration_secret_service,
 )
 from app.services.meta_whatsapp_configuration_service import (
     MetaWhatsAppConfigurationError,
@@ -37,9 +38,19 @@ from app.services.meta_whatsapp_service import (
 )
 from app.services.provider_integration_service import (
     ProviderIntegrationNotFoundError,
+    provider_integration_service,
 )
 from app.services.webhook_security_service import (
     verify_webhook_signature,
+)
+from app.services.toast_integration_service import (
+    TOAST_INTEGRATION_TYPE,
+    TOAST_PROVIDER,
+)
+from app.services.toast_webhook_service import (
+    ToastWebhookPayloadError,
+    parse_toast_order_webhook,
+    verify_toast_webhook_signature,
 )
 
 
@@ -381,3 +392,190 @@ async def process_meta_whatsapp_webhook(
     return adapter.build_response(
         channel_response,
     )
+
+@router.post(
+    "/toast/orders",
+    summary="Recibir webhook de ?rdenes de Toast",
+)
+async def process_toast_order_webhook(
+    request: Request,
+    toast_signature: str | None = Header(
+        default=None,
+        alias="Toast-Signature",
+    ),
+    toast_event_type: str | None = Header(
+        default=None,
+        alias="Toast-Event-Type",
+    ),
+    toast_attempt_number: str | None = Header(
+        default=None,
+        alias="Toast-Attempt-Number",
+    ),
+):
+    raw_body = await request.body()
+
+    if not toast_signature:
+        raise HTTPException(
+            status_code=401,
+            detail="Firma de Toast requerida.",
+        )
+
+    try:
+        raw_payload = json.loads(raw_body)
+
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Payload de Toast invalido.",
+        ) from exc
+
+    try:
+        event = parse_toast_order_webhook(
+            raw_payload
+        )
+
+    except ToastWebhookPayloadError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    if (
+        toast_event_type
+        and toast_event_type.strip()
+        != event.event_type
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Toast-Event-Type no coincide "
+                "con el payload."
+            ),
+        )
+
+    try:
+        integration = (
+            provider_integration_service
+            .get_integration_by_configuration_value(
+                provider=TOAST_PROVIDER,
+                integration_type=(
+                    TOAST_INTEGRATION_TYPE
+                ),
+                configuration_key=(
+                    "restaurant_external_id"
+                ),
+                configuration_value=(
+                    event.restaurant_guid
+                ),
+            )
+        )
+
+    except ProviderIntegrationNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Integraci?n Toast no encontrada "
+                "para el restaurante."
+            ),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Identidad Toast ambigua."
+            ),
+        ) from exc
+
+    credentials = integration.credentials
+
+    if not isinstance(credentials, dict):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Configuraci?n de webhook Toast "
+                "no disponible."
+            ),
+        )
+
+    webhook_secret_reference = (
+        credentials.get("webhook_secret")
+    )
+
+    if (
+        not isinstance(
+            webhook_secret_reference,
+            str,
+        )
+        or not webhook_secret_reference.strip()
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Secreto de webhook Toast "
+                "no configurado."
+            ),
+        )
+
+    try:
+        webhook_secret = (
+            integration_secret_service.resolve(
+                webhook_secret_reference
+            )
+        )
+
+    except IntegrationSecretError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Secreto de webhook Toast "
+                "no disponible."
+            ),
+        ) from exc
+
+    if not verify_toast_webhook_signature(
+        payload=raw_body,
+        timestamp=event.timestamp,
+        secret=webhook_secret,
+        signature=toast_signature,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Firma de Toast invalida.",
+        )
+
+    attempt_number = None
+
+    if toast_attempt_number:
+        try:
+            attempt_number = int(
+                toast_attempt_number
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Toast-Attempt-Number invalido."
+                ),
+            ) from exc
+
+        if attempt_number < 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Toast-Attempt-Number invalido."
+                ),
+            )
+
+    return {
+        "received": True,
+        "provider": "toast",
+        "tenant_id": integration.tenant_id,
+        "event_guid": event.event_guid,
+        "event_type": event.event_type,
+        "restaurant_guid": (
+            event.restaurant_guid
+        ),
+        "order_guid": event.order_guid,
+        "attempt_number": attempt_number,
+    }
