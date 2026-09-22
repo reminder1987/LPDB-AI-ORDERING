@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+﻿from dataclasses import dataclass, field
 
 from app.services.external_mapping_service import (
     get_external_mapping,
@@ -22,7 +22,7 @@ class ToastFulfillmentReconciliationResult:
     external_order_id: str | None = None
     fulfillment: ToastOrderFulfillment | None = None
     error: str | None = None
-    metadata: dict | None = None
+    metadata: dict = field(default_factory=dict)
 
 
 class ToastFulfillmentReconciliationService:
@@ -33,6 +33,7 @@ class ToastFulfillmentReconciliationService:
         transport: ToastFulfillmentHttpTransport,
         restaurant_external_id: str,
     ) -> None:
+
         if not isinstance(
             restaurant_external_id,
             str,
@@ -62,12 +63,26 @@ class ToastFulfillmentReconciliationService:
         internal_order_id: int,
     ) -> ToastFulfillmentReconciliationResult:
 
-        if tenant_id <= 0:
+        if (
+            not isinstance(tenant_id, int)
+            or isinstance(tenant_id, bool)
+            or tenant_id <= 0
+        ):
             raise ValueError(
                 "tenant_id debe ser positivo."
             )
 
-        if internal_order_id <= 0:
+        if (
+            not isinstance(
+                internal_order_id,
+                int,
+            )
+            or isinstance(
+                internal_order_id,
+                bool,
+            )
+            or internal_order_id <= 0
+        ):
             raise ValueError(
                 "internal_order_id debe ser positivo."
             )
@@ -80,34 +95,90 @@ class ToastFulfillmentReconciliationService:
         )
 
         if mapping is None:
-            return ToastFulfillmentReconciliationResult(
-                success=False,
-                tenant_id=tenant_id,
-                internal_order_id=(
-                    internal_order_id
-                ),
-                error=(
-                    "La orden interna no tiene "
-                    "mapping de Toast."
-                ),
-                metadata={
-                    "error_type": (
-                        "missing_external_mapping"
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
                     ),
-                    "retryable": False,
-                },
+                    error=(
+                        "La orden interna no tiene "
+                        "mapping de Toast."
+                    ),
+                    metadata={
+                        "error_type": (
+                            "missing_external_mapping"
+                        ),
+                        "retryable": False,
+                    },
+                )
             )
 
         external_order_id = (
             mapping.external_id
         )
 
-        result = self.transport.get_order(
-            restaurant_external_id=(
-                self.restaurant_external_id
-            ),
-            order_guid=external_order_id,
-        )
+        try:
+            result = self.transport.get_order(
+                restaurant_external_id=(
+                    self.restaurant_external_id
+                ),
+                order_guid=(
+                    external_order_id
+                ),
+            )
+
+        except Exception as exc:
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=(
+                        str(exc)
+                        or (
+                            "Toast fulfillment "
+                            "transport failed."
+                        )
+                    ),
+                    metadata={
+                        "error_type": (
+                            "transport_exception"
+                        ),
+                        "retryable": False,
+                    },
+                )
+            )
+
+        if not isinstance(result, dict):
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=(
+                        "Toast fulfillment transport "
+                        "returned an invalid response."
+                    ),
+                    metadata={
+                        "error_type": (
+                            "invalid_transport_response"
+                        ),
+                        "retryable": False,
+                    },
+                )
+            )
 
         metadata = result.get(
             "metadata"
@@ -119,23 +190,44 @@ class ToastFulfillmentReconciliationService:
         ):
             metadata = {}
 
+        metadata = dict(metadata)
+
         if not result.get("success"):
-            return ToastFulfillmentReconciliationResult(
-                success=False,
-                tenant_id=tenant_id,
-                internal_order_id=(
-                    internal_order_id
-                ),
-                external_order_id=(
-                    external_order_id
-                ),
-                error=result.get(
-                    "error",
-                    "Toast fulfillment lookup failed.",
-                ),
-                metadata=dict(
-                    metadata
-                ),
+            error = result.get(
+                "error"
+            )
+
+            if (
+                not isinstance(error, str)
+                or not error.strip()
+            ):
+                error = (
+                    "Toast fulfillment lookup failed."
+                )
+
+            metadata.setdefault(
+                "error_type",
+                "toast_fulfillment_error",
+            )
+
+            metadata.setdefault(
+                "retryable",
+                False,
+            )
+
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=error,
+                    metadata=metadata,
+                )
             )
 
         order_payload = result.get(
@@ -146,35 +238,32 @@ class ToastFulfillmentReconciliationService:
             order_payload,
             dict,
         ):
-            invalid_metadata = dict(
-                metadata
-            )
-
-            invalid_metadata.setdefault(
+            metadata.setdefault(
                 "error_type",
                 "invalid_response",
             )
-            invalid_metadata.setdefault(
+
+            metadata.setdefault(
                 "retryable",
                 False,
             )
 
-            return ToastFulfillmentReconciliationResult(
-                success=False,
-                tenant_id=tenant_id,
-                internal_order_id=(
-                    internal_order_id
-                ),
-                external_order_id=(
-                    external_order_id
-                ),
-                error=(
-                    "Toast fulfillment response "
-                    "did not contain an order."
-                ),
-                metadata=(
-                    invalid_metadata
-                ),
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=(
+                        "Toast fulfillment response "
+                        "did not contain an order."
+                    ),
+                    metadata=metadata,
+                )
             )
 
         try:
@@ -183,54 +272,75 @@ class ToastFulfillmentReconciliationService:
                     order_payload
                 )
             )
-        except Exception as exc:
-            invalid_metadata = dict(
-                metadata
-            )
 
-            invalid_metadata.setdefault(
+        except Exception as exc:
+            metadata.setdefault(
                 "error_type",
                 "invalid_fulfillment_response",
             )
-            invalid_metadata.setdefault(
+
+            metadata.setdefault(
                 "retryable",
                 False,
             )
 
-            return ToastFulfillmentReconciliationResult(
-                success=False,
-                tenant_id=tenant_id,
-                internal_order_id=(
-                    internal_order_id
-                ),
-                external_order_id=(
-                    external_order_id
-                ),
-                error=str(exc),
-                metadata=(
-                    invalid_metadata
-                ),
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=(
+                        str(exc)
+                        or (
+                            "Toast fulfillment "
+                            "payload is invalid."
+                        )
+                    ),
+                    metadata=metadata,
+                )
             )
 
         if (
             fulfillment.order_guid
             != external_order_id
         ):
-            mismatch_metadata = dict(
-                metadata
-            )
-
-            mismatch_metadata.setdefault(
+            metadata.setdefault(
                 "error_type",
                 "external_order_mismatch",
             )
-            mismatch_metadata.setdefault(
+
+            metadata.setdefault(
                 "retryable",
                 False,
             )
 
-            return ToastFulfillmentReconciliationResult(
-                success=False,
+            return (
+                ToastFulfillmentReconciliationResult(
+                    success=False,
+                    tenant_id=tenant_id,
+                    internal_order_id=(
+                        internal_order_id
+                    ),
+                    external_order_id=(
+                        external_order_id
+                    ),
+                    error=(
+                        "El GUID retornado por Toast "
+                        "no coincide con el mapping "
+                        "de la orden interna."
+                    ),
+                    metadata=metadata,
+                )
+            )
+
+        return (
+            ToastFulfillmentReconciliationResult(
+                success=True,
                 tenant_id=tenant_id,
                 internal_order_id=(
                     internal_order_id
@@ -238,29 +348,9 @@ class ToastFulfillmentReconciliationService:
                 external_order_id=(
                     external_order_id
                 ),
-                error=(
-                    "El GUID retornado por Toast "
-                    "no coincide con el mapping "
-                    "de la orden interna."
-                ),
-                metadata=(
-                    mismatch_metadata
-                ),
+                fulfillment=fulfillment,
+                metadata=metadata,
             )
-
-        return ToastFulfillmentReconciliationResult(
-            success=True,
-            tenant_id=tenant_id,
-            internal_order_id=(
-                internal_order_id
-            ),
-            external_order_id=(
-                external_order_id
-            ),
-            fulfillment=fulfillment,
-            metadata=dict(
-                metadata
-            ),
         )
 
 
