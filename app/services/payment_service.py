@@ -1,12 +1,13 @@
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import SessionLocal
 from app.core.payment_status import (
     PAYMENT_STATUS_PENDING,
+    PAYMENT_STATUS_PROCESSING,
     is_valid_payment_status,
     transition_payment_status,
 )
@@ -40,12 +41,12 @@ class PaymentService:
     """
     Servicio interno para administrar pagos.
 
-    Todas las operaciones están aisladas por tenant.
+    Todas las operaciones estÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡n aisladas por tenant.
 
     El monto de un pago siempre se obtiene del snapshot
     monetario persistido en la orden.
 
-    Este servicio no contiene lógica específica de Stripe,
+    Este servicio no contiene lÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³gica especÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­fica de Stripe,
     Wompi u otro proveedor externo.
     """
 
@@ -73,7 +74,7 @@ class PaymentService:
 
         if not is_valid_payment_status(status):
             raise ValueError(
-                f"Estado de pago no válido: {status}"
+                f"Estado de pago no vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡lido: {status}"
             )
 
         db = SessionLocal()
@@ -131,7 +132,7 @@ class PaymentService:
                 if existing_payment is not None:
                     raise PaymentDuplicateError(
                         "El identificador externo de pago "
-                        "ya está registrado para este tenant "
+                        "ya estÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ registrado para este tenant "
                         "y proveedor."
                     )
 
@@ -234,6 +235,64 @@ class PaymentService:
         finally:
             db.close()
 
+    def claim_for_processing(
+        self,
+        *,
+        tenant_id: int,
+        payment_id: int,
+    ) -> bool:
+        """
+        Reclama atomicamente un pago pendiente para procesamiento.
+
+        Devuelve True solo para el worker que logra cambiar
+        pending -> processing.
+
+        Devuelve False cuando el pago existe pero ya no esta
+        pendiente.
+
+        Esto evita que dos workers procesen simultaneamente
+        el mismo payment_id.
+        """
+        db = SessionLocal()
+
+        try:
+            payment_exists = db.scalar(
+                select(PaymentDB.id).where(
+                    PaymentDB.id == payment_id,
+                    PaymentDB.tenant_id == tenant_id,
+                )
+            )
+
+            if payment_exists is None:
+                raise PaymentNotFoundError(
+                    "Pago no encontrado."
+                )
+
+            result = db.execute(
+                update(PaymentDB)
+                .where(
+                    PaymentDB.id == payment_id,
+                    PaymentDB.tenant_id == tenant_id,
+                    PaymentDB.status == PAYMENT_STATUS_PENDING,
+                )
+                .values(
+                    status=PAYMENT_STATUS_PROCESSING,
+                )
+            )
+
+            claimed = result.rowcount == 1
+
+            db.commit()
+
+            return claimed
+
+        except Exception:
+            db.rollback()
+            raise
+
+        finally:
+            db.close()
+
     def update_status(
         self,
         *,
@@ -309,7 +368,7 @@ class PaymentService:
             if existing_payment is not None:
                 raise PaymentDuplicateError(
                     "El identificador externo de pago "
-                    "ya está registrado para este tenant "
+                    "ya estÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ registrado para este tenant "
                     "y proveedor."
                 )
 
@@ -399,7 +458,7 @@ class PaymentService:
 
         if len(normalized) != 3:
             raise ValueError(
-                "currency debe ser un código de tres letras."
+                "currency debe ser un cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³digo de tres letras."
             )
 
         return normalized

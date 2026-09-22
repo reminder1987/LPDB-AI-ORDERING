@@ -1,7 +1,23 @@
-﻿from app.services.toast_payment_submission_service import (
+import pytest
+
+from app.services.toast_payment_submission_service import (
     ToastPaymentSubmissionService,
 )
 
+
+
+
+@pytest.fixture(autouse=True)
+def mock_payment_claim_for_metadata_tests(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.services."
+        "toast_payment_submission_service."
+        "payment_service."
+        "claim_for_processing",
+        lambda **kwargs: True,
+    )
 
 class FakeContext:
     tenant_id = 1

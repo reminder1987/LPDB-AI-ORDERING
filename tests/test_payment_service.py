@@ -589,3 +589,84 @@ def test_payment_is_persisted_with_order_snapshot_amount(service):
 
     finally:
         db.close()
+
+def test_claim_for_processing_claims_pending_payment_once(service):
+    order = create_order()
+
+    payment = service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+    )
+
+    first_claim = service.claim_for_processing(
+        tenant_id=1,
+        payment_id=payment.id,
+    )
+
+    second_claim = service.claim_for_processing(
+        tenant_id=1,
+        payment_id=payment.id,
+    )
+
+    assert first_claim is True
+    assert second_claim is False
+
+    persisted = service.get_payment(
+        tenant_id=1,
+        payment_id=payment.id,
+    )
+
+    assert (
+        persisted.status
+        == PAYMENT_STATUS_PROCESSING
+    )
+
+
+def test_claim_for_processing_does_not_claim_paid_payment(service):
+    order = create_order()
+
+    payment = service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+        status=PAYMENT_STATUS_PAID,
+    )
+
+    claimed = service.claim_for_processing(
+        tenant_id=1,
+        payment_id=payment.id,
+    )
+
+    assert claimed is False
+
+    persisted = service.get_payment(
+        tenant_id=1,
+        payment_id=payment.id,
+    )
+
+    assert persisted.status == PAYMENT_STATUS_PAID
+
+
+def test_claim_for_processing_rejects_wrong_tenant(service):
+    order = create_order()
+
+    payment = service.create_payment(
+        tenant_id=1,
+        order_id=order.id,
+        provider="stripe-test",
+    )
+
+    with pytest.raises(PaymentNotFoundError):
+        service.claim_for_processing(
+            tenant_id=999999,
+            payment_id=payment.id,
+        )
+
+
+def test_claim_for_processing_rejects_missing_payment(service):
+    with pytest.raises(PaymentNotFoundError):
+        service.claim_for_processing(
+            tenant_id=1,
+            payment_id=999999999,
+        )

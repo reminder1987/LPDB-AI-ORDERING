@@ -1,9 +1,32 @@
-﻿from app.services.external_mapping_service import (
+from app.services.external_mapping_service import (
     create_external_mapping,
 )
 from app.services.toast_payment_submission_service import (
     ToastPaymentSubmissionService,
 )
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def mock_payment_claim_for_unit_tests(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.services."
+        "toast_payment_submission_service."
+        "payment_service."
+        "claim_for_processing",
+        fake_successful_payment_claim,
+    )
+
+
+def fake_successful_payment_claim(
+    *,
+    tenant_id,
+    payment_id,
+):
+    return True
 
 
 class FakeContext:
@@ -402,3 +425,78 @@ def test_missing_payment_guid_is_rejected(
         == "invalid_response"
     )
     assert created == []
+
+def test_lost_processing_claim_prevents_toast_submission(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.services."
+        "toast_payment_submission_service."
+        "get_external_mapping",
+        lambda **kwargs: None,
+    )
+
+    claim_calls = []
+
+    def fake_claim_for_processing(
+        *,
+        tenant_id,
+        payment_id,
+    ):
+        claim_calls.append(
+            {
+                "tenant_id": tenant_id,
+                "payment_id": payment_id,
+            }
+        )
+        return False
+
+    monkeypatch.setattr(
+        "app.services."
+        "toast_payment_submission_service."
+        "payment_service."
+        "claim_for_processing",
+        fake_claim_for_processing,
+    )
+
+    (
+        service,
+        resolver,
+        adapter,
+        transport,
+    ) = build_service(
+        {
+            "success": True,
+            "payment_guid": "must-not-be-used",
+        }
+    )
+
+    result = service.submit(
+        tenant_id=1,
+        payment_id=10,
+    )
+
+    assert result.success is False
+    assert result.external_payment_id is None
+    assert result.recovered_from_mapping is False
+
+    assert (
+        result.metadata["error_type"]
+        == "payment_already_processing"
+    )
+    assert (
+        result.metadata["submission_skipped"]
+        is True
+    )
+    assert result.metadata["retryable"] is False
+
+    assert claim_calls == [
+        {
+            "tenant_id": 1,
+            "payment_id": 10,
+        }
+    ]
+
+    assert resolver.calls == 0
+    assert adapter.calls == 0
+    assert transport.calls == 0

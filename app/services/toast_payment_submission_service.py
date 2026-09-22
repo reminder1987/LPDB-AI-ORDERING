@@ -1,9 +1,10 @@
-﻿from dataclasses import dataclass, field
+from dataclasses import dataclass, field
 
 from app.services.external_mapping_service import (
     create_external_mapping,
     get_external_mapping,
 )
+from app.services.payment_service import payment_service
 from app.services.toast_payment_adapter import (
     ToastPaymentAdapter,
 )
@@ -89,6 +90,28 @@ class ToastPaymentSubmissionService:
                             existing_mapping.external_id
                         ),
                     },
+                },
+            )
+
+        claimed = payment_service.claim_for_processing(
+            tenant_id=tenant_id,
+            payment_id=payment_id,
+        )
+
+        if not claimed:
+            return ToastPaymentSubmissionResult(
+                success=False,
+                payment_id=payment_id,
+                error=(
+                    "Payment submission already "
+                    "processing or completed."
+                ),
+                metadata={
+                    "error_type": (
+                        "payment_already_processing"
+                    ),
+                    "retryable": False,
+                    "submission_skipped": True,
                 },
             )
 
