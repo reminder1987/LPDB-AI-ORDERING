@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+﻿from dataclasses import dataclass, field
 
 from app.services.external_mapping_service import (
     create_external_mapping,
@@ -22,7 +22,9 @@ class ToastPaymentSubmissionResult:
     external_payment_id: str | None = None
     recovered_from_mapping: bool = False
     error: str | None = None
-    metadata: dict | None = None
+    metadata: dict = field(
+        default_factory=dict
+    )
 
 
 class ToastPaymentSubmissionService:
@@ -38,13 +40,24 @@ class ToastPaymentSubmissionService:
         self.context_resolver = context_resolver
         self.payment_adapter = payment_adapter
         self.transport = transport
+
+        if not isinstance(
+            restaurant_external_id,
+            str,
+        ):
+            raise ValueError(
+                "restaurant_external_id "
+                "es obligatorio."
+            )
+
         self.restaurant_external_id = (
             restaurant_external_id.strip()
         )
 
         if not self.restaurant_external_id:
             raise ValueError(
-                "restaurant_external_id es obligatorio."
+                "restaurant_external_id "
+                "es obligatorio."
             )
 
     def submit(
@@ -71,6 +84,11 @@ class ToastPaymentSubmissionService:
                 recovered_from_mapping=True,
                 metadata={
                     "recovered_from_mapping": True,
+                    "external_mappings": {
+                        "payment": (
+                            existing_mapping.external_id
+                        ),
+                    },
                 },
             )
 
@@ -115,26 +133,37 @@ class ToastPaymentSubmissionService:
                 },
             )
 
+        transport_metadata = result.get(
+            "metadata"
+        )
+
+        if not isinstance(
+            transport_metadata,
+            dict,
+        ):
+            transport_metadata = {}
+
+        transport_metadata = dict(
+            transport_metadata
+        )
+
         if result.get("success") is not True:
-            metadata = result.get(
-                "metadata"
-            )
-
-            if not isinstance(metadata, dict):
-                metadata = {}
-
             error = result.get("error")
 
-            if not isinstance(error, str):
+            if not isinstance(
+                error,
+                str,
+            ) or not error.strip():
                 error = (
-                    "Toast payment submission failed."
+                    "Toast payment submission "
+                    "failed."
                 )
 
             return ToastPaymentSubmissionResult(
                 success=False,
                 payment_id=payment_id,
                 error=error,
-                metadata=dict(metadata),
+                metadata=transport_metadata,
             )
 
         payment_guid = result.get(
@@ -152,6 +181,15 @@ class ToastPaymentSubmissionService:
         )
 
         if not payment_guid:
+            transport_metadata.setdefault(
+                "error_type",
+                "invalid_response",
+            )
+            transport_metadata.setdefault(
+                "retryable",
+                False,
+            )
+
             return ToastPaymentSubmissionResult(
                 success=False,
                 payment_id=payment_id,
@@ -159,12 +197,7 @@ class ToastPaymentSubmissionService:
                     "Toast respondio sin "
                     "payment_guid."
                 ),
-                metadata={
-                    "error_type": (
-                        "invalid_response"
-                    ),
-                    "retryable": False,
-                },
+                metadata=transport_metadata,
             )
 
         create_external_mapping(
@@ -175,12 +208,29 @@ class ToastPaymentSubmissionService:
             external_id=payment_guid,
         )
 
-        metadata = result.get(
-            "metadata"
+        external_mappings = (
+            transport_metadata.get(
+                "external_mappings"
+            )
         )
 
-        if not isinstance(metadata, dict):
-            metadata = {}
+        if not isinstance(
+            external_mappings,
+            dict,
+        ):
+            external_mappings = {}
+
+        external_mappings = dict(
+            external_mappings
+        )
+
+        external_mappings[
+            "payment"
+        ] = payment_guid
+
+        transport_metadata[
+            "external_mappings"
+        ] = external_mappings
 
         return ToastPaymentSubmissionResult(
             success=True,
@@ -189,7 +239,7 @@ class ToastPaymentSubmissionService:
                 payment_guid
             ),
             recovered_from_mapping=False,
-            metadata=dict(metadata),
+            metadata=transport_metadata,
         )
 
 
