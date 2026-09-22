@@ -30,7 +30,7 @@ Base funcional previa: ordering, conversación/agente, multi-tenant, canales y s
 
 Hito transversal completado: Tenant Isolation
 
-Último checkpoint funcional antes de esta actualización: e1ad2e8 — persist and propagate base change target products
+Último checkpoint funcional confirmado: 1a13959 — map combos and beverages into Toast payload
 
 Rama de trabajo actual: feature/orderdb-tenant
 
@@ -226,7 +226,7 @@ El backend cuenta con un contexto de tenant explícito y las APIs auditadas no p
 
 # FASE 13 — Canal de cliente, agente IA y dashboard operativo
 
-**Estado:** EN DEFINICIÓN / PRÓXIMA IMPLEMENTACIÓN
+**Estado:** BASE FUNCIONAL IMPLEMENTADA
 
 ## Objetivo
 
@@ -712,6 +712,16 @@ La rama `feature/orderdb-tenant` ya contiene integración funcional y pruebas pa
 - Migración Alembic para producto destino de `BASE_CHANGE`.
 - Serialización y external mapping del producto destino.
 - Fixtures y pruebas AREPA DE POLLO → PATACÓN DE POLLO.
+- Resolución de `BASE_CHANGE` hasta el producto efectivo enviado a Toast.
+- Resolución del mapping Toast correspondiente al producto destino de `BASE_CHANGE`.
+- Integración de combos en el payload Toast.
+- Resolución de papas de combo mediante mapping de ingrediente y `optionGroup`.
+- Resolución de bebidas mediante mapping de producto y `productGroup`.
+- Inclusión de papas y bebida como modifiers del selection Toast.
+- Validación de mappings obligatorios para combos y bebidas.
+- Aislamiento multi-tenant de mappings de combos y bebidas.
+- Cobertura E2E de combos, bebidas y `BASE_CHANGE`.
+- Regresión del bloque de payload fidelity validada con 112 pruebas aprobadas.
 
 ### Checkpoints recientes verificados
 
@@ -725,23 +735,105 @@ La rama `feature/orderdb-tenant` ya contiene integración funcional y pruebas pa
 - `1d11cd2` — build operational Toast order payload.
 - `e58973e` — add Toast modifier mappings and payloads.
 - `e1ad2e8` — persist and propagate base change target products.
+- `76d642c` — resolve base change target product in Toast payload.
+- `1a13959` — map combos and beverages into Toast payload.
+
+### Avance de Toast payload fidelity
+
+#### 19.12A — BASE_CHANGE → effective product → mapping → Toast payload
+
+**Estado:** COMPLETADO
+
+Implementado:
+
+- Persistencia de `new_product_id` y `new_product_name`.
+- Propagación del producto destino hasta el external order payload.
+- Resolución del producto efectivo en `ToastOrderAdapter`.
+- Resolución del mapping Toast del producto efectivo.
+- Preservación del producto original dentro del dominio.
+- Construcción del selection Toast utilizando el producto resultante.
+- Validaciones de mappings faltantes y conflictos de `BASE_CHANGE`.
+- Pruebas focalizadas y regresión satisfactorias.
+
+**Checkpoint:** `76d642c` — `feat: resolve base change target product in Toast payload`
+
+#### 19.12B — Combos + beverages → Toast payload
+
+**Estado:** COMPLETADO
+
+Implementado:
+
+- Lectura del combo desde el external order payload.
+- Resolución de `fries_ingredient_id`.
+- Resolución del mapping Toast del ingrediente de papas.
+- Resolución del `ingredient_group` correspondiente.
+- Resolución de `beverage_product_id`.
+- Resolución del mapping Toast de la bebida.
+- Resolución del `product_group` correspondiente.
+- Inclusión de papas y bebida como modifiers Toast.
+- Propagación de la cantidad del combo.
+- Validación de mappings faltantes.
+- Aislamiento multi-tenant.
+- Cobertura E2E específica.
+- Actualización de Submission Service E2E.
+- Actualización de Toast submission E2E.
+
+Validación confirmada:
+
+- `test_toast_combo_e2e.py`: 6 passed.
+- `test_submission_toast_e2e.py`: 1 passed.
+- `test_submission_service_with_toast.py`: 1 passed.
+- Regresión Toast / Submission / External Mapping: 112 passed.
+- 0 failed.
+- `git diff --check`: limpio.
+
+**Checkpoint:** `1a13959` — `feat: map combos and beverages into Toast payload`
+
+#### 19.12 — Toast payload fidelity
+
+**Estado:** COMPLETADO
+
+La revisión del adapter confirma cobertura del modelo actualmente soportado para:
+
+- Producto normal.
+- Cantidad.
+- `ADD`.
+- `REMOVE`, que no genera modifier Toast por diseño.
+- `BASE_CHANGE`.
+- Combos.
+- Papas de combo.
+- Bebidas.
+- Product mappings.
+- Product group mappings.
+- Ingredient mappings.
+- Ingredient group mappings.
+- Aislamiento de mappings por tenant.
+
+No crear una subfase 19.12C sin evidencia técnica de un nuevo caso de payload no soportado.
 
 ### Punto exacto de continuidad
 
-Frente activo: **Toast payload fidelity / resolución completa de órdenes externas**.
+Frente activo: **19.13 — Toast responses, errors and retries**.
 
-Después de `e1ad2e8`, continuar validando de extremo a extremo que todos los tipos soportados de item, modificación, combo y `BASE_CHANGE` produzcan el payload Toast correcto. No reconstruir componentes ya terminados.
+Los bloques `19.12A` y `19.12B` están completados y respaldados en GitHub.
+
+El último checkpoint funcional confirmado es:
+
+`1a13959` — `feat: map combos and beverages into Toast payload`
+
+El siguiente trabajo debe revisar y endurecer el manejo de respuestas HTTP de Toast, clasificación de errores, fallos transitorios, reintentos seguros e idempotencia donde corresponda.
+
+No reconstruir autenticación, routing, mappings, external order mapper ni payload fidelity ya terminados.
 
 ### Pendiente para cerrar Fase 19
 
-- Endurecer fidelidad del payload Toast para todos los tipos de orden soportados.
-- Validar combinaciones, bebidas y modificadores restantes.
-- Completar manejo de respuestas, errores y reintentos donde falte.
-- Integrar/endurecer webhooks Toast.
-- Completar Payments según capacidades y autorización disponibles.
-- Validar fulfillment/KDS con configuración real de Toast.
-- Completar integración productiva de WhatsApp donde corresponda.
-- Ejecutar suite integral y regresiones.
+- 19.13 — Completar y endurecer manejo de respuestas, errores y reintentos Toast.
+- 19.14 — Integrar/endurecer webhooks Toast.
+- 19.15 — Completar Toast Payments según capacidades, permisos y autorización disponibles.
+- 19.16 — Validar fulfillment/KDS con configuración real de Toast.
+- 19.17 — Ejecutar validación E2E integral de las integraciones externas.
+- 19.18 — Hardening final, regresiones y cierre formal de Fase 19.
+- Completar integración productiva de WhatsApp donde corresponda antes del cierre definitivo de producción.
 
 ### Principio arquitectónico
 
@@ -890,19 +982,19 @@ FASE 11 — Disponibilidad real                         ✅
 
 FASE 12 — Consulta de pedidos                         ✅
 
-FASE 13 — WhatsApp + Agent + Toast + Dashboard        ▶️ ACTUAL
+FASE 13 — WhatsApp + Agent + Toast + Dashboard        ✅
 
-FASE 14 — Pruebas integrales                          ⏳
+FASE 14 — Pruebas integrales                          ✅
 
-FASE 15 — Autenticación y seguridad                    ⏳
+FASE 15 — Autenticación y seguridad                   ✅
 
-FASE 16 — Datos / migraciones producción              ⏳
+FASE 16 — Datos / migraciones producción              ✅
 
-FASE 17 — Docker / despliegue                         ⏳
+FASE 17 — Docker / despliegue                         ✅
 
-FASE 18 — Staging                                     ⏳
+FASE 18 — Staging                                     ✅
 
-FASE 19 — Integraciones externas                      ⏳
+FASE 19 — Integraciones externas                      ▶️ ACTUAL
 
 FASE 20 — Observabilidad                              ⏳
 
