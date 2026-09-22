@@ -1,7 +1,13 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 
 from app.services.external_mapping_service import (
     get_internal_mapping,
+)
+from app.services.toast_fulfillment import (
+    ToastOrderFulfillment,
+)
+from app.services.toast_fulfillment_parser import (
+    parse_toast_order_fulfillment,
 )
 from app.services.toast_webhook_service import (
     ToastWebhookEvent,
@@ -17,6 +23,8 @@ class ToastWebhookProcessingResult:
     external_order_id: str
     event_id: str
     event_type: str
+    fulfillment: ToastOrderFulfillment | None = None
+    fulfillment_available: bool = False
 
 
 class ToastWebhookProcessor:
@@ -62,6 +70,10 @@ class ToastWebhookProcessor:
                 event_type=event.event_type,
             )
 
+        fulfillment = self._parse_fulfillment(
+            event
+        )
+
         return ToastWebhookProcessingResult(
             processed=True,
             duplicate=False,
@@ -70,7 +82,55 @@ class ToastWebhookProcessor:
             external_order_id=event.order_guid,
             event_id=event.event_guid,
             event_type=event.event_type,
+            fulfillment=fulfillment,
+            fulfillment_available=(
+                fulfillment is not None
+            ),
         )
+
+    @staticmethod
+    def _parse_fulfillment(
+        event: ToastWebhookEvent,
+    ) -> ToastOrderFulfillment | None:
+
+        order = event.order
+
+        if not isinstance(order, dict):
+            return None
+
+        checks = order.get("checks")
+
+        if not isinstance(checks, list):
+            return None
+
+        has_selection = False
+
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+
+            selections = check.get(
+                "selections"
+            )
+
+            if (
+                isinstance(selections, list)
+                and selections
+            ):
+                has_selection = True
+                break
+
+        if not has_selection:
+            return None
+
+        try:
+            return (
+                parse_toast_order_fulfillment(
+                    order
+                )
+            )
+        except Exception:
+            return None
 
 
 toast_webhook_processor = ToastWebhookProcessor()
