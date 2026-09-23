@@ -1043,6 +1043,228 @@ FASE 22 — Documentación / entrega                     ⏳
 
 ---
 
+
+---
+
+# CHECKPOINT MAESTRO — INICIO FASE 20
+
+Checkpoint de continuidad creado después del cierre formal de Fase 19.
+
+## Estado consolidado del proyecto
+
+- FASE 01 — Fundamentos — COMPLETADA
+- FASE 02 — API / CRUD inicial — COMPLETADA
+- FASE 03 — PostgreSQL — COMPLETADA
+- FASE 04 — Modelado de catálogo — COMPLETADA
+- FASE 05 — Productos / recetas — COMPLETADA
+- FASE 06 — Locations / disponibilidad — COMPLETADA
+- FASE 07 — Modificaciones — COMPLETADA
+- FASE 08 — Agent / Intent / conversación — COMPLETADA
+- FASE 09 — Ordering integration — COMPLETADA
+- FASE 10 — Precio final — COMPLETADA
+- FASE 11 — Disponibilidad real — COMPLETADA
+- FASE 12 — Consulta de pedidos — COMPLETADA
+- FASE 13 — WhatsApp + Agent + Toast + Dashboard base funcional — COMPLETADA
+- FASE 14 — Pruebas integrales — COMPLETADA
+- FASE 15 — Autenticación y seguridad — COMPLETADA
+- FASE 16 — Datos / migraciones de producción — COMPLETADA
+- FASE 17 — Docker / despliegue — COMPLETADA
+- FASE 18 — Staging — COMPLETADA
+- FASE 19 — Integraciones externas — COMPLETADA
+- FASE 20 — Observabilidad, operación y dashboard operativo — ACTUAL
+- FASE 21 — Producción — PENDIENTE
+- FASE 22 — Documentación / entrega — PENDIENTE
+
+## Cierre técnico confirmado de Fase 19
+
+Checkpoint documental:
+
+`f8cc731` — `docs: close phase 19 and start phase 20`
+
+Checkpoint técnico anterior:
+
+`835f071` — `harden ambiguous Toast payment recovery`
+
+Validaciones acumuladas al cierre:
+
+- Suite global confirmada: 611 pruebas aprobadas.
+- Alembic: `310d4d26a1d6 (head)`.
+- Toast Orders integrado.
+- Toast Payments integrado.
+- Toast Webhooks integrado.
+- Fulfillment / KDS integrado.
+- Reintentos seguros e idempotencia endurecidos.
+- Recuperación de fallos ambiguos de pagos implementada.
+- Prevención de duplicados concurrentes implementada.
+- External mappings endurecidos contra carreras.
+- Aislamiento multi-tenant validado.
+- Validaciones E2E de integración completadas.
+- Working tree limpio al cierre.
+- Rama sincronizada con `origin/feature/orderdb-tenant`.
+
+## Punto exacto de reanudación
+
+La siguiente implementación comienza en:
+
+**FASE 20 — Observabilidad, operación y dashboard operativo**
+
+No reconstruir fases 01–19 salvo que una regresión demuestre un defecto real.
+
+No reabrir Toast Orders, Payments, Webhooks, Fulfillment/KDS,
+idempotencia, mappings o aislamiento multi-tenant sin evidencia técnica.
+
+## Estado encontrado al iniciar Fase 20
+
+Auditoría inicial:
+
+- No se detectó infraestructura propia de logging estructurado en `app`.
+- No se detectó infraestructura propia de métricas en `app`.
+- No se detectaron health/readiness/liveness routes en `app`.
+- Existe dashboard Next.js funcional.
+- Dashboard usa Next.js 16.3.4.
+- Dashboard usa React 19.2.8.
+- Dashboard tiene Playwright.
+- Existen pruebas E2E de dashboard para canales, pedidos y estados.
+
+## Plan de ejecución de Fase 20
+
+### 20.1 — Observability foundation
+
+Implementar:
+
+- logging estructurado;
+- request/correlation IDs;
+- tenant context en eventos operativos;
+- clasificación consistente de errores;
+- eventos operativos relevantes;
+- protección contra exposición de secretos o datos sensibles.
+
+### 20.2 — Health / readiness / liveness
+
+Implementar:
+
+- health check de API;
+- readiness de base de datos;
+- liveness;
+- estado de dependencias críticas cuando corresponda;
+- respuestas aptas para infraestructura y monitoreo.
+
+### 20.3 — Métricas operativas
+
+Medir como mínimo:
+
+- órdenes;
+- órdenes exitosas/fallidas;
+- pagos;
+- pagos exitosos/fallidos;
+- Toast submissions;
+- WhatsApp processing;
+- webhooks;
+- retries;
+- reconciliaciones;
+- latencias;
+- errores por integración y tenant.
+
+### 20.4 — Alertas e incidentes
+
+Definir condiciones operativas para:
+
+- errores repetidos;
+- integración caída;
+- fallos de pagos;
+- órdenes atascadas;
+- reconciliaciones pendientes;
+- webhooks fallidos;
+- degradación de servicios.
+
+### 20.5 — Operational data layer
+
+Crear servicios/endpoints necesarios para que el dashboard consuma
+información operativa real sin acoplarse directamente a detalles internos
+de proveedores externos.
+
+### 20.6 — Arquitectura final del dashboard
+
+Definir y construir:
+
+- navegación;
+- layout;
+- responsive behavior;
+- jerarquía de información;
+- estados loading / empty / error;
+- permisos y visibilidad por rol/tenant.
+
+### 20.7 — Operación desde dashboard
+
+Incluir:
+
+- pedidos;
+- estados;
+- pagos;
+- clientes;
+- integraciones;
+- errores;
+- alertas;
+- actividad operativa;
+- acciones seguras cuando correspondan.
+
+### 20.8 — Métricas de negocio
+
+Incluir como mínimo:
+
+- ventas;
+- volumen de órdenes;
+- ticket promedio;
+- evolución temporal;
+- performance por restaurante/location;
+- estados y conversiones operativas disponibles.
+
+### 20.9 — Administración
+
+Incluir:
+
+- configuración del restaurante;
+- locations;
+- usuarios;
+- roles/permisos;
+- integraciones;
+- estado de configuración.
+
+### 20.10 — Finalización y regresión de Fase 20
+
+Completar:
+
+- diseño visual final;
+- responsive;
+- accesibilidad básica;
+- manejo de errores;
+- pruebas backend;
+- pruebas frontend;
+- pruebas E2E;
+- regresión integral;
+- checkpoint final antes de Fase 21.
+
+## Disciplina de trabajo para Fase 20
+
+Cada subfase debe seguir:
+
+1. Inspeccionar primero el código existente.
+2. No duplicar funcionalidades ya implementadas.
+3. Implementar el bloque completo.
+4. Ejecutar pruebas específicas.
+5. Ejecutar regresión relacionada.
+6. Revisar `git diff --check`.
+7. Confirmar `git status`.
+8. Hacer commit descriptivo.
+9. Hacer push a `feature/orderdb-tenant`.
+10. Confirmar SHA remoto.
+11. Actualizar ROADMAP solamente cuando cambie el estado real del proyecto.
+
+No declarar una subfase completada si las pruebas correspondientes no han sido ejecutadas satisfactoriamente.
+
+No crear subfases adicionales sin evidencia técnica.
+
+---
 # DISCIPLINA DE CHECKPOINTS Y CONTINUIDAD
 
 Desde este checkpoint, **guardar el trabajo** significa sincronizar código y memoria técnica del proyecto.
