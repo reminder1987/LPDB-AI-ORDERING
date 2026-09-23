@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.agent import router as agent_router
@@ -10,6 +10,11 @@ from app.api.products import router as products_router
 from app.api.webhooks import router as webhooks_router
 
 from app.core.config import settings
+from app.core.logging import configure_logging
+from app.core.observability_middleware import ObservabilityMiddleware
+
+
+configure_logging()
 
 
 app = FastAPI(
@@ -26,6 +31,10 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    ObservabilityMiddleware,
 )
 
 

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+from app.core.observability_context import set_tenant_id
 from app.core.tenant_access_context import TenantAccessContext
 from app.core.tenant_context import TenantContext
 from app.models.user_db import UserDB
@@ -35,9 +36,13 @@ def get_tenant_context(
     """
 
     try:
-        return tenant_service.resolve_tenant(
+        tenant_context = tenant_service.resolve_tenant(
             x_tenant,
         )
+
+        set_tenant_id(tenant_context.tenant_id)
+
+        return tenant_context
 
     except TenantNotFoundError as exc:
         raise HTTPException(
@@ -143,6 +148,8 @@ def get_tenant_access_context(
                     "El usuario no tiene acceso al tenant solicitado."
                 ),
             )
+
+        set_tenant_id(tenant_context.tenant_id)
 
         return TenantAccessContext(
             tenant=tenant_context,
