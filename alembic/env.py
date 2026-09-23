@@ -9,49 +9,70 @@ from app.core.database import database_url
 from app.models.base import Base
 
 # ============================================================
-# MODELOS
+# MODELS
 # ============================================================
 
 from app.models.category_db import (
-    ProductCategoryDB,
     IngredientCategoryDB,
+    ProductCategoryDB,
 )
-
+from app.models.channel_integration_db import (
+    ChannelIntegrationDB,
+)
 from app.models.conversation_session_db import (
     ConversationSessionDB,
 )
-
 from app.models.customer_db import CustomerDB
-from app.models.customer_identity_db import CustomerIdentityDB
-
-from app.models.channel_integration_db import ChannelIntegrationDB
-
-from app.models.external_mapping_db import ExternalMappingDB
-
+from app.models.customer_identity_db import (
+    CustomerIdentityDB,
+)
+from app.models.external_mapping_db import (
+    ExternalMappingDB,
+)
+from app.models.ingredient_availability_db import (
+    IngredientAvailabilityDB,
+)
+from app.models.ingredient_db import IngredientDB
+from app.models.location_db import (
+    LocationDB,
+    LocationHourDB,
+)
+from app.models.operational_incident_db import (
+    OperationalIncidentDB,
+)
+from app.models.order_db import OrderDB
+from app.models.order_item_combo_db import (
+    OrderItemComboDB,
+)
+from app.models.order_item_db import OrderItemDB
+from app.models.order_item_modification_db import (
+    OrderItemModificationDB,
+)
+from app.models.payment_db import PaymentDB
+from app.models.product_availability_db import (
+    ProductAvailabilityDB,
+)
+from app.models.product_db import ProductDB
+from app.models.provider_integration_db import (
+    ProviderIntegrationDB,
+)
 from app.models.provider_webhook_event_db import (
     ProviderWebhookEventDB,
 )
-
-from app.models.ingredient_db import IngredientDB
-from app.models.order_db import OrderDB
-from app.models.order_item_db import OrderItemDB
-from app.models.order_item_combo_db import OrderItemComboDB
-from app.models.order_item_modification_db import OrderItemModificationDB
-from app.models.product_availability_db import ProductAvailabilityDB
-from app.models.product_db import ProductDB
 from app.models.recipe_db import (
     RecipeDB,
     RecipeIngredientDB,
 )
 from app.models.tenant_db import TenantDB
+from app.models.user_db import UserDB
+from app.models.user_tenant_db import UserTenantDB
 
 
 # ============================================================
-# CONFIGURACIÓN ALEMBIC
+# ALEMBIC CONFIGURATION
 # ============================================================
 
 config = context.config
-
 
 if config.config_file_name is not None:
     fileConfig(
@@ -67,7 +88,7 @@ target_metadata = Base.metadata
 
 
 # ============================================================
-# MIGRACIÓN OFFLINE
+# OFFLINE MIGRATIONS
 # ============================================================
 
 def run_migrations_offline() -> None:
@@ -91,7 +112,7 @@ def run_migrations_offline() -> None:
 
 
 # ============================================================
-# MIGRACIÓN ONLINE
+# ONLINE MIGRATIONS
 # ============================================================
 
 def run_migrations_online() -> None:
@@ -110,7 +131,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -125,9 +145,6 @@ def run_migrations_online() -> None:
 # ============================================================
 
 if context.is_offline_mode():
-
     run_migrations_offline()
-
 else:
-
     run_migrations_online()

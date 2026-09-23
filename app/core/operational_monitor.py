@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from threading import RLock
 
 from app.core.alert_rules import (
@@ -23,6 +24,9 @@ from app.core.metrics import (
 )
 
 
+IncidentSink = Callable[[list[Incident]], None]
+
+
 class OperationalMonitor:
     """
     Bridges cumulative operational metrics to alert rules.
@@ -33,6 +37,7 @@ class OperationalMonitor:
         -> accumulated new operational failures
         -> alert rules
         -> deduplicated incidents
+        -> optional durable incident sink
 
     Repeated polling without new events does not create new
     occurrences.
@@ -44,6 +49,7 @@ class OperationalMonitor:
         metrics: OperationalMetrics | None = None,
         registry: IncidentRegistry | None = None,
         thresholds: AlertThresholds | None = None,
+        incident_sink: IncidentSink | None = None,
     ) -> None:
         self.metrics = metrics or operational_metrics
         self.registry = registry or incident_registry
@@ -52,6 +58,7 @@ class OperationalMonitor:
             registry=self.registry,
             thresholds=thresholds,
         )
+        self.incident_sink = incident_sink
 
         self._accumulated: dict[
             tuple[
@@ -65,7 +72,6 @@ class OperationalMonitor:
 
     def poll(self) -> list[Incident]:
         snapshot = self.metrics.snapshot()
-
         deltas = self.cursor.delta(snapshot)
 
         if not deltas:
@@ -89,9 +95,14 @@ class OperationalMonitor:
                 ), value in self._accumulated.items()
             ]
 
-        return self.rules.evaluate(
+        incidents = self.rules.evaluate(
             accumulated_snapshot
         )
+
+        if incidents and self.incident_sink is not None:
+            self.incident_sink(incidents)
+
+        return incidents
 
     def reset(self) -> None:
         with self._lock:
@@ -99,10 +110,34 @@ class OperationalMonitor:
             self._accumulated.clear()
 
 
-operational_monitor = OperationalMonitor()
+def _persist_incidents(
+    incidents: list[Incident],
+) -> None:
+    """
+    Production incident sink.
+
+    Imports remain local so the monitor core stays independent
+    from SQLAlchemy/database initialization during unit tests.
+    """
+    from app.core.database import SessionLocal
+    from app.services.operational_incident_service import (
+        operational_incident_service,
+    )
+
+    with SessionLocal() as session:
+        operational_incident_service.persist_many(
+            session,
+            incidents,
+        )
+
+
+operational_monitor = OperationalMonitor(
+    incident_sink=_persist_incidents,
+)
 
 
 __all__ = [
+    "IncidentSink",
     "OperationalMonitor",
     "operational_monitor",
 ]

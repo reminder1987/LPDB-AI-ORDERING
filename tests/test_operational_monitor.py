@@ -5,11 +5,14 @@ from app.core.incidents import (
     IncidentRegistry,
 )
 from app.core.metrics import OperationalMetrics
-from app.core.operational_monitor import OperationalMonitor
+from app.core.operational_monitor import (
+    OperationalMonitor,
+)
 
 
 def build_monitor(
     thresholds=None,
+    incident_sink=None,
 ):
     metrics = OperationalMetrics()
     registry = IncidentRegistry()
@@ -18,6 +21,7 @@ def build_monitor(
         metrics=metrics,
         registry=registry,
         thresholds=thresholds,
+        incident_sink=incident_sink,
     )
 
     return metrics, registry, monitor
@@ -202,3 +206,80 @@ def test_monitor_reset_starts_new_baseline():
     )
 
     assert len(open_incidents) == 1
+
+
+def test_incident_sink_receives_new_incident():
+    persisted = []
+
+    def sink(incidents):
+        persisted.extend(incidents)
+
+    metrics, registry, monitor = build_monitor(
+        incident_sink=sink,
+    )
+
+    monitor.poll()
+
+    record_provider_failure(
+        metrics,
+        count=3,
+    )
+
+    result = monitor.poll()
+
+    assert len(result) == 1
+    assert len(persisted) == 1
+    assert persisted[0].id == result[0].id
+
+
+def test_incident_sink_receives_incident_updates():
+    persisted = []
+
+    def sink(incidents):
+        persisted.extend(incidents)
+
+    metrics, registry, monitor = build_monitor(
+        incident_sink=sink,
+    )
+
+    monitor.poll()
+
+    record_provider_failure(
+        metrics,
+        count=3,
+    )
+
+    first = monitor.poll()
+
+    record_provider_failure(metrics)
+
+    second = monitor.poll()
+
+    assert first[0].id == second[0].id
+    assert len(persisted) == 2
+    assert persisted[1].id == first[0].id
+    assert persisted[1].occurrence_count == 2
+
+
+def test_incident_sink_not_called_without_new_delta():
+    calls = []
+
+    def sink(incidents):
+        calls.append(incidents)
+
+    metrics, registry, monitor = build_monitor(
+        incident_sink=sink,
+    )
+
+    monitor.poll()
+
+    record_provider_failure(
+        metrics,
+        count=3,
+    )
+
+    assert len(monitor.poll()) == 1
+    assert len(calls) == 1
+
+    assert monitor.poll() == []
+    assert len(calls) == 1
