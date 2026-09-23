@@ -1,4 +1,10 @@
+from time import perf_counter
 from typing import Any
+
+from app.core.business_metrics import (
+    record_provider_request,
+    record_whatsapp_message,
+)
 
 from app.services.meta_whatsapp_configuration import (
     MetaWhatsAppConfiguration,
@@ -61,6 +67,8 @@ class MetaWhatsAppHttpTransport:
             },
         }
 
+        started_at = perf_counter()
+
         try:
             response = self.http_client.post(
                 url,
@@ -69,6 +77,15 @@ class MetaWhatsAppHttpTransport:
                 timeout=self.configuration.timeout,
             )
         except Exception as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="transport_error",
+            )
+            record_whatsapp_message(
+                outcome="failure",
+                error_type="transport_error",
+            )
             return {
                 "success": False,
                 "message_id": None,
@@ -81,6 +98,16 @@ class MetaWhatsAppHttpTransport:
             response_body = {}
 
         if not 200 <= response.status_code < 300:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="http_error",
+                status_code=response.status_code,
+            )
+            record_whatsapp_message(
+                outcome="failure",
+                error_type="http_error",
+            )
             return {
                 "success": False,
                 "message_id": None,
@@ -94,6 +121,16 @@ class MetaWhatsAppHttpTransport:
         )
 
         if not message_id:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="invalid_response",
+                status_code=response.status_code,
+            )
+            record_whatsapp_message(
+                outcome="failure",
+                error_type="invalid_response",
+            )
             return {
                 "success": False,
                 "message_id": None,
@@ -103,11 +140,43 @@ class MetaWhatsAppHttpTransport:
                 ),
             }
 
+        self._record_request_metric(
+            started_at=started_at,
+            outcome="success",
+            status_code=response.status_code,
+        )
+        record_whatsapp_message(
+            outcome="success",
+        )
+
         return {
             "success": True,
             "message_id": message_id,
             "error": None,
         }
+
+    @staticmethod
+    def _record_request_metric(
+        *,
+        started_at: float,
+        outcome: str,
+        error_type: str | None = None,
+        status_code: int | None = None,
+    ) -> None:
+        duration_ms = max(
+            0.0,
+            (perf_counter() - started_at) * 1000.0,
+        )
+
+        record_provider_request(
+            provider="meta_whatsapp",
+            operation="send_text_message",
+            outcome=outcome,
+            duration_ms=duration_ms,
+            error_type=error_type,
+            status_code=status_code,
+            retryable=False,
+        )
 
     @staticmethod
     def _extract_message_id(

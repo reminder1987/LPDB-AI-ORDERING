@@ -1,4 +1,9 @@
+from time import perf_counter
 from typing import Any
+
+from app.core.business_metrics import (
+    record_provider_request,
+)
 
 from app.services.toast_configuration import (
     ToastConfiguration,
@@ -72,6 +77,8 @@ class ToastHttpTransport:
             ),
         }
 
+        started_at = perf_counter()
+
         try:
             response = self.http_client.post(
                 url,
@@ -80,18 +87,36 @@ class ToastHttpTransport:
                 timeout=self.configuration.timeout,
             )
         except TimeoutError as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="timeout",
+                retryable=True,
+            )
             return self._failure(
                 error=str(exc),
                 error_type="timeout",
                 retryable=True,
             )
         except ConnectionError as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="connection_error",
+                retryable=True,
+            )
             return self._failure(
                 error=str(exc),
                 error_type="connection_error",
                 retryable=True,
             )
         except Exception as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="transport_error",
+                retryable=False,
+            )
             return self._failure(
                 error=str(exc),
                 error_type="transport_error",
@@ -132,16 +157,27 @@ class ToastHttpTransport:
                     )
                 )
 
+            error_type = self._classify_http_error(
+                status_code
+            )
+            retryable = (
+                status_code
+                in self.RETRYABLE_STATUS_CODES
+            )
+
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type=error_type,
+                status_code=status_code,
+                retryable=retryable,
+            )
+
             return self._failure(
                 error=error,
-                error_type=self._classify_http_error(
-                    status_code
-                ),
+                error_type=error_type,
                 status_code=status_code,
-                retryable=(
-                    status_code
-                    in self.RETRYABLE_STATUS_CODES
-                ),
+                retryable=retryable,
                 retry_after_seconds=(
                     retry_after_seconds
                 ),
@@ -157,6 +193,14 @@ class ToastHttpTransport:
             )
 
         if not external_order_id:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="invalid_response",
+                status_code=status_code,
+                retryable=False,
+            )
+
             return self._failure(
                 error=(
                     "Toast response did not "
@@ -176,11 +220,42 @@ class ToastHttpTransport:
         if check_guid is not None:
             metadata["check_guid"] = check_guid
 
+        self._record_request_metric(
+            started_at=started_at,
+            outcome="success",
+            status_code=status_code,
+            retryable=False,
+        )
+
         return {
             "success": True,
             "external_order_id": external_order_id,
             "metadata": metadata,
         }
+
+    @staticmethod
+    def _record_request_metric(
+        *,
+        started_at: float,
+        outcome: str,
+        error_type: str | None = None,
+        status_code: int | None = None,
+        retryable: bool | None = None,
+    ) -> None:
+        duration_ms = max(
+            0.0,
+            (perf_counter() - started_at) * 1000.0,
+        )
+
+        record_provider_request(
+            provider="toast",
+            operation="create_order",
+            outcome=outcome,
+            duration_ms=duration_ms,
+            error_type=error_type,
+            status_code=status_code,
+            retryable=retryable,
+        )
 
     @staticmethod
     def _failure(

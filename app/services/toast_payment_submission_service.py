@@ -1,5 +1,9 @@
 from dataclasses import dataclass, field
 
+from app.core.business_metrics import (
+    classify_result_metadata,
+    record_payment_submission,
+)
 from app.services.external_mapping_service import (
     create_external_mapping,
     get_external_mapping,
@@ -99,6 +103,11 @@ class ToastPaymentSubmissionService:
         )
 
         if existing_mapping is not None:
+            record_payment_submission(
+                outcome="recovered",
+                recovered=True,
+            )
+
             return ToastPaymentSubmissionResult(
                 success=True,
                 payment_id=payment_id,
@@ -122,6 +131,14 @@ class ToastPaymentSubmissionService:
         )
 
         if not claimed:
+            record_payment_submission(
+                outcome="skipped",
+                error_type=(
+                    "payment_already_processing"
+                ),
+                retryable=False,
+            )
+
             return ToastPaymentSubmissionResult(
                 success=False,
                 payment_id=payment_id,
@@ -164,6 +181,12 @@ class ToastPaymentSubmissionService:
         )
 
         if not isinstance(result, dict):
+            record_payment_submission(
+                outcome="failure",
+                error_type="invalid_response",
+                retryable=False,
+            )
+
             return ToastPaymentSubmissionResult(
                 success=False,
                 payment_id=payment_id,
@@ -217,6 +240,19 @@ class ToastPaymentSubmissionService:
                     ),
                 )
 
+            (
+                metric_error_type,
+                metric_retryable,
+            ) = classify_result_metadata(
+                transport_metadata
+            )
+
+            record_payment_submission(
+                outcome="failure",
+                error_type=metric_error_type,
+                retryable=metric_retryable,
+            )
+
             return ToastPaymentSubmissionResult(
                 success=False,
                 payment_id=payment_id,
@@ -244,6 +280,12 @@ class ToastPaymentSubmissionService:
             transport_metadata.setdefault(
                 "retryable",
                 False,
+            )
+
+            record_payment_submission(
+                outcome="failure",
+                error_type="invalid_response",
+                retryable=False,
             )
 
             return ToastPaymentSubmissionResult(
@@ -288,6 +330,14 @@ class ToastPaymentSubmissionService:
             metadata[
                 "reconciliation_found"
             ] = False
+
+            record_payment_submission(
+                outcome="ambiguous",
+                error_type=metadata.get(
+                    "error_type"
+                ),
+                retryable=False,
+            )
 
             return ToastPaymentSubmissionResult(
                 success=False,
@@ -364,6 +414,14 @@ class ToastPaymentSubmissionService:
             "manual_reconciliation_required"
         ] = True
 
+        record_payment_submission(
+            outcome="ambiguous",
+            error_type=metadata.get(
+                "error_type"
+            ),
+            retryable=False,
+        )
+
         return ToastPaymentSubmissionResult(
             success=False,
             payment_id=payment_id,
@@ -412,6 +470,15 @@ class ToastPaymentSubmissionService:
         metadata[
             "external_mappings"
         ] = external_mappings
+
+        record_payment_submission(
+            outcome=(
+                "recovered"
+                if recovered
+                else "success"
+            ),
+            recovered=recovered,
+        )
 
         return ToastPaymentSubmissionResult(
             success=True,

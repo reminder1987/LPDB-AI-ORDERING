@@ -10,6 +10,7 @@ from fastapi import (
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
+from app.core.business_metrics import record_webhook
 from app.services.channel_integration_service import (
     ChannelIntegrationNotFoundError,
     channel_integration_service,
@@ -588,6 +589,14 @@ async def process_toast_order_webhook(
         tenant_id=integration.tenant_id,
         event=event,
         duplicate=registration.duplicate,
+    )
+
+    record_webhook(
+        provider="toast",
+        event_type=event.event_type,
+        duplicate=registration.duplicate,
+        processed=processing.processed,
+        matched=processing.matched,
     )
 
     return {

@@ -1,5 +1,9 @@
 from sqlalchemy import update
 
+from app.core.business_metrics import (
+    classify_result_metadata,
+    record_order_submission,
+)
 from app.core.database import SessionLocal
 from app.core.order_status import (
     ORDER_STATUS_CONFIRMED,
@@ -106,6 +110,11 @@ class SubmissionService:
 
                     db.commit()
 
+                    record_order_submission(
+                        outcome="recovered",
+                        provider=self.provider,
+                    )
+
                     return ExternalOrderResult(
                         success=True,
                         external_order_id=external_order_id,
@@ -113,6 +122,15 @@ class SubmissionService:
                             "recovered_from_mapping": True,
                         },
                     )
+
+                record_order_submission(
+                    outcome="skipped",
+                    provider=self.provider,
+                    error_type=(
+                        "order_already_submitting"
+                    ),
+                    retryable=False,
+                )
 
                 return ExternalOrderResult(
                     success=False,
@@ -154,6 +172,15 @@ class SubmissionService:
             db.commit()
 
             if not claimed:
+                record_order_submission(
+                    outcome="skipped",
+                    provider=self.provider,
+                    error_type=(
+                        "order_already_submitting"
+                    ),
+                    retryable=False,
+                )
+
                 return ExternalOrderResult(
                     success=False,
                     error=(
@@ -187,6 +214,22 @@ class SubmissionService:
             if not result.success:
                 metadata = result.metadata
 
+                (
+                    metric_error_type,
+                    metric_retryable,
+                ) = classify_result_metadata(
+                    metadata
+                    if isinstance(metadata, dict)
+                    else None
+                )
+
+                record_order_submission(
+                    outcome="failure",
+                    provider=self.provider,
+                    error_type=metric_error_type,
+                    retryable=metric_retryable,
+                )
+
                 retryable = (
                     isinstance(metadata, dict)
                     and metadata.get("retryable") is True
@@ -206,6 +249,13 @@ class SubmissionService:
                 return result
 
             if not result.external_order_id:
+                record_order_submission(
+                    outcome="failure",
+                    provider=self.provider,
+                    error_type="invalid_response",
+                    retryable=False,
+                )
+
                 order.status = transition_order_status(
                     current_status=order.status,
                     new_status=ORDER_STATUS_FAILED,
@@ -240,6 +290,11 @@ class SubmissionService:
             )
 
             db.commit()
+
+            record_order_submission(
+                outcome="success",
+                provider=self.provider,
+            )
 
             return result
 

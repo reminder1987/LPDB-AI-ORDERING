@@ -1,4 +1,8 @@
 from dataclasses import dataclass, field
+
+from app.core.business_metrics import (
+    record_reconciliation,
+)
 from typing import Protocol
 
 
@@ -252,6 +256,12 @@ class ToastPaymentReconciliationService:
                 "payment_external_id"
             ] = expected_external_id
 
+            record_reconciliation(
+                provider="toast",
+                entity_type="payment",
+                outcome="found",
+            )
+
             return ToastPaymentReconciliationResult(
                 found=True,
                 payment_guid=payment_guid,
@@ -264,6 +274,12 @@ class ToastPaymentReconciliationService:
         metadata[
             "payment_external_id"
         ] = expected_external_id
+
+        record_reconciliation(
+            provider="toast",
+            entity_type="payment",
+            outcome="not_found",
+        )
 
         return ToastPaymentReconciliationResult(
             found=False,
