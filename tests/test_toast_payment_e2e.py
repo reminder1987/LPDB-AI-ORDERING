@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 from sqlalchemy import delete
 
@@ -164,6 +164,9 @@ def test_toast_payment_e2e_and_idempotent_recovery():
 
         assert call["payload"] == [
             {
+                "externalId": (
+                    f"lpdb-payment-1-{payment_id}"
+                ),
                 "type": "OTHER",
                 "amount": 25.50,
                 "tipAmount": 0.0,

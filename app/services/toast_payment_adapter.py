@@ -1,4 +1,4 @@
-﻿from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 
 from app.services.toast_payment_context import (
     ToastPaymentContext,
@@ -75,6 +75,10 @@ class ToastPaymentAdapter:
 
         return [
             {
+                "externalId": (
+                    f"lpdb-payment-{context.tenant_id}-"
+                    f"{context.payment_id}"
+                ),
                 "type": "OTHER",
                 "amount": float(amount),
                 "tipAmount": 0.0,

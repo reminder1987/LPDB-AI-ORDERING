@@ -502,13 +502,13 @@ def test_submitting_order_with_existing_mapping_does_not_resubmit():
         db.close()
 
 
-def test_submitting_order_without_mapping_can_be_resubmitted():
+def test_submitting_order_without_mapping_is_not_resubmitted():
     db = database_module.SessionLocal()
 
     try:
         order = OrderDB(
             tenant_id=1,
-            customer_name="Retry Recovery",
+            customer_name="Ambiguous Submission",
             location_id=1,
             product="Pizza",
             quantity=1,
@@ -531,34 +531,66 @@ def test_submitting_order_without_mapping_can_be_resubmitted():
         provider="toast",
     )
 
-    result = service.submit_order(
-        order_id=order_id,
-        tenant=LPDB_TENANT,
-    )
-
-    assert result.success is True
-    assert len(external_service.calls) == 1
-
-    call = external_service.calls[0]
-
-    assert call["order_id"] == order_id
-    assert call["tenant_id"] == 1
-    assert call["location_id"] == 1
-
-    db = database_module.SessionLocal()
-
     try:
-        order = (
-            db.query(OrderDB)
-            .filter(
-                OrderDB.id == order_id,
-                OrderDB.tenant_id == 1,
-            )
-            .first()
+        result = service.submit_order(
+            order_id=order_id,
+            tenant=LPDB_TENANT,
         )
 
-        assert order is not None
-        assert order.status == ORDER_STATUS_SUBMITTED
+        assert result.success is False
+        assert result.error is not None
+
+        assert (
+            result.metadata["error_type"]
+            == "order_already_submitting"
+        )
+
+        assert (
+            result.metadata["submission_skipped"]
+            is True
+        )
+
+        assert (
+            len(external_service.calls)
+            == 0
+        )
+
+        db = database_module.SessionLocal()
+
+        try:
+            persisted_order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id
+                )
+                .first()
+            )
+
+            assert persisted_order is not None
+
+            assert (
+                persisted_order.status
+                == ORDER_STATUS_SUBMITTING
+            )
+
+        finally:
+            db.close()
 
     finally:
-        db.close()
+        db = database_module.SessionLocal()
+
+        try:
+            order = (
+                db.query(OrderDB)
+                .filter(
+                    OrderDB.id == order_id
+                )
+                .first()
+            )
+
+            if order is not None:
+                db.delete(order)
+                db.commit()
+
+        finally:
+            db.close()

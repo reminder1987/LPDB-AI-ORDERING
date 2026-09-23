@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from app.services.toast_payment_adapter import (
     ToastPaymentAdapter,
@@ -37,6 +37,7 @@ def test_builds_other_payment_payload():
 
     assert payload == [
         {
+            "externalId": "lpdb-payment-1-10",
             "type": "OTHER",
             "amount": 25.50,
             "tipAmount": 0.0,

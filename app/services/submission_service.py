@@ -1,3 +1,5 @@
+from sqlalchemy import update
+
 from app.core.database import SessionLocal
 from app.core.order_status import (
     ORDER_STATUS_CONFIRMED,
@@ -112,14 +114,62 @@ class SubmissionService:
                         },
                     )
 
-            if order.status == ORDER_STATUS_CONFIRMED:
-                order.status = transition_order_status(
-                    current_status=order.status,
-                    new_status=ORDER_STATUS_SUBMITTING,
+                return ExternalOrderResult(
+                    success=False,
+                    error=(
+                        "La orden ya esta en proceso "
+                        "de envio al proveedor externo."
+                    ),
+                    metadata={
+                        "error_type": (
+                            "order_already_submitting"
+                        ),
+                        "retryable": False,
+                        "submission_skipped": True,
+                    },
                 )
 
-                db.commit()
-                db.refresh(order)
+            claim_statement = (
+                update(OrderDB)
+                .where(
+                    OrderDB.id == order.id,
+                    OrderDB.tenant_id
+                    == tenant.tenant_id,
+                    OrderDB.status
+                    == ORDER_STATUS_CONFIRMED,
+                )
+                .values(
+                    status=ORDER_STATUS_SUBMITTING,
+                )
+            )
+
+            claim_result = db.execute(
+                claim_statement
+            )
+
+            claimed = (
+                claim_result.rowcount == 1
+            )
+
+            db.commit()
+
+            if not claimed:
+                return ExternalOrderResult(
+                    success=False,
+                    error=(
+                        "La orden ya esta en proceso "
+                        "de envio al proveedor externo."
+                    ),
+                    metadata={
+                        "error_type": (
+                            "order_already_submitting"
+                        ),
+                        "retryable": False,
+                        "submission_skipped": True,
+                    },
+                )
+
+            db.refresh(order)
 
             payload = build_external_order_payload(
                 order,

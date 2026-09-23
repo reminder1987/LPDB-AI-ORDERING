@@ -11,6 +11,9 @@ from app.services.toast_payment_adapter import (
 from app.services.toast_payment_context import (
     ToastPaymentContextResolver,
 )
+from app.services.toast_payment_reconciliation_service import (
+    ToastPaymentReconciliationService,
+)
 from app.services.toast_payment_transport import (
     ToastPaymentTransport,
 )
@@ -30,6 +33,20 @@ class ToastPaymentSubmissionResult:
 
 class ToastPaymentSubmissionService:
 
+    AMBIGUOUS_ERROR_TYPES = {
+        "timeout",
+        "connection_error",
+        "server_error",
+    }
+
+    AMBIGUOUS_STATUS_CODES = {
+        408,
+        500,
+        502,
+        503,
+        504,
+    }
+
     def __init__(
         self,
         *,
@@ -37,10 +54,16 @@ class ToastPaymentSubmissionService:
         payment_adapter: ToastPaymentAdapter,
         transport: ToastPaymentTransport,
         restaurant_external_id: str,
+        reconciliation_service: (
+            ToastPaymentReconciliationService | None
+        ) = None,
     ) -> None:
         self.context_resolver = context_resolver
         self.payment_adapter = payment_adapter
         self.transport = transport
+        self.reconciliation_service = (
+            reconciliation_service
+        )
 
         if not isinstance(
             restaurant_external_id,
@@ -149,9 +172,7 @@ class ToastPaymentSubmissionService:
                     "respondio con formato invalido."
                 ),
                 metadata={
-                    "error_type": (
-                        "invalid_response"
-                    ),
+                    "error_type": "invalid_response",
                     "retryable": False,
                 },
             )
@@ -171,6 +192,7 @@ class ToastPaymentSubmissionService:
         )
 
         if result.get("success") is not True:
+
             error = result.get("error")
 
             if not isinstance(
@@ -180,6 +202,19 @@ class ToastPaymentSubmissionService:
                 error = (
                     "Toast payment submission "
                     "failed."
+                )
+
+            if self._is_ambiguous_failure(
+                transport_metadata
+            ):
+                return self._reconcile_ambiguous_failure(
+                    tenant_id=tenant_id,
+                    payment_id=payment_id,
+                    context=context,
+                    original_error=error,
+                    transport_metadata=(
+                        transport_metadata
+                    ),
                 )
 
             return ToastPaymentSubmissionResult(
@@ -199,9 +234,7 @@ class ToastPaymentSubmissionService:
         ):
             payment_guid = ""
 
-        payment_guid = (
-            payment_guid.strip()
-        )
+        payment_guid = payment_guid.strip()
 
         if not payment_guid:
             transport_metadata.setdefault(
@@ -223,6 +256,131 @@ class ToastPaymentSubmissionService:
                 metadata=transport_metadata,
             )
 
+        return self._successful_result(
+            tenant_id=tenant_id,
+            payment_id=payment_id,
+            payment_guid=payment_guid,
+            metadata=transport_metadata,
+            recovered=False,
+        )
+
+    def _reconcile_ambiguous_failure(
+        self,
+        *,
+        tenant_id: int,
+        payment_id: int,
+        context,
+        original_error: str,
+        transport_metadata: dict,
+    ) -> ToastPaymentSubmissionResult:
+
+        metadata = dict(
+            transport_metadata
+        )
+
+        metadata["outcome_ambiguous"] = True
+        metadata["submission_skipped"] = True
+
+        if self.reconciliation_service is None:
+            metadata[
+                "reconciliation_attempted"
+            ] = False
+            metadata[
+                "reconciliation_found"
+            ] = False
+
+            return ToastPaymentSubmissionResult(
+                success=False,
+                payment_id=payment_id,
+                error=original_error,
+                metadata=metadata,
+            )
+
+        reconciliation = (
+            self.reconciliation_service.reconcile(
+                tenant_id=tenant_id,
+                payment_id=payment_id,
+                order_guid=(
+                    context.toast_order_guid
+                ),
+                check_guid=(
+                    context.toast_check_guid
+                ),
+            )
+        )
+
+        reconciliation_metadata = (
+            reconciliation.metadata
+        )
+
+        if isinstance(
+            reconciliation_metadata,
+            dict,
+        ):
+            for key, value in (
+                reconciliation_metadata.items()
+            ):
+                metadata[
+                    f"reconciliation_{key}"
+                ] = value
+
+        metadata[
+            "reconciliation_attempted"
+        ] = True
+
+        metadata[
+            "reconciliation_found"
+        ] = reconciliation.found
+
+        if (
+            reconciliation.found
+            and isinstance(
+                reconciliation.payment_guid,
+                str,
+            )
+            and reconciliation.payment_guid.strip()
+        ):
+            payment_guid = (
+                reconciliation.payment_guid.strip()
+            )
+
+            metadata[
+                "recovered_after_ambiguous_failure"
+            ] = True
+
+            return self._successful_result(
+                tenant_id=tenant_id,
+                payment_id=payment_id,
+                payment_guid=payment_guid,
+                metadata=metadata,
+                recovered=True,
+            )
+
+        metadata[
+            "retryable"
+        ] = False
+
+        metadata[
+            "manual_reconciliation_required"
+        ] = True
+
+        return ToastPaymentSubmissionResult(
+            success=False,
+            payment_id=payment_id,
+            error=original_error,
+            metadata=metadata,
+        )
+
+    def _successful_result(
+        self,
+        *,
+        tenant_id: int,
+        payment_id: int,
+        payment_guid: str,
+        metadata: dict,
+        recovered: bool,
+    ) -> ToastPaymentSubmissionResult:
+
         create_external_mapping(
             tenant_id=tenant_id,
             provider="toast",
@@ -231,10 +389,10 @@ class ToastPaymentSubmissionService:
             external_id=payment_guid,
         )
 
-        external_mappings = (
-            transport_metadata.get(
-                "external_mappings"
-            )
+        metadata = dict(metadata)
+
+        external_mappings = metadata.get(
+            "external_mappings"
         )
 
         if not isinstance(
@@ -251,18 +409,43 @@ class ToastPaymentSubmissionService:
             "payment"
         ] = payment_guid
 
-        transport_metadata[
+        metadata[
             "external_mappings"
         ] = external_mappings
 
         return ToastPaymentSubmissionResult(
             success=True,
             payment_id=payment_id,
-            external_payment_id=(
-                payment_guid
-            ),
-            recovered_from_mapping=False,
-            metadata=transport_metadata,
+            external_payment_id=payment_guid,
+            recovered_from_mapping=recovered,
+            metadata=metadata,
+        )
+
+    @classmethod
+    def _is_ambiguous_failure(
+        cls,
+        metadata: dict,
+    ) -> bool:
+
+        error_type = metadata.get(
+            "error_type"
+        )
+
+        status_code = metadata.get(
+            "status_code"
+        )
+
+        if (
+            isinstance(error_type, str)
+            and error_type
+            in cls.AMBIGUOUS_ERROR_TYPES
+        ):
+            return True
+
+        return (
+            isinstance(status_code, int)
+            and status_code
+            in cls.AMBIGUOUS_STATUS_CODES
         )
 
 
