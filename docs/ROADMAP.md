@@ -825,15 +825,28 @@ El siguiente trabajo debe revisar y endurecer el manejo de respuestas HTTP de To
 
 No reconstruir autenticación, routing, mappings, external order mapper ni payload fidelity ya terminados.
 
-### Pendiente para cerrar Fase 19
+### Cierre de Fase 19
 
-- 19.13 — Completar y endurecer manejo de respuestas, errores y reintentos Toast.
-- 19.14 — Integrar/endurecer webhooks Toast.
-- 19.15 — Completar Toast Payments según capacidades, permisos y autorización disponibles.
-- 19.16 — Validar fulfillment/KDS con configuración real de Toast.
-- 19.17 — Ejecutar validación E2E integral de las integraciones externas.
-- 19.18 — Hardening final, regresiones y cierre formal de Fase 19.
-- Completar integración productiva de WhatsApp donde corresponda antes del cierre definitivo de producción.
+- 19.13 — COMPLETADA — Manejo de respuestas, errores, reintentos seguros e idempotencia Toast.
+- 19.14 — COMPLETADA — Webhooks Toast multi-tenant, persistencia idempotente y reconciliación.
+- 19.15 — COMPLETADA — Toast Payments, transporte, orquestación, mappings y validación E2E.
+- 19.16 — COMPLETADA — Fulfillment/KDS, reconciliación, webhooks y ciclo hasta READY.
+- 19.17 — COMPLETADA — Validación E2E integral y regresión completa de integraciones externas.
+- 19.18 — COMPLETADA — Hardening final: concurrencia, prevención de duplicados, recuperación de fallos ambiguos, integridad de identificadores externos y aislamiento multi-tenant.
+
+Validación final de Fase 19:
+
+- Suite global: 611 pruebas aprobadas.
+- Alembic: `310d4d26a1d6 (head)`.
+- Hardening de mappings concurrentes completado.
+- Prevención de doble envío de pagos completada.
+- Recuperación segura ante timeout/5xx ambiguos completada.
+- Aislamiento multi-tenant de integraciones externas validado.
+- Working tree limpio al cierre técnico.
+
+Checkpoint técnico de cierre previo a la actualización documental:
+
+`835f071` — `harden ambiguous Toast payment recovery`
 
 ### Principio arquitectónico
 
@@ -858,7 +871,7 @@ Las integraciones de producción deben funcionar con autenticación, mapeo compl
 
 ## FASE 20 — Observabilidad y operación
 
-**Estado:** PENDIENTE
+**Estado:** ACTUAL
 
 ### Alcance
 
@@ -994,9 +1007,9 @@ FASE 17 — Docker / despliegue                         ✅
 
 FASE 18 — Staging                                     ✅
 
-FASE 19 — Integraciones externas                      ▶️ ACTUAL
+FASE 19 — Integraciones externas                      ✅
 
-FASE 20 — Observabilidad                              ⏳
+FASE 20 — Observabilidad                              ▶️ ACTUAL
 
 FASE 21 — Producción                                  ⏳
 
@@ -1026,7 +1039,7 @@ FASE 22 — Documentación / entrega                     ⏳
 | 16 | COMPLETADA | `2b5f000`, `10f0c19`, `5258192`, `9394f26` |
 | 17 | COMPLETADA | `055bc12`, `c17a702` |
 | 18 | COMPLETADA | Cerrada y respaldada antes del inicio de Fase 19 |
-| 19 | EN IMPLEMENTACIÓN AVANZADA | `e1ad2e8` |
+| 19 | COMPLETADA | `835f071` + cierre formal de hardening y regresión |
 
 ---
 
