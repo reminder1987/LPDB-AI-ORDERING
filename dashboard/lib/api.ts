@@ -1,7 +1,12 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+﻿import {
+  clearSession,
+  getAccessToken,
+  getActiveTenant,
+} from "@/lib/auth/session";
 
-const TENANT = "lpdb";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:8000";
 
 export interface OrderModification {
   type: string;
@@ -62,21 +67,42 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Tenant": TENANT,
-      ...options.headers,
+  const accessToken = getAccessToken();
+
+  if (!accessToken) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  const headers = new Headers(options.headers);
+
+  headers.set("Content-Type", "application/json");
+  headers.set("X-Tenant", getActiveTenant());
+  headers.set(
+    "Authorization",
+    `Bearer ${accessToken}`,
+  );
+
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      ...options,
+      headers,
+      cache: "no-store",
     },
-    cache: "no-store",
-  });
+  );
+
+  if (response.status === 401) {
+    clearSession();
+    throw new Error("AUTH_REQUIRED");
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
 
     throw new Error(
-      `API error ${response.status}: ${errorText || response.statusText}`,
+      `API error ${response.status}: ${
+        errorText || response.statusText
+      }`,
     );
   }
 
@@ -90,7 +116,9 @@ export async function getOrders(): Promise<OrderListResponse> {
 export async function getOrder(
   orderId: number,
 ): Promise<OrderResponseWrapper> {
-  return apiFetch<OrderResponseWrapper>(`/orders/${orderId}`);
+  return apiFetch<OrderResponseWrapper>(
+    `/orders/${orderId}`,
+  );
 }
 
 export async function updateOrderStatus(

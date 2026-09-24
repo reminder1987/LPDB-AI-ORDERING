@@ -1,21 +1,41 @@
 import { test, expect } from '@playwright/test';
 
-test('Dashboard permite abrir el detalle de un pedido', async ({ page }) => {
-  await page.goto('/');
+import {
+  authenticateDashboardPage,
+} from './support/auth';
 
-  await expect(
-    page.getByRole('heading', { name: 'Pedidos', exact: true })
-  ).toBeVisible();
+test(
+  'Dashboard permite abrir el detalle de un pedido',
+  async ({ page, request }) => {
+    await authenticateDashboardPage(page, request);
 
-  const firstOrder = page.locator('tbody tr[role="button"]').first();
+    await page.goto('/');
 
-  await expect(firstOrder).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Pedidos',
+        exact: true,
+      }),
+    ).toBeVisible();
 
-  await firstOrder.click();
+    const firstOrder = page
+      .locator('tbody tr[role="button"]')
+      .first();
 
-  await expect(
-    page.getByRole('heading', { name: /^Pedido #\d+$/ })
-  ).toBeVisible();
+    await expect(firstOrder).toBeVisible();
 
-  await expect(page.getByText('Detalle', { exact: true })).toBeVisible();
-});
+    await firstOrder.click();
+
+    await expect(
+      page.getByRole('heading', {
+        name: /^Pedido #\d+$/,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByText('Detalle', {
+        exact: true,
+      }),
+    ).toBeVisible();
+  },
+);

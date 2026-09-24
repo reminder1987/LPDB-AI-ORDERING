@@ -1,88 +1,115 @@
 import { test, expect } from '@playwright/test';
 
-test('Dashboard permite confirmar un pedido', async ({ page, request }) => {
-  const apiBaseUrl = 'http://127.0.0.1:8000';
+import {
+  API_BASE_URL,
+  authenticateDashboardPage,
+  getTenantHeaders,
+} from './support/auth';
 
-  let orderId: number | null = null;
+test(
+  'Dashboard permite confirmar un pedido',
+  async ({ page, request }) => {
+    let orderId: number | null = null;
+    let accessToken: string | null = null;
 
-  try {
-    const createResponse = await request.post(`${apiBaseUrl}/orders/`, {
-      headers: {
-        'X-Tenant': 'lpdb',
-      },
-      data: {
-        customer_name: 'E2E Dashboard Status Test',
-        location_id: 1,
-        items: [
-          {
-            product: 'PERRO DEL BARRIO',
-            quantity: 1,
-            modifications: [],
-            combo_requested: false,
-          },
-        ],
-      },
-    });
+    try {
+      accessToken = await authenticateDashboardPage(
+        page,
+        request,
+      );
 
-    expect(createResponse.ok()).toBeTruthy();
-
-    const createdOrder = await createResponse.json();
-
-    orderId = createdOrder.order.id;
-
-    expect(orderId).toBeGreaterThan(0);
-
-    await page.goto('/');
-
-    await expect(
-      page.getByRole('heading', { name: 'Pedidos', exact: true })
-    ).toBeVisible();
-
-    const order = page.locator('tbody tr[role="button"]').filter({
-      hasText: `#${orderId}`,
-    });
-
-    await expect(order).toBeVisible();
-
-    await expect(
-      order.getByText('Nuevo', { exact: true })
-    ).toBeVisible();
-
-    await order.click();
-
-    const detail = page.locator('aside').filter({
-      has: page.getByRole('heading', {
-        name: `Pedido #${orderId}`,
-        exact: true,
-      }),
-    });
-
-    await expect(
-      page.getByRole('heading', {
-        name: `Pedido #${orderId}`,
-        exact: true,
-      })
-    ).toBeVisible();
-
-    await page.getByRole('button', {
-      name: 'Confirmar pedido',
-    }).click();
-
-    await expect(
-      detail.getByText('Confirmado', { exact: true })
-    ).toBeVisible();
-  } finally {
-    if (orderId !== null) {
-      const deleteResponse = await request.delete(
-        `${apiBaseUrl}/orders/${orderId}`,
+      const createResponse = await request.post(
+        `${API_BASE_URL}/orders/`,
         {
           headers: {
             'X-Tenant': 'lpdb',
           },
+          data: {
+            customer_name: 'E2E Dashboard Status Test',
+            location_id: 1,
+            items: [
+              {
+                product: 'PERRO DEL BARRIO',
+                quantity: 1,
+                modifications: [],
+                combo_requested: false,
+              },
+            ],
+          },
         },
       );
 
-      expect(deleteResponse.status()).toBe(204);
+      expect(createResponse.ok()).toBeTruthy();
+
+      const createdOrder = await createResponse.json();
+
+      orderId = createdOrder.order.id;
+
+      expect(orderId).toBeGreaterThan(0);
+
+      await page.goto('/');
+
+      await expect(
+        page.getByRole('heading', {
+          name: 'Pedidos',
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      const order = page
+        .locator('tbody tr[role="button"]')
+        .filter({
+          hasText: `#${orderId}`,
+        });
+
+      await expect(order).toBeVisible();
+
+      await expect(
+        order.getByText('Nuevo', {
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      await order.click();
+
+      const detail = page
+        .locator('aside')
+        .filter({
+          has: page.getByRole('heading', {
+            name: `Pedido #${orderId}`,
+            exact: true,
+          }),
+        });
+
+      await expect(
+        page.getByRole('heading', {
+          name: `Pedido #${orderId}`,
+          exact: true,
+        }),
+      ).toBeVisible();
+
+      await page
+        .getByRole('button', {
+          name: 'Confirmar pedido',
+        })
+        .click();
+
+      await expect(
+        detail.getByText('Confirmado', {
+          exact: true,
+        }),
+      ).toBeVisible();
+    } finally {
+      if (orderId !== null && accessToken !== null) {
+        const deleteResponse = await request.delete(
+          `${API_BASE_URL}/orders/${orderId}`,
+          {
+            headers: getTenantHeaders(accessToken),
+          },
+        );
+
+        expect(deleteResponse.status()).toBe(204);
+      }
     }
-  }
-});
+  },
+);

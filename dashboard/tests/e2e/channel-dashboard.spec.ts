@@ -1,273 +1,247 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'child_process';
+import { createHmac } from 'node:crypto';
 
-test('Canal crea pedido y Dashboard lo recibe y confirma', async ({
-  page,
-  request,
-}) => {
-  const apiBaseUrl = 'http://127.0.0.1:8000';
+import {
+  API_BASE_URL,
+  authenticateDashboardPage,
+  getTenantHeaders,
+} from './support/auth';
 
-  const uniqueId = Date.now();
+function buildWebhookSignature(
+  payload: string,
+  secret: string,
+): string {
+  const digest = createHmac('sha256', secret)
+    .update(payload, 'utf8')
+    .digest('hex');
 
-  const businessExternalId =
-    `e2e-dashboard-business-${uniqueId}`;
+  return `sha256=${digest}`;
+}
 
-  const customerExternalId =
-    `e2e-dashboard-customer-${uniqueId}`;
+test(
+  'Canal crea pedido y Dashboard lo recibe y confirma',
+  async ({ page, request }) => {
+    const uniqueId = Date.now();
 
-  const sessionId =
-    `e2e-dashboard-session-${uniqueId}`;
+    const businessExternalId =
+      `e2e-dashboard-business-${uniqueId}`;
 
-  let orderId: number | null = null;
+    const customerExternalId =
+      `e2e-dashboard-customer-${uniqueId}`;
 
-  const projectRoot = process.cwd().endsWith('dashboard')
-    ? '..'
-    : '.';
+    const sessionId =
+      `e2e-dashboard-session-${uniqueId}`;
 
-  try {
-    // ========================================================
-    // 1. CREAR INTEGRACIÓN DE CANAL PARA LA PRUEBA
-    // ========================================================
+    let orderId: number | null = null;
+    let accessToken: string | null = null;
+    let webhookSecret: string | null = null;
 
-    execFileSync(
-      'python',
-      [
-        '-c',
-        `
+    const projectRoot = process.cwd().endsWith('dashboard')
+      ? '..'
+      : '.';
+
+    async function sendChannelMessage(
+      message: string,
+    ) {
+      if (!webhookSecret) {
+        throw new Error(
+          'Webhook secret was not initialized.',
+        );
+      }
+
+      const payload = {
+        provider: 'meta',
+        business_external_id: businessExternalId,
+        external_id: customerExternalId,
+        session_id: sessionId,
+        customer_name: 'E2E Channel Dashboard Test',
+        message,
+        phone: '3050000099',
+        email: 'e2e-channel-dashboard@example.com',
+      };
+
+      const rawBody = JSON.stringify(payload);
+
+      return request.post(
+        `${API_BASE_URL}/webhooks/whatsapp`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Webhook-Signature':
+              buildWebhookSignature(
+                rawBody,
+                webhookSecret,
+              ),
+          },
+          data: rawBody,
+        },
+      );
+    }
+
+    try {
+      accessToken = await authenticateDashboardPage(
+        page,
+        request,
+      );
+
+      const secretOutput = execFileSync(
+        'python',
+        [
+          '-c',
+          `
 from app.services.channel_integration_service import ChannelIntegrationService
 
 service = ChannelIntegrationService()
 
-service.create_integration(
+integration = service.create_integration(
     tenant_id=1,
     channel="whatsapp",
     provider="meta",
     external_id="${businessExternalId}",
 )
+
+print(integration.webhook_secret)
 `,
-      ],
-      {
-        cwd: projectRoot,
-        stdio: 'inherit',
-      },
-    );
-
-    // ========================================================
-    // 2. WHATSAPP → PRIMER MENSAJE
-    // ========================================================
-
-    const channelResponse = await request.post(
-      `${apiBaseUrl}/webhooks/whatsapp`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
+        ],
+        {
+          cwd: projectRoot,
+          encoding: 'utf8',
         },
-        data: {
-          provider: 'meta',
-          business_external_id: businessExternalId,
-          external_id: customerExternalId,
-          session_id: sessionId,
-          customer_name: 'E2E Channel Dashboard Test',
-          message: 'Quiero un perro del barrio',
-          phone: '3050000099',
-          email: 'e2e-channel-dashboard@example.com',
-        },
-      },
-    );
+      );
 
-    expect(channelResponse.ok()).toBeTruthy();
+      webhookSecret = secretOutput.trim();
 
-    const channelResult = await channelResponse.json();
+      expect(webhookSecret.length).toBeGreaterThan(0);
 
-    expect(channelResult.customer_id).toBeGreaterThan(0);
-    expect(channelResult.status).toBe('needs_input');
+      const channelResponse =
+        await sendChannelMessage(
+          'Quiero un perro del barrio',
+        );
 
-    // ========================================================
-    // 3. WHATSAPP → SEDE
-    // ========================================================
+      expect(channelResponse.ok()).toBeTruthy();
 
-    const locationResponse = await request.post(
-      `${apiBaseUrl}/webhooks/whatsapp`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        data: {
-          provider: 'meta',
-          business_external_id: businessExternalId,
-          external_id: customerExternalId,
-          session_id: sessionId,
-          customer_name: 'E2E Channel Dashboard Test',
-          message: 'Dirty Rabbit',
-          phone: '3050000099',
-          email: 'e2e-channel-dashboard@example.com',
-        },
-      },
-    );
+      const channelResult =
+        await channelResponse.json();
 
-    expect(locationResponse.ok()).toBeTruthy();
+      expect(
+        channelResult.customer_id,
+      ).toBeGreaterThan(0);
 
-    // ========================================================
-    // 4. WHATSAPP → NO COMBO
-    // ========================================================
+      expect(
+        channelResult.status,
+      ).toBe('needs_input');
 
-    const comboResponse = await request.post(
-      `${apiBaseUrl}/webhooks/whatsapp`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        data: {
-          provider: 'meta',
-          business_external_id: businessExternalId,
-          external_id: customerExternalId,
-          session_id: sessionId,
-          customer_name: 'E2E Channel Dashboard Test',
-          message: 'NO',
-          phone: '3050000099',
-          email: 'e2e-channel-dashboard@example.com',
-        },
-      },
-    );
+      const locationResponse =
+        await sendChannelMessage('Dirty Rabbit');
 
-    expect(comboResponse.ok()).toBeTruthy();
+      expect(locationResponse.ok()).toBeTruthy();
 
-    // ========================================================
-    // 5. WHATSAPP → CONFIRMACIÓN DEL PEDIDO
-    // ========================================================
+      const comboResponse =
+        await sendChannelMessage('NO');
 
-    const confirmationResponse = await request.post(
-      `${apiBaseUrl}/webhooks/whatsapp`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        data: {
-          provider: 'meta',
-          business_external_id: businessExternalId,
-          external_id: customerExternalId,
-          session_id: sessionId,
-          customer_name: 'E2E Channel Dashboard Test',
-          message: 'SI',
-          phone: '3050000099',
-          email: 'e2e-channel-dashboard@example.com',
-        },
-      },
-    );
+      expect(comboResponse.ok()).toBeTruthy();
 
-    expect(confirmationResponse.ok()).toBeTruthy();
+      const confirmationResponse =
+        await sendChannelMessage('SI');
 
-    const confirmationResult =
-      await confirmationResponse.json();
+      expect(
+        confirmationResponse.ok(),
+      ).toBeTruthy();
 
-    // ========================================================
-    // 6. VALIDAR PEDIDO DEVUELTO POR EL CANAL
-    //
-    // WhatsAppAdapter aplana response.data mediante:
-    //
-    //     result.update(response.data)
-    //
-    // Por eso "order" está directamente en la respuesta.
-    // ========================================================
+      const confirmationResult =
+        await confirmationResponse.json();
 
-    expect(confirmationResult.status).toBe('ready');
-    expect(confirmationResult.order).toBeDefined();
-    expect(confirmationResult.order.id).toBeGreaterThan(0);
+      expect(
+        confirmationResult.status,
+      ).toBe('ready');
 
-    orderId = confirmationResult.order.id;
+      expect(
+        confirmationResult.order,
+      ).toBeDefined();
 
-    // ========================================================
-    // 7. DASHBOARD → VERIFICAR QUE RECIBE EL MISMO PEDIDO
-    // ========================================================
+      expect(
+        confirmationResult.order.id,
+      ).toBeGreaterThan(0);
 
-    await page.goto('/');
+      orderId = confirmationResult.order.id;
 
-    await expect(
-      page.getByRole('heading', {
-        name: 'Pedidos',
-        exact: true,
-      }),
-    ).toBeVisible();
+      await page.goto('/');
 
-    const order = page
-      .locator('tbody tr[role="button"]')
-      .filter({
-        hasText: `#${orderId}`,
-      });
+      await expect(
+        page.getByRole('heading', {
+          name: 'Pedidos',
+          exact: true,
+        }),
+      ).toBeVisible();
 
-    await expect(order).toBeVisible();
+      const order = page
+        .locator('tbody tr[role="button"]')
+        .filter({
+          hasText: `#${orderId}`,
+        });
 
-    await expect(
-      order.getByText('Nuevo', {
-        exact: true,
-      }),
-    ).toBeVisible();
+      await expect(order).toBeVisible();
 
-    // ========================================================
-    // 8. DASHBOARD → ABRIR DETALLE
-    // ========================================================
+      await expect(
+        order.getByText('Nuevo', {
+          exact: true,
+        }),
+      ).toBeVisible();
 
-    await order.click();
+      await order.click();
 
-    await expect(
-      page.getByRole('heading', {
-        name: `Pedido #${orderId}`,
-        exact: true,
-      }),
-    ).toBeVisible();
-
-    // ========================================================
-    // 9. DASHBOARD → CONFIRMAR PEDIDO
-    // ========================================================
-
-    await page
-      .getByRole('button', {
-        name: 'Confirmar pedido',
-      })
-      .click();
-
-    const detail = page
-      .locator('aside')
-      .filter({
-        has: page.getByRole('heading', {
+      await expect(
+        page.getByRole('heading', {
           name: `Pedido #${orderId}`,
           exact: true,
         }),
-      });
+      ).toBeVisible();
 
-    await expect(
-      detail.getByText('Confirmado', {
-        exact: true,
-      }),
-    ).toBeVisible();
-  } finally {
-    // ========================================================
-    // 10. LIMPIEZA DEL PEDIDO
-    // ========================================================
+      await page
+        .getByRole('button', {
+          name: 'Confirmar pedido',
+        })
+        .click();
 
-    if (orderId !== null) {
-      const deleteResponse =
-        await request.delete(
-          `${apiBaseUrl}/orders/${orderId}`,
-          {
-            headers: {
-              'X-Tenant': 'lpdb',
+      const detail = page
+        .locator('aside')
+        .filter({
+          has: page.getByRole('heading', {
+            name: `Pedido #${orderId}`,
+            exact: true,
+          }),
+        });
+
+      await expect(
+        detail.getByText('Confirmado', {
+          exact: true,
+        }),
+      ).toBeVisible();
+    } finally {
+      if (
+        orderId !== null &&
+        accessToken !== null
+      ) {
+        const deleteResponse =
+          await request.delete(
+            `${API_BASE_URL}/orders/${orderId}`,
+            {
+              headers:
+                getTenantHeaders(accessToken),
             },
-          },
-        );
+          );
 
-      expect(deleteResponse.status()).toBe(204);
-    }
+        expect(
+          deleteResponse.status(),
+        ).toBe(204);
+      }
 
-    // ========================================================
-    // 11. LIMPIEZA DE LA INTEGRACIÓN DE PRUEBA
-    // ========================================================
-
-    execFileSync(
-      'python',
-      [
-        '-c',
-        `
+      execFileSync(
+        'python',
+        [
+          '-c',
+          `
 from app.core.database import SessionLocal
 from app.models.channel_integration_db import ChannelIntegrationDB
 from sqlalchemy import delete
@@ -280,17 +254,16 @@ try:
             ChannelIntegrationDB.external_id == "${businessExternalId}"
         )
     )
-
     db.commit()
-
 finally:
     db.close()
 `,
-      ],
-      {
-        cwd: projectRoot,
-        stdio: 'inherit',
-      },
-    );
-  }
-});
+        ],
+        {
+          cwd: projectRoot,
+          stdio: 'inherit',
+        },
+      );
+    }
+  },
+);

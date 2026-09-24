@@ -1,11 +1,29 @@
 import { test, expect } from '@playwright/test';
 
-test('Dashboard carga la lista de pedidos', async ({ page }) => {
-  await page.goto('/');
+import {
+  authenticateDashboardPage,
+} from './support/auth';
 
-  await expect(
-    page.getByRole('heading', { name: 'Pedidos', exact: true })
-  ).toBeVisible();
+test(
+  'Dashboard carga la lista de pedidos',
+  async ({ page, request }) => {
+    await authenticateDashboardPage(page, request);
 
-  await expect(page.locator('body')).toContainText(/pedidos/i);
-});
+    await page.goto('/');
+
+    await expect(
+      page.getByRole('heading', {
+        name: 'Pedidos',
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      page.locator('tbody tr[role="button"]').first(),
+    ).toBeVisible();
+
+    await expect(
+      page.locator('body'),
+    ).toContainText(/pedidos/i);
+  },
+);
