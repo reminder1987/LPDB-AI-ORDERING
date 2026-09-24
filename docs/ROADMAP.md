@@ -1183,7 +1183,7 @@ Crear servicios/endpoints necesarios para que el dashboard consuma
 información operativa real sin acoplarse directamente a detalles internos
 de proveedores externos.
 
-## CHECKPOINT ? CIERRE 20.5 OPERATIONAL DATA LAYER
+## CHECKPOINT — CIERRE 20.5 OPERATIONAL DATA LAYER
 
 Estado: **COMPLETADA / CERRADA**
 
@@ -1211,7 +1211,7 @@ Validaci?n final:
 
 Punto exacto de reanudaci?n:
 
-**20.6 ? Arquitectura final del dashboard**
+**20.6 — Arquitectura final del dashboard**
 
 No reabrir 20.5 salvo que una regresi?n demuestre un defecto real.
 
