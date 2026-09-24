@@ -1,4 +1,4 @@
-# LPDB-AI-ORDERING â€” ROADMAP OFICIAL
+# LPDB-AI-ORDERING — ROADMAP OFICIAL
 
 ## Fuente de verdad del proyecto
 
@@ -14,23 +14,23 @@ Este documento es la fuente oficial del orden, alcance y estado de las fases del
 
 4. Cada fase debe tener objetivo, alcance, pruebas y criterio de cierre antes de marcarse como completada.
 
-5. Si la conversaciÃ³n y este documento presentan una contradicciÃ³n, primero se revisa el repositorio y se actualiza este documento de forma explÃ­cita antes de continuar.
+5. Si la conversación y este documento presentan una contradicción, primero se revisa el repositorio y se actualiza este documento de forma explícita antes de continuar.
 
-6. El cÃ³digo de producciÃ³n debe permanecer alineado con el roadmap y cada hito importante debe quedar versionado en GitHub.
+6. El código de producción debe permanecer alineado con el roadmap y cada hito importante debe quedar versionado en GitHub.
 
 ---
 
 # ESTADO ACTUAL
 
-Fase actual: 19 â€” Integraciones externas
+Fase actual: 19 — Integraciones externas
 
-Estado: EN IMPLEMENTACIÃ“N AVANZADA â€” TOAST
+Estado: EN IMPLEMENTACIÓN AVANZADA — TOAST
 
-Base funcional previa: ordering, conversaciÃ³n/agente, multi-tenant, canales y submission E2E ya implementados.
+Base funcional previa: ordering, conversación/agente, multi-tenant, canales y submission E2E ya implementados.
 
 Hito transversal completado: Tenant Isolation
 
-Ãšltimo checkpoint funcional confirmado: 1a13959 â€” map combos and beverages into Toast payload
+Último checkpoint funcional confirmado: 1a13959 — map combos and beverages into Toast payload
 
 Rama de trabajo actual: feature/orderdb-tenant
 
@@ -40,49 +40,49 @@ Rama principal: master
 
 # FASES DEL PROYECTO
 
-## FASE 01 â€” Fundamentos del proyecto
+## FASE 01 — Fundamentos del proyecto
 
 **Estado:** COMPLETADA
 
-## FASE 02 â€” API / CRUD inicial
+## FASE 02 — API / CRUD inicial
 
 **Estado:** COMPLETADA
 
-## FASE 03 â€” PostgreSQL
+## FASE 03 — PostgreSQL
 
 **Estado:** COMPLETADA
 
-## FASE 04 â€” Modelado de catÃ¡logo
+## FASE 04 — Modelado de catálogo
 
 **Estado:** COMPLETADA
 
-## FASE 05 â€” Productos / recetas
+## FASE 05 — Productos / recetas
 
 **Estado:** COMPLETADA
 
-## FASE 06 â€” Sedes / disponibilidad
+## FASE 06 — Sedes / disponibilidad
 
 **Estado:** COMPLETADA
 
-## FASE 07 â€” Modificaciones
+## FASE 07 — Modificaciones
 
 **Estado:** COMPLETADA
 
 Reglas y persistencia de `ADD`, `REMOVE` y `BASE_CHANGE`.
 
-## FASE 08 â€” Agent / Intent / conversaciÃ³n
+## FASE 08 — Agent / Intent / conversación
 
 **Estado:** COMPLETADA
 
-InterpretaciÃ³n de mensajes, productos, cantidades, modificaciones, combos y flujo conversacional.
+Interpretación de mensajes, productos, cantidades, modificaciones, combos y flujo conversacional.
 
-## FASE 09 â€” IntegraciÃ³n completa de ordering
+## FASE 09 — Integración completa de ordering
 
 **Estado:** COMPLETADA
 
-IntegraciÃ³n de catÃ¡logo, modificaciones, disponibilidad, sedes, conversaciÃ³n y persistencia.
+Integración de catálogo, modificaciones, disponibilidad, sedes, conversación y persistencia.
 
-## FASE 10 â€” Precio final
+## FASE 10 — Precio final
 
 **Estado:** COMPLETADA
 
@@ -92,33 +92,33 @@ IntegraciÃ³n de catÃ¡logo, modificaciones, disponibilidad, sedes, conversaci
 
 - `REMOVE` sin costo adicional.
 
-- `BASE_CHANGE` segÃºn producto/base resultante.
+- `BASE_CHANGE` según producto/base resultante.
 
 - Cantidades.
 
-- MÃºltiples productos.
+- Múltiples productos.
 
 - Combos y bebida.
 
 - Subtotal y total consistentes.
 
-- No inventar precios de combo mientras no estÃ©n definidos.
+- No inventar precios de combo mientras no estén definidos.
 
-## FASE 11 â€” Disponibilidad real
+## FASE 11 — Disponibilidad real
 
 **Estado:** COMPLETADA
 
 - Producto disponible/no disponible.
 
-- Ingredientes y modificaciones segÃºn disponibilidad.
+- Ingredientes y modificaciones según disponibilidad.
 
 - Bebidas disponibles.
 
-- ValidaciÃ³n antes de crear la orden.
+- Validación antes de crear la orden.
 
-- IntegraciÃ³n con el flujo conversacional.
+- Integración con el flujo conversacional.
 
-## FASE 12 â€” Consulta de pedidos
+## FASE 12 — Consulta de pedidos
 
 **Estado:** COMPLETADA
 
@@ -146,7 +146,7 @@ IntegraciÃ³n de catÃ¡logo, modificaciones, disponibilidad, sedes, conversaci
 
 - Pedidos con `BASE_CHANGE`.
 
-- MÃºltiples items.
+- Múltiples items.
 
 - Combos y bebidas.
 
@@ -158,27 +158,27 @@ IntegraciÃ³n de catÃ¡logo, modificaciones, disponibilidad, sedes, conversaci
 
 ### Checkpoint
 
-`221116b` â€” `feat: completar consultas de pedidos fase 12`
+`221116b` — `feat: completar consultas de pedidos fase 12`
 
 ---
 
-# HITO TRANSVERSAL â€” TENANT ISOLATION
+# HITO TRANSVERSAL — TENANT ISOLATION
 
 Estado: COMPLETADO
 
-Este hito establece el aislamiento multi-tenant transversal del backend antes de avanzar hacia la capa de interacciÃ³n del producto.
+Este hito establece el aislamiento multi-tenant transversal del backend antes de avanzar hacia la capa de interacción del producto.
 
 ## Alcance implementado
 
-ResoluciÃ³n del tenant mediante el header HTTP X-Tenant.
+Resolución del tenant mediante el header HTTP X-Tenant.
 
 TenantContext como contexto de negocio.
 
 Tenant obligatorio en los endpoints protegidos.
 
-ValidaciÃ³n de tenant inexistente o inactivo.
+Validación de tenant inexistente o inactivo.
 
-PropagaciÃ³n del tenant_id desde la capa HTTP hacia los servicios.
+Propagación del tenant_id desde la capa HTTP hacia los servicios.
 
 Aislamiento de productos por tenant.
 
@@ -186,7 +186,7 @@ Aislamiento de disponibilidad por tenant.
 
 Aislamiento de sedes por tenant.
 
-Aislamiento de Ã³rdenes y sesiones conversacionales por tenant.
+Aislamiento de órdenes y sesiones conversacionales por tenant.
 
 Validaciones de disponibilidad conscientes de tenant.
 
@@ -194,113 +194,113 @@ Persistencia de tenant_id donde corresponde en el dominio de ordering.
 
 ## Validaciones realizadas
 
-GET /products/ con X-Tenant: lpdb â†’ correcto.
+GET /products/ con X-Tenant: lpdb → correcto.
 
-GET /products/ sin X-Tenant â†’ rechazado.
+GET /products/ sin X-Tenant → rechazado.
 
-GET /products/ con tenant inexistente â†’ rechazado.
+GET /products/ con tenant inexistente → rechazado.
 
-GET /availability/1/1 con X-Tenant: lpdb â†’ correcto.
+GET /availability/1/1 con X-Tenant: lpdb → correcto.
 
-GET /availability/1/1 sin X-Tenant â†’ rechazado.
+GET /availability/1/1 sin X-Tenant → rechazado.
 
-VerificaciÃ³n de consistencia entre ingredientes y sedes.
+Verificación de consistencia entre ingredientes y sedes.
 
 Pruebas del flujo conversacional con tenant.
 
-CompilaciÃ³n de los mÃ³dulos API modificados.
+Compilación de los módulos API modificados.
 
-git diff --check â†’ limpio.
+git diff --check → limpio.
 
 ## Checkpoints Git
 
-a9f290b â€” Add tenant context to conversation orders
+a9f290b — Add tenant context to conversation orders
 
-333413d â€” Enforce tenant context on product and availability APIs
+333413d — Enforce tenant context on product and availability APIs
 
 ## Criterio de cierre
 
-El backend cuenta con un contexto de tenant explÃ­cito y las APIs auditadas no pueden operar sin un tenant vÃ¡lido. El hito queda cerrado y respaldado en GitHub.
+El backend cuenta con un contexto de tenant explícito y las APIs auditadas no pueden operar sin un tenant válido. El hito queda cerrado y respaldado en GitHub.
 
 ---
 
-# FASE 13 â€” Canal de cliente, agente IA y dashboard operativo
+# FASE 13 — Canal de cliente, agente IA y dashboard operativo
 
 **Estado:** BASE FUNCIONAL IMPLEMENTADA
 
 ## Objetivo
 
-Construir la capa de interacciÃ³n del producto alrededor de la visiÃ³n real del negocio:
+Construir la capa de interacción del producto alrededor de la visión real del negocio:
 
-> El cliente no necesita descargar una aplicaciÃ³n nueva. El canal principal del cliente serÃ¡ WhatsApp, donde conversa con el agente de IA. El agente entiende y valida el pedido, confirma la orden y conduce el flujo hasta el pago mediante Toast. Una vez confirmado el pago, el pedido queda listo para el flujo operativo de Toast y su envÃ­o a cocina/KDS segÃºn la configuraciÃ³n del restaurante.
+> El cliente no necesita descargar una aplicación nueva. El canal principal del cliente será WhatsApp, donde conversa con el agente de IA. El agente entiende y valida el pedido, confirma la orden y conduce el flujo hasta el pago mediante Toast. Una vez confirmado el pago, el pedido queda listo para el flujo operativo de Toast y su envío a cocina/KDS según la configuración del restaurante.
 
-La interfaz web no serÃ¡ el frontend principal del cliente. El frontend web de esta fase serÃ¡ principalmente un **dashboard operativo para el restaurante/administrador**.
+La interfaz web no será el frontend principal del cliente. El frontend web de esta fase será principalmente un **dashboard operativo para el restaurante/administrador**.
 
 ## Arquitectura conceptual
 
 ```text
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  CLIENTE
+                    CLIENTE
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚ WhatsApp
+                       │ WhatsApp
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+              ┌─────────────────┐
 
-Â  Â  Â  Â  Â  Â  Â  â”‚ Â AGENTE DE IA Â  â”‚
+              │  AGENTE DE IA   │
 
-Â  Â  Â  Â  Â  Â  Â  â”‚ Â  Â WHATSAPP Â  Â  â”‚
+              │    WHATSAPP     │
 
-Â  Â  Â  Â  Â  Â  Â  â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+              └────────┬────────┘
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  CATÃLOGO / PRECIOS
+              CATÁLOGO / PRECIOS
 
-Â  Â  Â  Â  Â  Â  Â  DISPONIBILIDAD
+              DISPONIBILIDAD
 
-Â  Â  Â  Â  Â  Â  Â  MODIFICACIONES
+              MODIFICACIONES
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â CONFIRMA ORDEN
+                 CONFIRMA ORDEN
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â INTEGRACIÃ“N TOAST
+                 INTEGRACIÓN TOAST
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  PAGO EN TOAST
+                  PAGO EN TOAST
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  ORDEN PAGADA
+                ORDEN PAGADA
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â TOAST / KDS
+                 TOAST / KDS
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â”‚
+                       │
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â–¼
+                       ▼
 
-Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  COCINA
+                    COCINA
 
 ```
 
@@ -310,57 +310,57 @@ En paralelo:
 
 RESTAURANTE
 
-Â  Â  Â â”‚
+     │
 
-Â  Â  Â â–¼
+     ▼
 
 DASHBOARD WEB
 
-Â  Â  Â â”‚
+     │
 
-Â  Â  Â â”œâ”€â”€ Pedidos
+     ├── Pedidos
 
-Â  Â  Â â”œâ”€â”€ Productos
+     ├── Productos
 
-Â  Â  Â â”œâ”€â”€ Precios
+     ├── Precios
 
-Â  Â  Â â”œâ”€â”€ Disponibilidad
+     ├── Disponibilidad
 
-Â  Â  Â â”œâ”€â”€ Sedes
+     ├── Sedes
 
-Â  Â  Â â””â”€â”€ ConfiguraciÃ³n
+     └── Configuración
 
 ```
 
 ## 13.1 Canal WhatsApp
 
-Definir e implementar el canal mediante el cual los clientes conversarÃ¡n con el agente sin instalar una aplicaciÃ³n nueva.
+Definir e implementar el canal mediante el cual los clientes conversarán con el agente sin instalar una aplicación nueva.
 
 Debe contemplar:
 
-- RecepciÃ³n de mensajes.
+- Recepción de mensajes.
 
-- EnvÃ­o de respuestas.
+- Envío de respuestas.
 
-- IdentificaciÃ³n de cliente/conversaciÃ³n.
+- Identificación de cliente/conversación.
 
-- Persistencia de sesiÃ³n.
+- Persistencia de sesión.
 
 - Manejo de errores del canal.
 
-- ConfirmaciÃ³n conversacional del pedido.
+- Confirmación conversacional del pedido.
 
-El proveedor concreto de WhatsApp queda pendiente de decisiÃ³n tÃ©cnica antes de implementar la integraciÃ³n.
+El proveedor concreto de WhatsApp queda pendiente de decisión técnica antes de implementar la integración.
 
-## 13.2 Agente de IA / conversaciÃ³n
+## 13.2 Agente de IA / conversación
 
-Reutilizar el motor existente de `/agent/message` y `conversation_service` como nÃºcleo de interpretaciÃ³n y conversaciÃ³n.
+Reutilizar el motor existente de `/agent/message` y `conversation_service` como núcleo de interpretación y conversación.
 
-El canal externo no debe duplicar la lÃ³gica de intent, modificaciones, disponibilidad ni precios.
+El canal externo no debe duplicar la lógica de intent, modificaciones, disponibilidad ni precios.
 
-## 13.3 ConfirmaciÃ³n del pedido
+## 13.3 Confirmación del pedido
 
-El cliente debe recibir una representaciÃ³n clara del pedido antes del pago, incluyendo cuando corresponda:
+El cliente debe recibir una representación clara del pedido antes del pago, incluyendo cuando corresponda:
 
 - Productos.
 
@@ -378,9 +378,9 @@ El cliente debe recibir una representaciÃ³n clara del pedido antes del pago, i
 
 ## 13.4 Toast como sistema de pago y POS
 
-**No se construirÃ¡ una pasarela de pagos propia para el producto.**
+**No se construirá una pasarela de pagos propia para el producto.**
 
-La arquitectura objetivo es integrar Toast para que el pedido pueda entrar en su ecosistema de POS/pagos. Toast serÃ¡ la referencia externa para el precio final y el flujo de pago, sujeto a los permisos, capacidades y configuraciÃ³n del restaurante y de la integraciÃ³n aprobada por Toast.
+La arquitectura objetivo es integrar Toast para que el pedido pueda entrar en su ecosistema de POS/pagos. Toast será la referencia externa para el precio final y el flujo de pago, sujeto a los permisos, capacidades y configuración del restaurante y de la integración aprobada por Toast.
 
 Flujo objetivo:
 
@@ -388,33 +388,33 @@ Flujo objetivo:
 
 pedido interpretado por LPDB
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â  Â integraciÃ³n Toast
+   integración Toast
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â precio/check de Toast
+ precio/check de Toast
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â confirmaciÃ³n del cliente
+ confirmación del cliente
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â  Â  Â pago en Toast
+     pago en Toast
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â  Â  pago confirmado
+    pago confirmado
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â Toast / fulfillment
+ Toast / fulfillment
 
-Â  Â  Â  Â  Â  â†“
+          ↓
 
-Â  Â  Â  KDS / cocina
+      KDS / cocina
 
 ```
 
@@ -422,13 +422,13 @@ LPDB no debe almacenar datos sensibles de tarjetas ni convertirse en procesador 
 
 ## 13.5 Toast y cocina
 
-La integraciÃ³n deberÃ¡ diseÃ±arse para que, despuÃ©s de que el pedido estÃ© correctamente creado y pagado segÃºn el flujo de Toast, Toast pueda ejecutar su flujo normal de fulfillment y envÃ­o a cocina/KDS cuando el restaurante tenga configurado el comportamiento correspondiente.
+La integración deberá diseñarse para que, después de que el pedido esté correctamente creado y pagado según el flujo de Toast, Toast pueda ejecutar su flujo normal de fulfillment y envío a cocina/KDS cuando el restaurante tenga configurado el comportamiento correspondiente.
 
-No se debe asumir que todo pedido serÃ¡ enviado automÃ¡ticamente a cocina: esto depende de la configuraciÃ³n y capacidades de Toast/KDS del restaurante y deberÃ¡ verificarse durante la integraciÃ³n.
+No se debe asumir que todo pedido será enviado automáticamente a cocina: esto depende de la configuración y capacidades de Toast/KDS del restaurante y deberá verificarse durante la integración.
 
 ## 13.6 Dashboard web del restaurante
 
-Construir una interfaz web para operaciÃ³n y administraciÃ³n, no como requisito de descarga para el cliente.
+Construir una interfaz web para operación y administración, no como requisito de descarga para el cliente.
 
 Debe contemplar inicialmente:
 
@@ -446,9 +446,9 @@ Debe contemplar inicialmente:
 
 - Sedes.
 
-- ConfiguraciÃ³n operativa necesaria.
+- Configuración operativa necesaria.
 
-## 13.7 IntegraciÃ³n externa preparada
+## 13.7 Integración externa preparada
 
 La fase debe definir contratos internos limpios para:
 
@@ -456,19 +456,19 @@ La fase debe definir contratos internos limpios para:
 
 LPDB Core
 
-Â  Â  â†“
+    ↓
 
 Integration Layer
 
-Â  Â  â”œâ”€â”€ WhatsApp
+    ├── WhatsApp
 
-Â  Â  â””â”€â”€ Toast
+    └── Toast
 
 ```
 
-La implementaciÃ³n completa y endurecimiento de las integraciones externas continÃºa en la Fase 19 cuando corresponda.
+La implementación completa y endurecimiento de las integraciones externas continúa en la Fase 19 cuando corresponda.
 
-## Principios arquitectÃ³nicos
+## Principios arquitectónicos
 
 1. **WhatsApp es la interfaz principal del cliente.**
 
@@ -476,15 +476,15 @@ La implementaciÃ³n completa y endurecimiento de las integraciones externas con
 
 3. **Toast es el sistema externo objetivo para POS y pagos; LPDB no implementa una pasarela propia.**
 
-4. El backend FastAPI continÃºa siendo la fuente de verdad de la lÃ³gica de ordering de LPDB.
+4. El backend FastAPI continúa siendo la fuente de verdad de la lógica de ordering de LPDB.
 
 5. El frontend no duplica reglas de precios, disponibilidad o modificaciones.
 
-6. El canal WhatsApp no debe contener lÃ³gica de negocio que deba vivir en los servicios del backend.
+6. El canal WhatsApp no debe contener lógica de negocio que deba vivir en los servicios del backend.
 
-7. Las integraciones externas deben aislarse mediante una capa de integraciÃ³n.
+7. Las integraciones externas deben aislarse mediante una capa de integración.
 
-8. No se implementarÃ¡ una app mÃ³vil nativa como requisito del producto salvo decisiÃ³n explÃ­cita posterior.
+8. No se implementará una app móvil nativa como requisito del producto salvo decisión explícita posterior.
 
 ## Backend existente que alimenta esta fase
 
@@ -494,11 +494,11 @@ Actualmente el backend dispone de piezas relevantes:
 
 - `/products/`
 
-- bÃºsqueda de productos
+- búsqueda de productos
 
 - consulta de recetas
 
-- validaciÃ³n de modificaciones
+- validación de modificaciones
 
 - `/availability/{location_id}/{product_id}`
 
@@ -508,31 +508,31 @@ Actualmente el backend dispone de piezas relevantes:
 
 Estas capacidades deben reutilizarse antes de crear nuevos endpoints.
 
-## Lo que NO se debe asumir todavÃ­a
+## Lo que NO se debe asumir todavía
 
-No se debe asumir sin decisiÃ³n explÃ­cita:
+No se debe asumir sin decisión explícita:
 
 - proveedor concreto de WhatsApp;
 
-- credenciales de producciÃ³n;
+- credenciales de producción;
 
 - permisos definitivos de Toast;
 
-- configuraciÃ³n definitiva de Toast Payments;
+- configuración definitiva de Toast Payments;
 
-- configuraciÃ³n de Toast KDS/auto-firing;
+- configuración de Toast KDS/auto-firing;
 
-- autenticaciÃ³n definitiva del dashboard;
+- autenticación definitiva del dashboard;
 
-- infraestructura de producciÃ³n.
+- infraestructura de producción.
 
 ## Criterio de cierre
 
-La Fase 13 se considerarÃ¡ terminada cuando:
+La Fase 13 se considerará terminada cuando:
 
-1. El canal de cliente definido estÃ© tÃ©cnicamente integrado o preparado segÃºn el alcance acordado.
+1. El canal de cliente definido esté técnicamente integrado o preparado según el alcance acordado.
 
-2. El cliente pueda iniciar y continuar una conversaciÃ³n de ordering mediante WhatsApp.
+2. El cliente pueda iniciar y continuar una conversación de ordering mediante WhatsApp.
 
 3. El agente pueda interpretar y validar el pedido usando el backend existente.
 
@@ -542,13 +542,13 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 6. Exista un dashboard web operativo para el restaurante dentro del alcance acordado.
 
-7. Exista una separaciÃ³n clara entre canal, interfaz operativa, backend y futuras integraciones externas.
+7. Exista una separación clara entre canal, interfaz operativa, backend y futuras integraciones externas.
 
 8. Las pruebas de los flujos implementados pasen y exista un checkpoint de GitHub.
 
 ---
 
-## FASE 14 â€” Pruebas integrales
+## FASE 14 — Pruebas integrales
 
 **Estado:** COMPLETADA
 
@@ -560,49 +560,49 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 - Pruebas del canal WhatsApp.
 
-- Pruebas de integraciÃ³n canal â†” API.
+- Pruebas de integración canal ↔ API.
 
 - Flujos End-to-End.
 
 - Casos positivos y negativos.
 
-- Regresiones de las Fases 10â€“13.
+- Regresiones de las Fases 10–13.
 
-- ReducciÃ³n de dependencia de pruebas manuales.
+- Reducción de dependencia de pruebas manuales.
 
-## FASE 15 â€” AutenticaciÃ³n y seguridad
+## FASE 15 — Autenticación y seguridad
 
 **Estado:** COMPLETADA
 
 ### Alcance
 
-- AutenticaciÃ³n.
+- Autenticación.
 
 - Usuarios.
 
 - Roles.
 
-- AutorizaciÃ³n.
+- Autorización.
 
-- ProtecciÃ³n de endpoints administrativos.
+- Protección de endpoints administrativos.
 
-- ProtecciÃ³n de informaciÃ³n sensible.
+- Protección de información sensible.
 
 - CORS.
 
 - Variables de entorno y secretos.
 
-- ValidaciÃ³n y controles de entrada.
+- Validación y controles de entrada.
 
 - Seguridad de webhooks y callbacks.
 
-## FASE 16 â€” Datos y migraciones de producciÃ³n
+## FASE 16 — Datos y migraciones de producción
 
 **Estado:** COMPLETADA
 
 ### Alcance
 
-- RevisiÃ³n de migraciones Alembic.
+- Revisión de migraciones Alembic.
 
 - Seeds y datos iniciales.
 
@@ -610,25 +610,25 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 - Constraints.
 
-- Ãndices necesarios.
+- Índices necesarios.
 
 - Tratamiento de datos legacy.
 
-- Backups y restauraciÃ³n.
+- Backups y restauración.
 
-- Estados de pedidos y pagos necesarios para producciÃ³n.
+- Estados de pedidos y pagos necesarios para producción.
 
-- Flujo desarrollo â†’ staging â†’ producciÃ³n.
+- Flujo desarrollo → staging → producción.
 
-## FASE 17 â€” Docker y despliegue
+## FASE 17 — Docker y despliegue
 
 **Estado:** COMPLETADA
 
 ### Alcance
 
-- ContenerizaciÃ³n del backend.
+- Contenerización del backend.
 
-- ConfiguraciÃ³n de ejecuciÃ³n para producciÃ³n.
+- Configuración de ejecución para producción.
 
 - Variables de entorno.
 
@@ -636,13 +636,13 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 - Health checks.
 
-- ConfiguraciÃ³n de servicios.
+- Configuración de servicios.
 
-- PreparaciÃ³n del dashboard para despliegue.
+- Preparación del dashboard para despliegue.
 
 - Infraestructura necesaria para webhooks.
 
-## FASE 18 â€” Staging
+## FASE 18 — Staging
 
 **Estado:** COMPLETADA
 
@@ -654,7 +654,7 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 - Base de datos de staging.
 
-- ConfiguraciÃ³n independiente de producciÃ³n.
+- Configuración independiente de producción.
 
 - Pruebas desde Internet.
 
@@ -662,143 +662,143 @@ La Fase 13 se considerarÃ¡ terminada cuando:
 
 - Smoke tests.
 
-- Correcciones antes de producciÃ³n.
+- Correcciones antes de producción.
 
 ```text
 
 GitHub
 
-Â  Â â†“
+   ↓
 
 STAGING
 
-Â  Â â†“
+   ↓
 
 PRUEBAS REALES
 
-Â  Â â†“
+   ↓
 
 CORRECCIONES
 
-Â  Â â†“
+   ↓
 
-PRODUCCIÃ“N
+PRODUCCIÓN
 
 ```
 
-## FASE 19 â€” Integraciones externas
+## FASE 19 — Integraciones externas
 
-**Estado:** EN IMPLEMENTACIÃ“N AVANZADA â€” TOAST
+**Estado:** EN IMPLEMENTACIÓN AVANZADA — TOAST
 
 ### Estado real verificado en GitHub
 
-La rama `feature/orderdb-tenant` ya contiene integraciÃ³n funcional y pruebas para submission, autenticaciÃ³n y construcciÃ³n de payloads Toast. La fase no estÃ¡ en preparaciÃ³n inicial.
+La rama `feature/orderdb-tenant` ya contiene integración funcional y pruebas para submission, autenticación y construcción de payloads Toast. La fase no está en preparación inicial.
 
 ### Implementado y versionado
 
-- Capa de integraciÃ³n externa separada del nÃºcleo de ordering.
-- Submission service y flujo E2E de envÃ­o a Toast.
-- Pruebas de integraciÃ³n Toast, cobertura multi-tenant y rutas de fallo.
-- ConfiguraciÃ³n Toast runtime por tenant.
-- AutenticaciÃ³n Toast mediante client credentials.
-- Cache de autenticaciÃ³n/token Toast por tenant.
-- ConstrucciÃ³n de payload operacional de Ã³rdenes Toast.
+- Capa de integración externa separada del núcleo de ordering.
+- Submission service y flujo E2E de envío a Toast.
+- Pruebas de integración Toast, cobertura multi-tenant y rutas de fallo.
+- Configuración Toast runtime por tenant.
+- Autenticación Toast mediante client credentials.
+- Cache de autenticación/token Toast por tenant.
+- Construcción de payload operacional de órdenes Toast.
 - Mapeos de productos y modificadores hacia Toast.
 - Payloads Toast para modificadores.
-- Persistencia de snapshots de precio y preservaciÃ³n del precio histÃ³rico.
-- PropagaciÃ³n del identificador persistente de cada order item.
-- Soporte de `BASE_CHANGE` con resoluciÃ³n del producto destino real.
+- Persistencia de snapshots de precio y preservación del precio histórico.
+- Propagación del identificador persistente de cada order item.
+- Soporte de `BASE_CHANGE` con resolución del producto destino real.
 - Persistencia de `new_product_id` y `new_product_name`.
-- MigraciÃ³n Alembic para producto destino de `BASE_CHANGE`.
-- SerializaciÃ³n y external mapping del producto destino.
-- Fixtures y pruebas AREPA DE POLLO â†’ PATACÃ“N DE POLLO.
-- ResoluciÃ³n de `BASE_CHANGE` hasta el producto efectivo enviado a Toast.
-- ResoluciÃ³n del mapping Toast correspondiente al producto destino de `BASE_CHANGE`.
-- IntegraciÃ³n de combos en el payload Toast.
-- ResoluciÃ³n de papas de combo mediante mapping de ingrediente y `optionGroup`.
-- ResoluciÃ³n de bebidas mediante mapping de producto y `productGroup`.
-- InclusiÃ³n de papas y bebida como modifiers del selection Toast.
-- ValidaciÃ³n de mappings obligatorios para combos y bebidas.
+- Migración Alembic para producto destino de `BASE_CHANGE`.
+- Serialización y external mapping del producto destino.
+- Fixtures y pruebas AREPA DE POLLO → PATACÓN DE POLLO.
+- Resolución de `BASE_CHANGE` hasta el producto efectivo enviado a Toast.
+- Resolución del mapping Toast correspondiente al producto destino de `BASE_CHANGE`.
+- Integración de combos en el payload Toast.
+- Resolución de papas de combo mediante mapping de ingrediente y `optionGroup`.
+- Resolución de bebidas mediante mapping de producto y `productGroup`.
+- Inclusión de papas y bebida como modifiers del selection Toast.
+- Validación de mappings obligatorios para combos y bebidas.
 - Aislamiento multi-tenant de mappings de combos y bebidas.
 - Cobertura E2E de combos, bebidas y `BASE_CHANGE`.
-- RegresiÃ³n del bloque de payload fidelity validada con 112 pruebas aprobadas.
+- Regresión del bloque de payload fidelity validada con 112 pruebas aprobadas.
 
 ### Checkpoints recientes verificados
 
-- `3a3b6e5` â€” complete Toast submission E2E integration.
-- `eb17829` â€” align Toast integration tests.
-- `8586bf5` â€” add multi-tenant isolation coverage.
-- `420f5b7` â€” add failure path coverage.
-- `ccbb512` â€” add multi-tenant Toast runtime configuration.
-- `9c4dae9` â€” add Toast client credential authentication.
-- `18c9a54` â€” cache Toast authentication per tenant.
-- `1d11cd2` â€” build operational Toast order payload.
-- `e58973e` â€” add Toast modifier mappings and payloads.
-- `e1ad2e8` â€” persist and propagate base change target products.
-- `76d642c` â€” resolve base change target product in Toast payload.
-- `1a13959` â€” map combos and beverages into Toast payload.
+- `3a3b6e5` — complete Toast submission E2E integration.
+- `eb17829` — align Toast integration tests.
+- `8586bf5` — add multi-tenant isolation coverage.
+- `420f5b7` — add failure path coverage.
+- `ccbb512` — add multi-tenant Toast runtime configuration.
+- `9c4dae9` — add Toast client credential authentication.
+- `18c9a54` — cache Toast authentication per tenant.
+- `1d11cd2` — build operational Toast order payload.
+- `e58973e` — add Toast modifier mappings and payloads.
+- `e1ad2e8` — persist and propagate base change target products.
+- `76d642c` — resolve base change target product in Toast payload.
+- `1a13959` — map combos and beverages into Toast payload.
 
 ### Avance de Toast payload fidelity
 
-#### 19.12A â€” BASE_CHANGE â†’ effective product â†’ mapping â†’ Toast payload
+#### 19.12A — BASE_CHANGE → effective product → mapping → Toast payload
 
 **Estado:** COMPLETADO
 
 Implementado:
 
 - Persistencia de `new_product_id` y `new_product_name`.
-- PropagaciÃ³n del producto destino hasta el external order payload.
-- ResoluciÃ³n del producto efectivo en `ToastOrderAdapter`.
-- ResoluciÃ³n del mapping Toast del producto efectivo.
-- PreservaciÃ³n del producto original dentro del dominio.
-- ConstrucciÃ³n del selection Toast utilizando el producto resultante.
+- Propagación del producto destino hasta el external order payload.
+- Resolución del producto efectivo en `ToastOrderAdapter`.
+- Resolución del mapping Toast del producto efectivo.
+- Preservación del producto original dentro del dominio.
+- Construcción del selection Toast utilizando el producto resultante.
 - Validaciones de mappings faltantes y conflictos de `BASE_CHANGE`.
-- Pruebas focalizadas y regresiÃ³n satisfactorias.
+- Pruebas focalizadas y regresión satisfactorias.
 
-**Checkpoint:** `76d642c` â€” `feat: resolve base change target product in Toast payload`
+**Checkpoint:** `76d642c` — `feat: resolve base change target product in Toast payload`
 
-#### 19.12B â€” Combos + beverages â†’ Toast payload
+#### 19.12B — Combos + beverages → Toast payload
 
 **Estado:** COMPLETADO
 
 Implementado:
 
 - Lectura del combo desde el external order payload.
-- ResoluciÃ³n de `fries_ingredient_id`.
-- ResoluciÃ³n del mapping Toast del ingrediente de papas.
-- ResoluciÃ³n del `ingredient_group` correspondiente.
-- ResoluciÃ³n de `beverage_product_id`.
-- ResoluciÃ³n del mapping Toast de la bebida.
-- ResoluciÃ³n del `product_group` correspondiente.
-- InclusiÃ³n de papas y bebida como modifiers Toast.
-- PropagaciÃ³n de la cantidad del combo.
-- ValidaciÃ³n de mappings faltantes.
+- Resolución de `fries_ingredient_id`.
+- Resolución del mapping Toast del ingrediente de papas.
+- Resolución del `ingredient_group` correspondiente.
+- Resolución de `beverage_product_id`.
+- Resolución del mapping Toast de la bebida.
+- Resolución del `product_group` correspondiente.
+- Inclusión de papas y bebida como modifiers Toast.
+- Propagación de la cantidad del combo.
+- Validación de mappings faltantes.
 - Aislamiento multi-tenant.
-- Cobertura E2E especÃ­fica.
-- ActualizaciÃ³n de Submission Service E2E.
-- ActualizaciÃ³n de Toast submission E2E.
+- Cobertura E2E específica.
+- Actualización de Submission Service E2E.
+- Actualización de Toast submission E2E.
 
-ValidaciÃ³n confirmada:
+Validación confirmada:
 
 - `test_toast_combo_e2e.py`: 6 passed.
 - `test_submission_toast_e2e.py`: 1 passed.
 - `test_submission_service_with_toast.py`: 1 passed.
-- RegresiÃ³n Toast / Submission / External Mapping: 112 passed.
+- Regresión Toast / Submission / External Mapping: 112 passed.
 - 0 failed.
 - `git diff --check`: limpio.
 
-**Checkpoint:** `1a13959` â€” `feat: map combos and beverages into Toast payload`
+**Checkpoint:** `1a13959` — `feat: map combos and beverages into Toast payload`
 
-#### 19.12 â€” Toast payload fidelity
+#### 19.12 — Toast payload fidelity
 
 **Estado:** COMPLETADO
 
-La revisiÃ³n del adapter confirma cobertura del modelo actualmente soportado para:
+La revisión del adapter confirma cobertura del modelo actualmente soportado para:
 
 - Producto normal.
 - Cantidad.
 - `ADD`.
-- `REMOVE`, que no genera modifier Toast por diseÃ±o.
+- `REMOVE`, que no genera modifier Toast por diseño.
 - `BASE_CHANGE`.
 - Combos.
 - Papas de combo.
@@ -809,67 +809,67 @@ La revisiÃ³n del adapter confirma cobertura del modelo actualmente soportado p
 - Ingredient group mappings.
 - Aislamiento de mappings por tenant.
 
-No crear una subfase 19.12C sin evidencia tÃ©cnica de un nuevo caso de payload no soportado.
+No crear una subfase 19.12C sin evidencia técnica de un nuevo caso de payload no soportado.
 
 ### Punto exacto de continuidad
 
-Frente activo: **19.13 â€” Toast responses, errors and retries**.
+Frente activo: **19.13 — Toast responses, errors and retries**.
 
-Los bloques `19.12A` y `19.12B` estÃ¡n completados y respaldados en GitHub.
+Los bloques `19.12A` y `19.12B` están completados y respaldados en GitHub.
 
-El Ãºltimo checkpoint funcional confirmado es:
+El último checkpoint funcional confirmado es:
 
-`1a13959` â€” `feat: map combos and beverages into Toast payload`
+`1a13959` — `feat: map combos and beverages into Toast payload`
 
-El siguiente trabajo debe revisar y endurecer el manejo de respuestas HTTP de Toast, clasificaciÃ³n de errores, fallos transitorios, reintentos seguros e idempotencia donde corresponda.
+El siguiente trabajo debe revisar y endurecer el manejo de respuestas HTTP de Toast, clasificación de errores, fallos transitorios, reintentos seguros e idempotencia donde corresponda.
 
-No reconstruir autenticaciÃ³n, routing, mappings, external order mapper ni payload fidelity ya terminados.
+No reconstruir autenticación, routing, mappings, external order mapper ni payload fidelity ya terminados.
 
 ### Cierre de Fase 19
 
-- 19.13 â€” COMPLETADA â€” Manejo de respuestas, errores, reintentos seguros e idempotencia Toast.
-- 19.14 â€” COMPLETADA â€” Webhooks Toast multi-tenant, persistencia idempotente y reconciliaciÃ³n.
-- 19.15 â€” COMPLETADA â€” Toast Payments, transporte, orquestaciÃ³n, mappings y validaciÃ³n E2E.
-- 19.16 â€” COMPLETADA â€” Fulfillment/KDS, reconciliaciÃ³n, webhooks y ciclo hasta READY.
-- 19.17 â€” COMPLETADA â€” ValidaciÃ³n E2E integral y regresiÃ³n completa de integraciones externas.
-- 19.18 â€” COMPLETADA â€” Hardening final: concurrencia, prevenciÃ³n de duplicados, recuperaciÃ³n de fallos ambiguos, integridad de identificadores externos y aislamiento multi-tenant.
+- 19.13 — COMPLETADA — Manejo de respuestas, errores, reintentos seguros e idempotencia Toast.
+- 19.14 — COMPLETADA — Webhooks Toast multi-tenant, persistencia idempotente y reconciliación.
+- 19.15 — COMPLETADA — Toast Payments, transporte, orquestación, mappings y validación E2E.
+- 19.16 — COMPLETADA — Fulfillment/KDS, reconciliación, webhooks y ciclo hasta READY.
+- 19.17 — COMPLETADA — Validación E2E integral y regresión completa de integraciones externas.
+- 19.18 — COMPLETADA — Hardening final: concurrencia, prevención de duplicados, recuperación de fallos ambiguos, integridad de identificadores externos y aislamiento multi-tenant.
 
-ValidaciÃ³n final de Fase 19:
+Validación final de Fase 19:
 
 - Suite global: 611 pruebas aprobadas.
 - Alembic: `310d4d26a1d6 (head)`.
 - Hardening de mappings concurrentes completado.
-- PrevenciÃ³n de doble envÃ­o de pagos completada.
-- RecuperaciÃ³n segura ante timeout/5xx ambiguos completada.
+- Prevención de doble envío de pagos completada.
+- Recuperación segura ante timeout/5xx ambiguos completada.
 - Aislamiento multi-tenant de integraciones externas validado.
-- Working tree limpio al cierre tÃ©cnico.
+- Working tree limpio al cierre técnico.
 
-Checkpoint tÃ©cnico de cierre previo a la actualizaciÃ³n documental:
+Checkpoint técnico de cierre previo a la actualización documental:
 
-`835f071` â€” `harden ambiguous Toast payment recovery`
+`835f071` — `harden ambiguous Toast payment recovery`
 
-### Principio arquitectÃ³nico
+### Principio arquitectónico
 
 ```text
 LPDB Core
-   â†“
+   ↓
 Integration Layer
-   â”œâ”€â”€ WhatsApp
-   â””â”€â”€ Toast
-          â”œâ”€â”€ Auth
-          â”œâ”€â”€ Orders
-          â”œâ”€â”€ Payments
-          â”œâ”€â”€ Webhooks
-          â””â”€â”€ Fulfillment / KDS
+   ├── WhatsApp
+   └── Toast
+          ├── Auth
+          ├── Orders
+          ├── Payments
+          ├── Webhooks
+          └── Fulfillment / KDS
 ```
 
-Las integraciones externas no deben contaminar el nÃºcleo de ordering.
+Las integraciones externas no deben contaminar el núcleo de ordering.
 
 ### Criterio de cierre
 
-Las integraciones de producciÃ³n deben funcionar con autenticaciÃ³n, mapeo completo, manejo de errores, estados, reintentos cuando correspondan y pruebas E2E/regresiÃ³n satisfactorias.
+Las integraciones de producción deben funcionar con autenticación, mapeo completo, manejo de errores, estados, reintentos cuando correspondan y pruebas E2E/regresión satisfactorias.
 
-## FASE 20 â€” Observabilidad y operaciÃ³n
+## FASE 20 — Observabilidad y operación
 
 **Estado:** ACTUAL
 
@@ -881,17 +881,17 @@ Las integraciones de producciÃ³n deben funcionar con autenticaciÃ³n, mapeo c
 
 - Health checks.
 
-- MÃ©tricas.
+- Métricas.
 
 - Monitoreo.
 
 - Alertas.
 
-- AuditorÃ­a.
+- Auditoría.
 
-- Seguimiento de webhooks, pagos y sincronizaciÃ³n con POS.
+- Seguimiento de webhooks, pagos y sincronización con POS.
 
-## FASE 21 â€” ProducciÃ³n
+## FASE 21 — Producción
 
 **Estado:** PENDIENTE
 
@@ -903,7 +903,7 @@ Las integraciones de producciÃ³n deben funcionar con autenticaciÃ³n, mapeo c
 
 - Dominio.
 
-- Variables de producciÃ³n.
+- Variables de producción.
 
 - Base de datos productiva.
 
@@ -913,19 +913,19 @@ Las integraciones de producciÃ³n deben funcionar con autenticaciÃ³n, mapeo c
 
 - Webhooks productivos.
 
-- ConfiguraciÃ³n productiva de WhatsApp.
+- Configuración productiva de WhatsApp.
 
-- ConfiguraciÃ³n productiva de Toast.
+- Configuración productiva de Toast.
 
 - Smoke tests.
 
-- Prueba real de conversaciÃ³n â†’ pedido â†’ pago â†’ POS/KDS.
+- Prueba real de conversación → pedido → pago → POS/KDS.
 
 ### Criterio de cierre
 
-El producto debe estar disponible pÃºblicamente y operar correctamente en un entorno productivo controlado.
+El producto debe estar disponible públicamente y operar correctamente en un entorno productivo controlado.
 
-## FASE 22 â€” DocumentaciÃ³n y entrega
+## FASE 22 — Documentación y entrega
 
 **Estado:** PENDIENTE
 
@@ -935,7 +935,7 @@ El producto debe estar disponible pÃºblicamente y operar correctamente en un e
 
 - Arquitectura.
 
-- InstalaciÃ³n.
+- Instalación.
 
 - Variables de entorno.
 
@@ -959,11 +959,11 @@ El producto debe estar disponible pÃºblicamente y operar correctamente en un e
 
 - Procedimientos operativos.
 
-- GuÃ­a de administraciÃ³n del restaurante.
+- Guía de administración del restaurante.
 
 ### Criterio de cierre
 
-El proyecto debe poder ser instalado, entendido, operado y mantenido por otra persona sin depender de la memoria de esta conversaciÃ³n.
+El proyecto debe poder ser instalado, entendido, operado y mantenido por otra persona sin depender de la memoria de esta conversación.
 
 ---
 
@@ -971,49 +971,49 @@ El proyecto debe poder ser instalado, entendido, operado y mantenido por otra pe
 
 ```text
 
-FASE 01 â€” Fundamentos del proyecto Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 01 — Fundamentos del proyecto                    ✅
 
-FASE 02 â€” API / CRUD inicial Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 02 — API / CRUD inicial                          ✅
 
-FASE 03 â€” PostgreSQL Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 03 — PostgreSQL                                  ✅
 
-FASE 04 â€” Modelado de catÃ¡logo Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 04 — Modelado de catálogo                       ✅
 
-FASE 05 â€” Productos / recetas Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 05 — Productos / recetas                        ✅
 
-FASE 06 â€” Sedes / disponibilidad Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 06 — Sedes / disponibilidad                     ✅
 
-FASE 07 â€” Modificaciones Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 07 — Modificaciones                              ✅
 
-FASE 08 â€” Agent / Intent / conversaciÃ³n Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 08 — Agent / Intent / conversación               ✅
 
-FASE 09 â€” IntegraciÃ³n completa ordering Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 09 — Integración completa ordering               ✅
 
-FASE 10 â€” Precio final Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â âœ…
+FASE 10 — Precio final                                ✅
 
-FASE 11 â€” Disponibilidad real Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 11 — Disponibilidad real                         ✅
 
-FASE 12 â€” Consulta de pedidos Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  âœ…
+FASE 12 — Consulta de pedidos                         ✅
 
-FASE 13 â€” WhatsApp + Agent + Toast + Dashboard        âœ…
+FASE 13 — WhatsApp + Agent + Toast + Dashboard        ✅
 
-FASE 14 â€” Pruebas integrales                          âœ…
+FASE 14 — Pruebas integrales                          ✅
 
-FASE 15 â€” AutenticaciÃ³n y seguridad                   âœ…
+FASE 15 — Autenticación y seguridad                   ✅
 
-FASE 16 â€” Datos / migraciones producciÃ³n              âœ…
+FASE 16 — Datos / migraciones producción              ✅
 
-FASE 17 â€” Docker / despliegue                         âœ…
+FASE 17 — Docker / despliegue                         ✅
 
-FASE 18 â€” Staging                                     âœ…
+FASE 18 — Staging                                     ✅
 
-FASE 19 â€” Integraciones externas                      âœ…
+FASE 19 — Integraciones externas                      ✅
 
-FASE 20 â€” Observabilidad                              â–¶ï¸ ACTUAL
+FASE 20 — Observabilidad                              ▶️ ACTUAL
 
-FASE 21 â€” ProducciÃ³n Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  Â â³
+FASE 21 — Producción                                  ⏳
 
-FASE 22 â€” DocumentaciÃ³n / entrega Â  Â  Â  Â  Â  Â  Â  Â  Â  Â  â³
+FASE 22 — Documentación / entrega                     ⏳
 
 ```
 
@@ -1034,56 +1034,56 @@ FASE 22 â€” DocumentaciÃ³n / entrega Â  Â  Â  Â  Â  Â  Â  �
 | Tenant Isolation | COMPLETADO | `333413d` |
 
 | 13 | BASE FUNCIONAL IMPLEMENTADA | Integrada en rama de trabajo |
-| 14 | COMPLETADA | Pruebas E2E, integraciÃ³n, multi-tenant, fallos y state machine versionadas |
+| 14 | COMPLETADA | Pruebas E2E, integración, multi-tenant, fallos y state machine versionadas |
 | 15 | COMPLETADA | `54614ef`, `3102918`, `e4fe56a`, `66d1160` |
 | 16 | COMPLETADA | `2b5f000`, `10f0c19`, `5258192`, `9394f26` |
 | 17 | COMPLETADA | `055bc12`, `c17a702` |
 | 18 | COMPLETADA | Cerrada y respaldada antes del inicio de Fase 19 |
-| 19 | COMPLETADA | `835f071` + cierre formal de hardening y regresiÃ³n |
+| 19 | COMPLETADA | `835f071` + cierre formal de hardening y regresión |
 
 ---
 
 
 ---
 
-# CHECKPOINT MAESTRO â€” INICIO FASE 20
+# CHECKPOINT MAESTRO — INICIO FASE 20
 
-Checkpoint de continuidad creado despuÃ©s del cierre formal de Fase 19.
+Checkpoint de continuidad creado después del cierre formal de Fase 19.
 
 ## Estado consolidado del proyecto
 
-- FASE 01 â€” Fundamentos â€” COMPLETADA
-- FASE 02 â€” API / CRUD inicial â€” COMPLETADA
-- FASE 03 â€” PostgreSQL â€” COMPLETADA
-- FASE 04 â€” Modelado de catÃ¡logo â€” COMPLETADA
-- FASE 05 â€” Productos / recetas â€” COMPLETADA
-- FASE 06 â€” Locations / disponibilidad â€” COMPLETADA
-- FASE 07 â€” Modificaciones â€” COMPLETADA
-- FASE 08 â€” Agent / Intent / conversaciÃ³n â€” COMPLETADA
-- FASE 09 â€” Ordering integration â€” COMPLETADA
-- FASE 10 â€” Precio final â€” COMPLETADA
-- FASE 11 â€” Disponibilidad real â€” COMPLETADA
-- FASE 12 â€” Consulta de pedidos â€” COMPLETADA
-- FASE 13 â€” WhatsApp + Agent + Toast + Dashboard base funcional â€” COMPLETADA
-- FASE 14 â€” Pruebas integrales â€” COMPLETADA
-- FASE 15 â€” AutenticaciÃ³n y seguridad â€” COMPLETADA
-- FASE 16 â€” Datos / migraciones de producciÃ³n â€” COMPLETADA
-- FASE 17 â€” Docker / despliegue â€” COMPLETADA
-- FASE 18 â€” Staging â€” COMPLETADA
-- FASE 19 â€” Integraciones externas â€” COMPLETADA
-- FASE 20 â€” Observabilidad, operaciÃ³n y dashboard operativo â€” ACTUAL
-- FASE 21 â€” ProducciÃ³n â€” PENDIENTE
-- FASE 22 â€” DocumentaciÃ³n / entrega â€” PENDIENTE
+- FASE 01 — Fundamentos — COMPLETADA
+- FASE 02 — API / CRUD inicial — COMPLETADA
+- FASE 03 — PostgreSQL — COMPLETADA
+- FASE 04 — Modelado de catálogo — COMPLETADA
+- FASE 05 — Productos / recetas — COMPLETADA
+- FASE 06 — Locations / disponibilidad — COMPLETADA
+- FASE 07 — Modificaciones — COMPLETADA
+- FASE 08 — Agent / Intent / conversación — COMPLETADA
+- FASE 09 — Ordering integration — COMPLETADA
+- FASE 10 — Precio final — COMPLETADA
+- FASE 11 — Disponibilidad real — COMPLETADA
+- FASE 12 — Consulta de pedidos — COMPLETADA
+- FASE 13 — WhatsApp + Agent + Toast + Dashboard base funcional — COMPLETADA
+- FASE 14 — Pruebas integrales — COMPLETADA
+- FASE 15 — Autenticación y seguridad — COMPLETADA
+- FASE 16 — Datos / migraciones de producción — COMPLETADA
+- FASE 17 — Docker / despliegue — COMPLETADA
+- FASE 18 — Staging — COMPLETADA
+- FASE 19 — Integraciones externas — COMPLETADA
+- FASE 20 — Observabilidad, operación y dashboard operativo — ACTUAL
+- FASE 21 — Producción — PENDIENTE
+- FASE 22 — Documentación / entrega — PENDIENTE
 
-## Cierre tÃ©cnico confirmado de Fase 19
+## Cierre técnico confirmado de Fase 19
 
 Checkpoint documental:
 
-`f8cc731` â€” `docs: close phase 19 and start phase 20`
+`f8cc731` — `docs: close phase 19 and start phase 20`
 
-Checkpoint tÃ©cnico anterior:
+Checkpoint técnico anterior:
 
-`835f071` â€” `harden ambiguous Toast payment recovery`
+`835f071` — `harden ambiguous Toast payment recovery`
 
 Validaciones acumuladas al cierre:
 
@@ -1094,31 +1094,31 @@ Validaciones acumuladas al cierre:
 - Toast Webhooks integrado.
 - Fulfillment / KDS integrado.
 - Reintentos seguros e idempotencia endurecidos.
-- RecuperaciÃ³n de fallos ambiguos de pagos implementada.
-- PrevenciÃ³n de duplicados concurrentes implementada.
+- Recuperación de fallos ambiguos de pagos implementada.
+- Prevención de duplicados concurrentes implementada.
 - External mappings endurecidos contra carreras.
 - Aislamiento multi-tenant validado.
-- Validaciones E2E de integraciÃ³n completadas.
+- Validaciones E2E de integración completadas.
 - Working tree limpio al cierre.
 - Rama sincronizada con `origin/feature/orderdb-tenant`.
 
-## Punto exacto de reanudaciÃ³n
+## Punto exacto de reanudación
 
-La siguiente implementaciÃ³n comienza en:
+La siguiente implementación comienza en:
 
-**FASE 20 â€” Observabilidad, operaciÃ³n y dashboard operativo**
+**FASE 20 — Observabilidad, operación y dashboard operativo**
 
-No reconstruir fases 01â€“19 salvo que una regresiÃ³n demuestre un defecto real.
+No reconstruir fases 01–19 salvo que una regresión demuestre un defecto real.
 
 No reabrir Toast Orders, Payments, Webhooks, Fulfillment/KDS,
-idempotencia, mappings o aislamiento multi-tenant sin evidencia tÃ©cnica.
+idempotencia, mappings o aislamiento multi-tenant sin evidencia técnica.
 
 ## Estado encontrado al iniciar Fase 20
 
-AuditorÃ­a inicial:
+Auditoría inicial:
 
-- No se detectÃ³ infraestructura propia de logging estructurado en `app`.
-- No se detectÃ³ infraestructura propia de mÃ©tricas en `app`.
+- No se detectó infraestructura propia de logging estructurado en `app`.
+- No se detectó infraestructura propia de métricas en `app`.
 - No se detectaron health/readiness/liveness routes en `app`.
 - Existe dashboard Next.js funcional.
 - Dashboard usa Next.js 16.3.4.
@@ -1126,35 +1126,35 @@ AuditorÃ­a inicial:
 - Dashboard tiene Playwright.
 - Existen pruebas E2E de dashboard para canales, pedidos y estados.
 
-## Plan de ejecuciÃ³n de Fase 20
+## Plan de ejecución de Fase 20
 
-### 20.1 â€” Observability foundation
+### 20.1 — Observability foundation
 
 Implementar:
 
 - logging estructurado;
 - request/correlation IDs;
 - tenant context en eventos operativos;
-- clasificaciÃ³n consistente de errores;
+- clasificación consistente de errores;
 - eventos operativos relevantes;
-- protecciÃ³n contra exposiciÃ³n de secretos o datos sensibles.
+- protección contra exposición de secretos o datos sensibles.
 
-### 20.2 â€” Health / readiness / liveness
+### 20.2 — Health / readiness / liveness
 
 Implementar:
 
 - health check de API;
 - readiness de base de datos;
 - liveness;
-- estado de dependencias crÃ­ticas cuando corresponda;
+- estado de dependencias críticas cuando corresponda;
 - respuestas aptas para infraestructura y monitoreo.
 
-### 20.3 â€” MÃ©tricas operativas
+### 20.3 — Métricas operativas
 
-Medir como mÃ­nimo:
+Medir como mínimo:
 
-- Ã³rdenes;
-- Ã³rdenes exitosas/fallidas;
+- órdenes;
+- órdenes exitosas/fallidas;
 - pagos;
 - pagos exitosos/fallidos;
 - Toast submissions;
@@ -1163,71 +1163,72 @@ Medir como mÃ­nimo:
 - retries;
 - reconciliaciones;
 - latencias;
-- errores por integraciÃ³n y tenant.
+- errores por integración y tenant.
 
-### 20.4 â€” Alertas e incidentes
+### 20.4 — Alertas e incidentes
 
 Definir condiciones operativas para:
 
 - errores repetidos;
-- integraciÃ³n caÃ­da;
+- integración caída;
 - fallos de pagos;
-- Ã³rdenes atascadas;
+- órdenes atascadas;
 - reconciliaciones pendientes;
 - webhooks fallidos;
-- degradaciÃ³n de servicios.
+- degradación de servicios.
 
-### 20.5 â€” Operational data layer
+### 20.5 — Operational data layer
 
 Crear servicios/endpoints necesarios para que el dashboard consuma
-informaciÃ³n operativa real sin acoplarse directamente a detalles internos
+información operativa real sin acoplarse directamente a detalles internos
 de proveedores externos.
 
-## CHECKPOINT - CIERRE 20.5 OPERATIONAL DATA LAYER
+## CHECKPOINT ? CIERRE 20.5 OPERATIONAL DATA LAYER
 
 Estado: **COMPLETADA / CERRADA**
 
 Implementado:
 
 - persistencia PostgreSQL de incidentes operativos;
-- migración Alembic `e5374cc233ec`;
+- migraci?n Alembic `e5374cc233ec`;
 - servicio persistente de incidentes;
-- integración monitor -> almacenamiento persistente;
-- worker/runtime automático del monitor operacional;
+- integraci?n monitor ? almacenamiento persistente;
+- worker/runtime autom?tico del monitor operacional;
 - API multi-tenant de incidentes para dashboard;
-- aislamiento por tenant en métricas, fingerprints e incidentes;
-- prevención de re-disparo de incidentes por series métricas no relacionadas;
+- aislamiento por tenant en m?tricas, fingerprints e incidentes;
+- prevenci?n de re-disparo de incidentes por series m?tricas no relacionadas;
 - identidad persistente estable de `incident_id` en upserts por fingerprint;
 - permisos de lectura mediante `VIEW_DASHBOARD`.
 
-Validación final:
+Validaci?n final:
 
 - Suite global: **712 passed**.
 - Alembic current: `e5374cc233ec (head)`.
 - Alembic heads: `e5374cc233ec (head)`.
 - `git diff --check`: sin errores.
-- Hardening técnico respaldado en commit:
+- Hardening t?cnico respaldado en commit:
   `d8aa066d3603b7c14daddc94a737ac96c3906193`.
 
-Punto exacto de reanudación:
+Punto exacto de reanudaci?n:
 
-**20.6 - Arquitectura final del dashboard**
+**20.6 ? Arquitectura final del dashboard**
 
-No reabrir 20.5 salvo que una regresión demuestre un defecto real.
+No reabrir 20.5 salvo que una regresi?n demuestre un defecto real.
 
 ---
-### 20.6 â€” Arquitectura final del dashboard
+
+### 20.6 — Arquitectura final del dashboard
 
 Definir y construir:
 
-- navegaciÃ³n;
+- navegación;
 - layout;
 - responsive behavior;
-- jerarquÃ­a de informaciÃ³n;
+- jerarquía de información;
 - estados loading / empty / error;
 - permisos y visibilidad por rol/tenant.
 
-### 20.7 â€” OperaciÃ³n desde dashboard
+### 20.7 — Operación desde dashboard
 
 Incluir:
 
@@ -1241,51 +1242,51 @@ Incluir:
 - actividad operativa;
 - acciones seguras cuando correspondan.
 
-### 20.8 â€” MÃ©tricas de negocio
+### 20.8 — Métricas de negocio
 
-Incluir como mÃ­nimo:
+Incluir como mínimo:
 
 - ventas;
-- volumen de Ã³rdenes;
+- volumen de órdenes;
 - ticket promedio;
-- evoluciÃ³n temporal;
+- evolución temporal;
 - performance por restaurante/location;
 - estados y conversiones operativas disponibles.
 
-### 20.9 â€” AdministraciÃ³n
+### 20.9 — Administración
 
 Incluir:
 
-- configuraciÃ³n del restaurante;
+- configuración del restaurante;
 - locations;
 - usuarios;
 - roles/permisos;
 - integraciones;
-- estado de configuraciÃ³n.
+- estado de configuración.
 
-### 20.10 â€” FinalizaciÃ³n y regresiÃ³n de Fase 20
+### 20.10 — Finalización y regresión de Fase 20
 
 Completar:
 
-- diseÃ±o visual final;
+- diseño visual final;
 - responsive;
-- accesibilidad bÃ¡sica;
+- accesibilidad básica;
 - manejo de errores;
 - pruebas backend;
 - pruebas frontend;
 - pruebas E2E;
-- regresiÃ³n integral;
+- regresión integral;
 - checkpoint final antes de Fase 21.
 
 ## Disciplina de trabajo para Fase 20
 
 Cada subfase debe seguir:
 
-1. Inspeccionar primero el cÃ³digo existente.
+1. Inspeccionar primero el código existente.
 2. No duplicar funcionalidades ya implementadas.
 3. Implementar el bloque completo.
-4. Ejecutar pruebas especÃ­ficas.
-5. Ejecutar regresiÃ³n relacionada.
+4. Ejecutar pruebas específicas.
+5. Ejecutar regresión relacionada.
 6. Revisar `git diff --check`.
 7. Confirmar `git status`.
 8. Hacer commit descriptivo.
@@ -1295,24 +1296,24 @@ Cada subfase debe seguir:
 
 No declarar una subfase completada si las pruebas correspondientes no han sido ejecutadas satisfactoriamente.
 
-No crear subfases adicionales sin evidencia tÃ©cnica.
+No crear subfases adicionales sin evidencia técnica.
 
 ---
 # DISCIPLINA DE CHECKPOINTS Y CONTINUIDAD
 
-Desde este checkpoint, **guardar el trabajo** significa sincronizar cÃ³digo y memoria tÃ©cnica del proyecto.
+Desde este checkpoint, **guardar el trabajo** significa sincronizar código y memoria técnica del proyecto.
 
 En cada cierre de bloque significativo:
 
 1. Ejecutar las pruebas correspondientes.
 2. Confirmar `git status`.
-3. Actualizar este ROADMAP si cambiÃ³ fase, subfase, alcance, checkpoint o punto de continuidad.
-4. Crear commit del cÃ³digo/documentaciÃ³n.
+3. Actualizar este ROADMAP si cambió fase, subfase, alcance, checkpoint o punto de continuidad.
+4. Crear commit del código/documentación.
 5. Hacer push a `feature/orderdb-tenant`.
 6. Confirmar el SHA remoto.
 7. Registrar el siguiente punto exacto de trabajo cuando exista un cambio material.
 
-El historial Git es la evidencia tÃ©cnica y este ROADMAP es el Ã­ndice de continuidad. Ambos deben permanecer alineados.
+El historial Git es la evidencia técnica y este ROADMAP es el índice de continuidad. Ambos deben permanecer alineados.
 
 ---
 
@@ -1324,7 +1325,7 @@ Antes de cerrar una fase se debe:
 
 1. Ejecutar las pruebas correspondientes.
 
-2. Revisar los cambios de cÃ³digo.
+2. Revisar los cambios de código.
 
 3. Actualizar este `ROADMAP.md`.
 
@@ -1334,4 +1335,4 @@ Antes de cerrar una fase se debe:
 
 6. Verificar que el working tree quede limpio.
 
-El siguiente trabajo comienza siempre desde el Ãºltimo checkpoint confirmado en este documento y en GitHub.
+El siguiente trabajo comienza siempre desde el último checkpoint confirmado en este documento y en GitHub.
