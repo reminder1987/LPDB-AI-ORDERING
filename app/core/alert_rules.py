@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
@@ -108,6 +108,16 @@ class AlertRuleEngine:
             if severity is None:
                 continue
 
+            tenant_id_value = metric.labels.get(
+                "tenant_id"
+            )
+
+            tenant_id = (
+                int(tenant_id_value)
+                if tenant_id_value is not None
+                else None
+            )
+
             provider = metric.labels.get(
                 "provider",
                 "unknown",
@@ -123,6 +133,7 @@ class AlertRuleEngine:
 
             fingerprint = (
                 self.registry.build_fingerprint(
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_PROVIDER,
                     provider=provider,
                     operation=operation,
@@ -133,6 +144,7 @@ class AlertRuleEngine:
             incidents.append(
                 self.registry.open(
                     fingerprint=fingerprint,
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_PROVIDER,
                     severity=severity,
                     title=(
@@ -186,6 +198,16 @@ class AlertRuleEngine:
             if severity is None:
                 continue
 
+            tenant_id_value = metric.labels.get(
+                "tenant_id"
+            )
+
+            tenant_id = (
+                int(tenant_id_value)
+                if tenant_id_value is not None
+                else None
+            )
+
             provider = metric.labels.get(
                 "provider",
                 "unknown",
@@ -197,6 +219,7 @@ class AlertRuleEngine:
 
             fingerprint = (
                 self.registry.build_fingerprint(
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_PAYMENT,
                     provider=provider,
                     operation="submit_payment",
@@ -207,6 +230,7 @@ class AlertRuleEngine:
             incidents.append(
                 self.registry.open(
                     fingerprint=fingerprint,
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_PAYMENT,
                     severity=severity,
                     title=(
@@ -266,6 +290,16 @@ class AlertRuleEngine:
             if severity is None:
                 continue
 
+            tenant_id_value = metric.labels.get(
+                "tenant_id"
+            )
+
+            tenant_id = (
+                int(tenant_id_value)
+                if tenant_id_value is not None
+                else None
+            )
+
             provider = metric.labels.get(
                 "provider",
                 "unknown",
@@ -277,6 +311,7 @@ class AlertRuleEngine:
 
             fingerprint = (
                 self.registry.build_fingerprint(
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_WEBHOOK,
                     provider=provider,
                     operation="receive_webhook",
@@ -287,6 +322,7 @@ class AlertRuleEngine:
             incidents.append(
                 self.registry.open(
                     fingerprint=fingerprint,
+                    tenant_id=tenant_id,
                     category=INCIDENT_CATEGORY_WEBHOOK,
                     severity=severity,
                     title=(
@@ -340,6 +376,16 @@ class AlertRuleEngine:
             if severity is None:
                 continue
 
+            tenant_id_value = metric.labels.get(
+                "tenant_id"
+            )
+
+            tenant_id = (
+                int(tenant_id_value)
+                if tenant_id_value is not None
+                else None
+            )
+
             provider = metric.labels.get(
                 "provider",
                 "unknown",
@@ -351,6 +397,7 @@ class AlertRuleEngine:
 
             fingerprint = (
                 self.registry.build_fingerprint(
+                    tenant_id=tenant_id,
                     category=(
                         INCIDENT_CATEGORY_RECONCILIATION
                     ),
@@ -363,6 +410,7 @@ class AlertRuleEngine:
             incidents.append(
                 self.registry.open(
                     fingerprint=fingerprint,
+                    tenant_id=tenant_id,
                     category=(
                         INCIDENT_CATEGORY_RECONCILIATION
                     ),

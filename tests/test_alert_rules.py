@@ -253,3 +253,41 @@ def test_payment_critical_threshold():
         result[0].severity
         == INCIDENT_SEVERITY_CRITICAL
     )
+
+def test_alert_incident_preserves_tenant_identity():
+    from app.core.metrics import MetricSnapshot
+
+    registry = IncidentRegistry()
+
+    engine = AlertRuleEngine(
+        registry=registry,
+    )
+
+    incidents = engine.evaluate(
+        [
+            MetricSnapshot(
+                name="provider_requests_total",
+                value=3,
+                labels={
+                    "provider": "toast",
+                    "operation": "create_order",
+                    "outcome": "failure",
+                    "error_type": "timeout",
+                    "tenant_id": "42",
+                },
+            )
+        ]
+    )
+
+    assert len(incidents) == 1
+    assert incidents[0].tenant_id == 42
+
+    expected_fingerprint = registry.build_fingerprint(
+        category="provider",
+        provider="toast",
+        operation="create_order",
+        tenant_id=42,
+        key="timeout",
+    )
+
+    assert incidents[0].fingerprint == expected_fingerprint

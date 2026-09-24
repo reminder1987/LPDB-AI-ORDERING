@@ -31,16 +31,10 @@ class OperationalMonitor:
     """
     Bridges cumulative operational metrics to alert rules.
 
-    Flow:
-        metrics snapshot
-        -> delta cursor
-        -> accumulated new operational failures
-        -> alert rules
-        -> deduplicated incidents
-        -> optional durable incident sink
-
-    Repeated polling without new events does not create new
-    occurrences.
+    Only metric series that changed in the current poll are
+    evaluated. Their accumulated values are preserved so alert
+    thresholds still span multiple polls without re-triggering
+    unrelated incidents.
     """
 
     def __init__(
@@ -77,26 +71,24 @@ class OperationalMonitor:
         if not deltas:
             return []
 
+        changed_snapshot: list[MetricSnapshot] = []
+
         with self._lock:
             for metric in deltas:
-                self._accumulated[
-                    metric_key(metric)
-                ] += metric.value
+                key = metric_key(metric)
 
-            accumulated_snapshot = [
-                MetricSnapshot(
-                    name=name,
-                    value=value,
-                    labels=dict(labels),
+                self._accumulated[key] += metric.value
+
+                changed_snapshot.append(
+                    MetricSnapshot(
+                        name=metric.name,
+                        value=self._accumulated[key],
+                        labels=metric.labels.copy(),
+                    )
                 )
-                for (
-                    name,
-                    labels,
-                ), value in self._accumulated.items()
-            ]
 
         incidents = self.rules.evaluate(
-            accumulated_snapshot
+            changed_snapshot
         )
 
         if incidents and self.incident_sink is not None:

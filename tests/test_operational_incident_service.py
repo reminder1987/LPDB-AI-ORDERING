@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -149,7 +149,27 @@ def test_persist_matches_existing_fingerprint():
     ).all()
 
     assert len(rows) == 1
+    assert rows[0].incident_id == "incident-1"
     assert rows[0].occurrence_count == 3
+
+    persisted = service.get(
+        session,
+        incident_id="incident-1",
+        tenant_id=1,
+    )
+
+    assert persisted is not None
+    assert persisted.id == "incident-1"
+    assert persisted.occurrence_count == 3
+
+    assert (
+        service.get(
+            session,
+            incident_id="different-id",
+            tenant_id=1,
+        )
+        is None
+    )
 
 
 def test_list_is_tenant_isolated():

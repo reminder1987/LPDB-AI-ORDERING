@@ -1,8 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Any, Mapping
 
 from app.core.metrics import operational_metrics
+from app.core.observability_context import get_tenant_id
 
 
 PROVIDER_TOAST = "toast"
@@ -18,6 +19,11 @@ def _labels(
         "provider": provider,
         "operation": operation,
     }
+
+    tenant_id = get_tenant_id()
+
+    if tenant_id is not None:
+        labels["tenant_id"] = tenant_id
 
     for key, value in extra.items():
         if value is not None:
@@ -127,13 +133,14 @@ def record_webhook(
 ) -> None:
     operational_metrics.increment(
         "webhooks_received_total",
-        labels={
-            "provider": provider,
-            "event_type": event_type,
-            "duplicate": duplicate,
-            "processed": processed,
-            "matched": matched,
-        },
+        labels=_labels(
+            provider,
+            "receive_webhook",
+            event_type=event_type,
+            duplicate=duplicate,
+            processed=processed,
+            matched=matched,
+        ),
     )
 
 
@@ -161,11 +168,12 @@ def record_reconciliation(
 ) -> None:
     operational_metrics.increment(
         "reconciliations_total",
-        labels={
-            "provider": provider,
-            "entity_type": entity_type,
-            "outcome": outcome,
-        },
+        labels=_labels(
+            provider,
+            "reconcile",
+            entity_type=entity_type,
+            outcome=outcome,
+        ),
     )
 
 

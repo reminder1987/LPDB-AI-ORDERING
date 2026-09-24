@@ -198,3 +198,41 @@ def test_metrics_do_not_require_business_identifiers():
     assert forbidden.isdisjoint(
         metric.labels.keys()
     )
+
+def test_metrics_include_tenant_from_observability_context():
+    from app.core.observability_context import (
+        reset_tenant_id,
+        set_tenant_id,
+    )
+
+    token = set_tenant_id(42)
+
+    try:
+        record_provider_request(
+            provider="toast",
+            operation="create_order",
+            outcome="failure",
+            duration_ms=10,
+            error_type="timeout",
+            retryable=True,
+        )
+    finally:
+        reset_tenant_id(token)
+
+    metric = metric_values(
+        "provider_requests_total"
+    )[0]
+
+    assert metric.labels["tenant_id"] == "42"
+
+
+def test_metrics_remain_valid_without_tenant_context():
+    record_order_submission(
+        outcome="success",
+    )
+
+    metric = metric_values(
+        "order_submissions_total"
+    )[0]
+
+    assert "tenant_id" not in metric.labels

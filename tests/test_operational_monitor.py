@@ -283,3 +283,38 @@ def test_incident_sink_not_called_without_new_delta():
 
     assert monitor.poll() == []
     assert len(calls) == 1
+
+def test_unrelated_metric_delta_does_not_retrigger_old_incident():
+    metrics, registry, monitor = build_monitor()
+
+    monitor.poll()
+
+    record_provider_failure(
+        metrics,
+        count=3,
+    )
+
+    first = monitor.poll()
+
+    assert len(first) == 1
+    assert first[0].occurrence_count == 1
+
+    metrics.increment(
+        "payment_submissions_total",
+        labels={
+            "provider": "toast",
+            "operation": "submit_payment",
+            "outcome": "success",
+        },
+    )
+
+    second = monitor.poll()
+
+    assert second == []
+
+    open_incidents = registry.list(
+        status="open",
+    )
+
+    assert len(open_incidents) == 1
+    assert open_incidents[0].occurrence_count == 1

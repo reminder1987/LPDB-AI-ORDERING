@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -49,7 +49,9 @@ class OperationalIncidentService:
         row: OperationalIncidentDB,
         incident: Incident,
     ) -> None:
-        row.incident_id = incident.id
+        # incident_id is the durable public identity of the
+        # persistent record. When an upsert matches by logical
+        # fingerprint, preserve the existing incident_id.
         row.fingerprint = incident.fingerprint
         row.category = incident.category
         row.severity = incident.severity
