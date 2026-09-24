@@ -1,5 +1,7 @@
 import type { Order } from "@/lib/api";
 
+import { DashboardState } from "@/components/ui/dashboard-state";
+
 import {
   formatCurrency,
   formatStatus,
@@ -35,45 +37,27 @@ export function OrdersTable({
       </div>
 
       {loading && (
-        <div className="flex min-h-48 items-center justify-center px-5 py-12">
-          <div className="text-center">
-            <p className="text-sm font-medium text-zinc-600">
-              Cargando pedidos
-            </p>
-
-            <p className="mt-1 text-xs text-zinc-400">
-              Consultando el backend LPDB.
-            </p>
-          </div>
-        </div>
+        <DashboardState
+          variant="loading"
+          title="Cargando pedidos"
+          description="Consultando el backend LPDB."
+        />
       )}
 
       {!loading && error && (
-        <div className="flex min-h-48 items-center justify-center px-5 py-12">
-          <div className="text-center">
-            <p className="text-sm font-medium text-red-600">
-              No fue posible cargar los pedidos
-            </p>
-
-            <p className="mt-2 max-w-xl text-xs text-zinc-400">
-              {error}
-            </p>
-          </div>
-        </div>
+        <DashboardState
+          variant="error"
+          title="No fue posible cargar los pedidos"
+          description={error}
+        />
       )}
 
       {!loading && !error && orders.length === 0 && (
-        <div className="flex min-h-48 items-center justify-center px-5 py-12">
-          <div className="text-center">
-            <p className="text-sm font-medium text-zinc-600">
-              No hay pedidos
-            </p>
-
-            <p className="mt-1 text-xs text-zinc-400">
-              Los pedidos recibidos apareceran aqui.
-            </p>
-          </div>
-        </div>
+        <DashboardState
+          variant="empty"
+          title="No hay pedidos"
+          description="Los pedidos recibidos apareceran aqui."
+        />
       )}
 
       {!loading && !error && orders.length > 0 && (

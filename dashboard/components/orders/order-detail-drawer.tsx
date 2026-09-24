@@ -1,5 +1,7 @@
 import type { Order } from "@/lib/api";
 
+import { DashboardState } from "@/components/ui/dashboard-state";
+
 import {
   formatCurrency,
   formatStatus,
@@ -39,6 +41,11 @@ export function OrderDetailDrawer({
       <aside
         className="flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
+        aria-label={
+          order
+            ? `Detalle del pedido ${order.id}`
+            : "Detalle del pedido"
+        }
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
           <div>
@@ -61,34 +68,28 @@ export function OrderDetailDrawer({
         </div>
 
         {loading && (
-          <div className="flex flex-1 items-center justify-center p-6">
-            <div className="text-center">
-              <p className="text-sm font-medium text-zinc-600">
-                Cargando pedido
-              </p>
-
-              <p className="mt-1 text-xs text-zinc-400">
-                Consultando el backend LPDB.
-              </p>
-            </div>
+          <div className="flex flex-1 flex-col">
+            <DashboardState
+              variant="loading"
+              title="Cargando pedido"
+              description="Consultando el backend LPDB."
+            />
           </div>
         )}
 
         {!loading && error && (
-          <div className="flex flex-1 items-center justify-center p-6">
-            <div className="max-w-sm text-center">
-              <p className="text-sm font-medium text-red-600">
-                No fue posible cargar el pedido
-              </p>
+          <div className="flex flex-1 flex-col">
+            <DashboardState
+              variant="error"
+              title="No fue posible cargar el pedido"
+              description={error}
+            />
 
-              <p className="mt-2 text-xs leading-5 text-zinc-500">
-                {error}
-              </p>
-
+            <div className="px-6 pb-6 text-center">
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-5 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
               >
                 Cerrar
               </button>
@@ -257,7 +258,11 @@ export function OrderDetailDrawer({
               </div>
 
               {statusError && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                <div
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+                  role="alert"
+                  aria-live="assertive"
+                >
                   <p className="text-sm font-medium text-red-700">
                     No fue posible actualizar el pedido
                   </p>
@@ -273,6 +278,7 @@ export function OrderDetailDrawer({
                   <button
                     type="button"
                     disabled={statusUpdating}
+                    aria-busy={statusUpdating}
                     onClick={() =>
                       onUpdateStatus(order.id, "confirmed")
                     }
@@ -301,6 +307,7 @@ export function OrderDetailDrawer({
                   <button
                     type="button"
                     disabled={statusUpdating}
+                    aria-busy={statusUpdating}
                     onClick={() =>
                       onUpdateStatus(order.id, "cancelled")
                     }
