@@ -1,9 +1,16 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "LPDB AI Ordering"
     environment: str = "development"
+
+    # ============================================================
+    # OPERATIONAL MONITORING
+    # ============================================================
+
+    operational_monitor_enabled: bool = True
+    operational_monitor_interval_seconds: float = 30.0
 
     # ============================================================
     # DATABASE
@@ -31,9 +38,7 @@ class Settings(BaseSettings):
     )
 
     toast_client_id: str | None = None
-
     toast_client_secret: str | None = None
-
     toast_management_group_guid: str | None = None
 
     owner_email: str | None = None
@@ -44,9 +49,7 @@ class Settings(BaseSettings):
     # ============================================================
 
     jwt_secret_key: str
-
     jwt_algorithm: str = "HS256"
-
     jwt_expire_minutes: int = 60
 
     # ============================================================
