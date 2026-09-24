@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 
 import {
   authenticateDashboardPage,
@@ -9,7 +9,7 @@ test(
   async ({ page, request }) => {
     await authenticateDashboardPage(page, request);
 
-    await page.goto('/');
+    await page.goto('/pedidos');
 
     await expect(
       page.getByRole('heading', {

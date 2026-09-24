@@ -1,11 +1,27 @@
-﻿import Link from "next/link";
+﻿"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { dashboardNavigation } from "@/lib/dashboard/navigation";
 
+function isNavigationItemActive(
+  pathname: string,
+  href: string,
+) {
+  if (href === "/") {
+    return pathname === "/";
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function DashboardSidebar() {
+  const pathname = usePathname();
+
   return (
     <aside
-      aria-label="Navegación principal"
+      aria-label="Navegacion principal"
       className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white lg:flex lg:flex-col"
     >
       <div className="border-b border-zinc-200 px-6 py-6">
@@ -25,22 +41,35 @@ export function DashboardSidebar() {
               <div
                 key={item.label}
                 className="rounded-lg px-3 py-3 text-sm text-zinc-400"
-                title="Disponible próximamente"
+                title="Disponible proximamente"
+                aria-disabled="true"
               >
-                <div className="font-medium">{item.label}</div>
+                <div className="font-medium">
+                  {item.label}
+                </div>
 
                 <div className="mt-0.5 text-xs text-zinc-400">
-                  Próximamente
+                  Proximamente
                 </div>
               </div>
             );
           }
 
+          const isActive = isNavigationItemActive(
+            pathname,
+            item.href,
+          );
+
           return (
             <Link
               key={item.label}
               href={item.href}
-              className="rounded-lg bg-zinc-950 px-3 py-3 text-sm font-medium text-white"
+              aria-current={isActive ? "page" : undefined}
+              className={
+                isActive
+                  ? "rounded-lg bg-zinc-950 px-3 py-3 text-sm font-medium text-white"
+                  : "rounded-lg px-3 py-3 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
+              }
             >
               {item.label}
             </Link>

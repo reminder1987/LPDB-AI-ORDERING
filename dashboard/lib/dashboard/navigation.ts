@@ -9,13 +9,13 @@ export const dashboardNavigation: DashboardNavigationItem[] = [
   {
     label: "Resumen",
     href: "/",
-    description: "Vista general de la operación",
+    description: "Vista general de la operacion",
     enabled: false,
   },
   {
     label: "Pedidos",
-    href: "/",
-    description: "Pedidos y operación en tiempo real",
+    href: "/pedidos",
+    description: "Pedidos y operacion en tiempo real",
     enabled: true,
   },
   {
@@ -25,13 +25,13 @@ export const dashboardNavigation: DashboardNavigationItem[] = [
     enabled: false,
   },
   {
-    label: "Métricas",
+    label: "Metricas",
     href: "/metricas",
     description: "Indicadores operativos y comerciales",
     enabled: false,
   },
   {
-    label: "Configuración",
+    label: "Configuracion",
     href: "/configuracion",
     description: "Restaurante, integraciones y usuarios",
     enabled: false,

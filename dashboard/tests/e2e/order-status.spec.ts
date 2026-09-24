@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 
 import {
   API_BASE_URL,
@@ -47,7 +47,7 @@ test(
 
       expect(orderId).toBeGreaterThan(0);
 
-      await page.goto('/');
+      await page.goto('/pedidos');
 
       await expect(
         page.getByRole('heading', {

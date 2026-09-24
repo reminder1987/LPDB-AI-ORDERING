@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import { execFileSync } from 'child_process';
 import { createHmac } from 'node:crypto';
 
@@ -166,7 +166,7 @@ print(integration.webhook_secret)
 
       orderId = confirmationResult.order.id;
 
-      await page.goto('/');
+      await page.goto('/pedidos');
 
       await expect(
         page.getByRole('heading', {

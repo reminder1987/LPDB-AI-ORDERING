@@ -1,5 +1,5 @@
-﻿import { OrderDashboard } from "@/components/orders/order-dashboard";
+﻿import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <OrderDashboard />;
+  redirect("/pedidos");
 }
