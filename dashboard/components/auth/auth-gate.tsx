@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 
+import { DashboardSessionProvider } from "@/components/auth/session/dashboard-session-context";
+
 import {
   establishSession,
   getCurrentUser,
@@ -249,16 +251,25 @@ export default function AuthGate({
     );
   }
 
+  if (!user || !tenant) {
+    return null;
+  }
+
   return (
-    <>
+    <DashboardSessionProvider
+      session={{
+        user,
+        tenant,
+      }}
+    >
       <div className="fixed bottom-4 right-4 z-40 hidden items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2 shadow-sm lg:flex">
         <div className="min-w-0">
           <p className="max-w-48 truncate text-xs font-semibold text-zinc-700">
-            {user?.email}
+            {user.email}
           </p>
 
           <p className="text-[11px] text-zinc-400">
-            {tenant?.tenant_name} · {tenant?.role}
+            {tenant.tenant_name} · {tenant.role}
           </p>
         </div>
 
@@ -272,6 +283,6 @@ export default function AuthGate({
       </div>
 
       {children}
-    </>
+    </DashboardSessionProvider>
   );
 }

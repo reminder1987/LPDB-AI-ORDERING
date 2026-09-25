@@ -5,7 +5,12 @@
   enabled: boolean;
 };
 
-export const dashboardNavigation: DashboardNavigationItem[] = [
+export type DashboardNavigationContext = {
+  tenantSlug: string;
+  role: string;
+};
+
+const dashboardNavigationItems: DashboardNavigationItem[] = [
   {
     label: "Resumen",
     href: "/",
@@ -37,3 +42,25 @@ export const dashboardNavigation: DashboardNavigationItem[] = [
     enabled: false,
   },
 ];
+
+export function getDashboardNavigation(
+  context: DashboardNavigationContext,
+): DashboardNavigationItem[] {
+  void context;
+
+  return dashboardNavigationItems;
+}
+
+export function isDashboardNavigationItemActive(
+  pathname: string,
+  href: string,
+): boolean {
+  if (href === "/") {
+    return pathname === "/";
+  }
+
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
+}

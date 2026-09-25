@@ -8,23 +8,24 @@ import {
   useState,
 } from "react";
 
-import { dashboardNavigation } from "@/lib/dashboard/navigation";
+import { useDashboardSession } from "@/components/auth/session/dashboard-session-context";
 
-function isNavigationItemActive(
-  pathname: string,
-  href: string,
-) {
-  if (href === "/") {
-    return pathname === "/";
-  }
-
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import {
+  getDashboardNavigation,
+  isDashboardNavigationItemActive,
+} from "@/lib/dashboard/navigation";
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const { user, tenant } = useDashboardSession();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const navigation = getDashboardNavigation({
+    tenantSlug: tenant.tenant_slug,
+    role: tenant.role,
+  });
 
   useEffect(() => {
     if (!menuOpen) {
@@ -54,7 +55,7 @@ export function DashboardHeader() {
       <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Los Perritos del Barrio
+            {tenant.tenant_name}
           </p>
 
           <p className="truncate text-sm font-semibold text-zinc-950">
@@ -109,7 +110,7 @@ export function DashboardHeader() {
             aria-label="Navegacion principal movil"
             className="flex flex-col gap-1"
           >
-            {dashboardNavigation.map((item) => {
+            {navigation.map((item) => {
               if (!item.enabled) {
                 return (
                   <div
@@ -129,7 +130,7 @@ export function DashboardHeader() {
               }
 
               const isActive =
-                isNavigationItemActive(
+                isDashboardNavigationItemActive(
                   pathname,
                   item.href,
                 );
@@ -154,20 +155,36 @@ export function DashboardHeader() {
             })}
           </nav>
 
-          <div className="mt-4 border-t border-zinc-200 pt-4 sm:hidden">
-            <div
-              className="flex items-center gap-2"
-              role="status"
-              aria-label="Sistema operativo"
-            >
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
-                aria-hidden="true"
-              />
+          <div className="mt-4 border-t border-zinc-200 pt-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-zinc-700">
+                  {user.email}
+                </p>
 
-              <span className="text-xs font-medium text-zinc-600">
-                Operativo
-              </span>
+                <p className="mt-1 truncate text-xs text-zinc-400">
+                  {tenant.tenant_name}
+                </p>
+
+                <p className="mt-1 truncate text-xs text-zinc-400">
+                  {tenant.role}
+                </p>
+              </div>
+
+              <div
+                className="flex shrink-0 items-center gap-2 sm:hidden"
+                role="status"
+                aria-label="Sistema operativo"
+              >
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+
+                <span className="text-xs font-medium text-zinc-600">
+                  Operativo
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -3,21 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { dashboardNavigation } from "@/lib/dashboard/navigation";
+import { useDashboardSession } from "@/components/auth/session/dashboard-session-context";
 
-function isNavigationItemActive(
-  pathname: string,
-  href: string,
-) {
-  if (href === "/") {
-    return pathname === "/";
-  }
-
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import {
+  getDashboardNavigation,
+  isDashboardNavigationItemActive,
+} from "@/lib/dashboard/navigation";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const { tenant } = useDashboardSession();
+
+  const navigation = getDashboardNavigation({
+    tenantSlug: tenant.tenant_slug,
+    role: tenant.role,
+  });
 
   return (
     <aside
@@ -32,10 +32,14 @@ export function DashboardSidebar() {
         <p className="mt-1 text-lg font-semibold text-zinc-950">
           AI Ordering
         </p>
+
+        <p className="mt-2 truncate text-xs text-zinc-400">
+          {tenant.tenant_name}
+        </p>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 p-4">
-        {dashboardNavigation.map((item) => {
+        {navigation.map((item) => {
           if (!item.enabled) {
             return (
               <div
@@ -55,10 +59,11 @@ export function DashboardSidebar() {
             );
           }
 
-          const isActive = isNavigationItemActive(
-            pathname,
-            item.href,
-          );
+          const isActive =
+            isDashboardNavigationItemActive(
+              pathname,
+              item.href,
+            );
 
           return (
             <Link
@@ -78,7 +83,11 @@ export function DashboardSidebar() {
       </nav>
 
       <div className="border-t border-zinc-200 p-4">
-        <p className="text-xs text-zinc-500">
+        <p className="truncate text-xs font-medium text-zinc-600">
+          {tenant.role}
+        </p>
+
+        <p className="mt-1 text-xs text-zinc-400">
           Operational Dashboard
         </p>
       </div>
