@@ -27,7 +27,7 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     label: "Operaciones",
     href: "/operaciones",
     description: "Incidentes y salud operacional",
-    enabled: false,
+    enabled: true,
   },
   {
     label: "Metricas",
