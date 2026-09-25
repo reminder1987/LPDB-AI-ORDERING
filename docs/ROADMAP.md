@@ -891,6 +891,21 @@ Las integraciones de producción deben funcionar con autenticación, mapeo compl
 
 - Seguimiento de webhooks, pagos y sincronización con POS.
 
+**Estado: COMPLETADO / CERRADO**
+
+Cierre validado:
+- arquitectura autenticada y modular del dashboard;
+- navegación desktop/mobile y responsive behavior;
+- estados loading / empty / error;
+- arquitectura preparada para usuario, tenant y role;
+- regresión final: ESLint PASS, production build PASS, TypeScript PASS y Playwright E2E 5/5 PASS.
+
+Commits de cierre:
+- `8d55ad564afb853d51974ac072cf2b9cbbbd76a4` — responsive/accessibility;
+- `87499d0ea89faed7637dba832ef9d4c7f02a85cf` — tenant/role-ready architecture.
+
+**Punto de reanudación: 20.7 — Operación desde dashboard.**
+
 ## FASE 21 — Producción
 
 **Estado:** PENDIENTE
