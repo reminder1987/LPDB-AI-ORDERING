@@ -30,6 +30,12 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     enabled: true,
   },
   {
+    label: "Clientes",
+    href: "/clientes",
+    description: "Clientes, identidades y actividad de pedidos",
+    enabled: true,
+  },
+  {
     label: "Operaciones",
     href: "/operaciones",
     description: "Incidentes y salud operacional",

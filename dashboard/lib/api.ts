@@ -88,6 +88,35 @@ export interface PaymentFilters {
   provider?: string;
 }
 
+export interface CustomerIdentity {
+  id: number;
+  channel: string;
+  external_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Customer {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  order_count: number;
+  order_total: number;
+}
+
+export interface CustomerDetail extends Customer {
+  identities: CustomerIdentity[];
+}
+
+export interface CustomerFilters {
+  search?: string;
+  active?: boolean;
+}
+
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -191,5 +220,41 @@ export async function getPayment(
 ): Promise<Payment> {
   return apiFetch<Payment>(
     `/payments/${paymentId}`,
+  );
+}
+
+export async function getCustomers(
+  filters: CustomerFilters = {},
+): Promise<Customer[]> {
+  const searchParams = new URLSearchParams();
+
+  if (filters.search?.trim()) {
+    searchParams.set(
+      "search",
+      filters.search.trim(),
+    );
+  }
+
+  if (filters.active !== undefined) {
+    searchParams.set(
+      "active",
+      String(filters.active),
+    );
+  }
+
+  const query = searchParams.toString();
+
+  return apiFetch<Customer[]>(
+    query
+      ? `/customers?${query}`
+      : "/customers",
+  );
+}
+
+export async function getCustomer(
+  customerId: number,
+): Promise<CustomerDetail> {
+  return apiFetch<CustomerDetail>(
+    `/customers/${customerId}`,
   );
 }
