@@ -12,6 +12,26 @@ from app.models.provider_integration_db import (
 )
 
 
+SENSITIVE_CONFIGURATION_KEY_PARTS = frozenset(
+    {
+        "access_token",
+        "api_key",
+        "apikey",
+        "app_secret",
+        "authorization",
+        "bearer",
+        "client_secret",
+        "credential",
+        "credentials",
+        "password",
+        "private_key",
+        "secret",
+        "token",
+        "verify_token",
+    }
+)
+
+
 @dataclass(frozen=True)
 class OperationalIntegration:
     id: int
@@ -27,6 +47,18 @@ class OperationalIntegration:
 
 
 class OperationalIntegrationService:
+    """
+    Read-only operational projection for provider integrations.
+
+    Security boundary:
+    - every query is tenant scoped;
+    - credential values are never exposed;
+    - configuration is recursively sanitized before it leaves
+      the operational service;
+    - safe operational configuration remains visible to the
+      dashboard.
+    """
+
     def list(
         self,
         session: Session,
@@ -108,17 +140,22 @@ class OperationalIntegrationService:
             integration,
         )
 
-    @staticmethod
+    @classmethod
     def _to_operational_integration(
+        cls,
         integration: ProviderIntegrationDB,
     ) -> OperationalIntegration:
-        configuration = (
-            dict(integration.configuration)
+        raw_configuration = (
+            integration.configuration
             if isinstance(
                 integration.configuration,
                 dict,
             )
             else {}
+        )
+
+        configuration = cls._sanitize_configuration(
+            raw_configuration,
         )
 
         credentials = (
@@ -159,6 +196,68 @@ class OperationalIntegrationService:
             updated_at=integration.updated_at,
         )
 
+    @classmethod
+    def _sanitize_configuration(
+        cls,
+        configuration: dict[str, Any],
+    ) -> dict[str, Any]:
+        sanitized: dict[str, Any] = {}
+
+        for raw_key, value in configuration.items():
+            key = str(raw_key)
+
+            if cls._is_sensitive_configuration_key(
+                key,
+            ):
+                continue
+
+            sanitized[key] = cls._sanitize_value(
+                value,
+            )
+
+        return sanitized
+
+    @classmethod
+    def _sanitize_value(
+        cls,
+        value: Any,
+    ) -> Any:
+        if isinstance(value, dict):
+            return cls._sanitize_configuration(
+                value,
+            )
+
+        if isinstance(value, list):
+            return [
+                cls._sanitize_value(item)
+                for item in value
+            ]
+
+        if isinstance(value, tuple):
+            return [
+                cls._sanitize_value(item)
+                for item in value
+            ]
+
+        return value
+
+    @staticmethod
+    def _is_sensitive_configuration_key(
+        key: str,
+    ) -> bool:
+        normalized = (
+            key.strip()
+            .lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+
+        return any(
+            sensitive_part in normalized
+            for sensitive_part
+            in SENSITIVE_CONFIGURATION_KEY_PARTS
+        )
+
     @staticmethod
     def _normalize_optional(
         value: str | None,
@@ -179,5 +278,6 @@ operational_integration_service = (
 __all__ = [
     "OperationalIntegration",
     "OperationalIntegrationService",
+    "SENSITIVE_CONFIGURATION_KEY_PARTS",
     "operational_integration_service",
 ]

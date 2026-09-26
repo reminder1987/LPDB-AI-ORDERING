@@ -3,7 +3,7 @@ type PaymentMetricsProps = {
   paid: number;
   pending: number;
   failed: number;
-  paidAmount: number;
+  paidAmountsByCurrency: Record<string, number>;
   loading: boolean;
 };
 
@@ -14,6 +14,27 @@ function formatAmount(
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatPaidAmounts(
+  amountsByCurrency: Record<string, number>,
+): string {
+  const entries = Object.entries(
+    amountsByCurrency,
+  ).sort(([currencyA], [currencyB]) =>
+    currencyA.localeCompare(currencyB),
+  );
+
+  if (entries.length === 0) {
+    return "0.00";
+  }
+
+  return entries
+    .map(
+      ([currency, amount]) =>
+        `${currency} ${formatAmount(amount)}`,
+    )
+    .join(" · ");
 }
 
 function MetricSkeleton() {
@@ -30,7 +51,7 @@ export function PaymentMetrics({
   paid,
   pending,
   failed,
-  paidAmount,
+  paidAmountsByCurrency,
   loading,
 }: PaymentMetricsProps) {
   const metrics = [
@@ -56,8 +77,11 @@ export function PaymentMetrics({
     },
     {
       label: "Monto pagado",
-      value: `$${formatAmount(paidAmount)}`,
-      description: "Total pagado en la consulta actual",
+      value: formatPaidAmounts(
+        paidAmountsByCurrency,
+      ),
+      description:
+        "Totales separados por moneda en la consulta actual",
     },
   ];
 

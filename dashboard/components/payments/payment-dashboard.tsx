@@ -199,18 +199,26 @@ export function PaymentDashboard() {
       (payment) => payment.status === "failed",
     );
 
-    const paidAmount = paidPayments.reduce(
-      (total, payment) =>
-        total + Number(payment.amount),
-      0,
-    );
+    const paidAmountsByCurrency = paidPayments.reduce<
+      Record<string, number>
+    >((totals, payment) => {
+      const currency =
+        payment.currency.trim().toUpperCase() ||
+        "UNKNOWN";
+
+      totals[currency] =
+        (totals[currency] ?? 0) +
+        Number(payment.amount);
+
+      return totals;
+    }, {});
 
     return {
       total: payments.length,
       paid: paidPayments.length,
       pending: pendingPayments.length,
       failed: failedPayments.length,
-      paidAmount,
+      paidAmountsByCurrency,
     };
   }, [payments]);
 
@@ -251,7 +259,9 @@ export function PaymentDashboard() {
           paid={metrics.paid}
           pending={metrics.pending}
           failed={metrics.failed}
-          paidAmount={metrics.paidAmount}
+          paidAmountsByCurrency={
+            metrics.paidAmountsByCurrency
+          }
           loading={loading}
         />
 
