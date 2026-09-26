@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { useDashboardRole } from "@/components/auth/session/dashboard-session-context";
 import {
   getOrder,
   getOrders,
@@ -13,7 +14,40 @@ import { OrderDetailDrawer } from "./order-detail-drawer";
 import { OrderMetrics } from "./order-metrics";
 import { OrdersTable } from "./orders-table";
 
+const ORDER_MANAGEMENT_ROLES = new Set([
+  "owner",
+  "admin",
+  "manager",
+]);
+
+function getOrderErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  if (error.message === "AUTH_REQUIRED") {
+    return "La sesion expiro. Inicia sesion nuevamente.";
+  }
+
+  if (
+    error.message === "PERMISSION_DENIED" ||
+    error.message.includes("API error 403")
+  ) {
+    return "No tienes permisos para realizar esta accion.";
+  }
+
+  return error.message || fallback;
+}
+
 export function OrderDashboard() {
+  const role = useDashboardRole();
+  const canManageOrders = ORDER_MANAGEMENT_ROLES.has(
+    role.trim().toLowerCase(),
+  );
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,26 +65,38 @@ export function OrderDashboard() {
     useState<string | null>(null);
 
   useEffect(() => {
-    async function loadOrders() {
-      try {
-        setLoading(true);
-        setError(null);
+    let active = true;
 
-        const response = await getOrders();
+    getOrders()
+      .then((response) => {
+        if (!active) {
+          return;
+        }
 
         setOrders(response.orders);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "No fue posible cargar los pedidos.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active) {
+          return;
+        }
 
-    loadOrders();
+        setError(
+          getOrderErrorMessage(
+            err,
+            "No fue posible cargar los pedidos.",
+          ),
+        );
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -86,9 +132,10 @@ export function OrderDashboard() {
     } catch (err) {
       setSelectedOrder(null);
       setDetailError(
-        err instanceof Error
-          ? err.message
-          : "No fue posible cargar el detalle del pedido.",
+        getOrderErrorMessage(
+          err,
+          "No fue posible cargar el detalle del pedido.",
+        ),
       );
     } finally {
       setDetailLoading(false);
@@ -99,6 +146,13 @@ export function OrderDashboard() {
     orderId: number,
     newStatus: string,
   ) {
+    if (!canManageOrders) {
+      setStatusError(
+        "No tienes permisos para modificar pedidos.",
+      );
+      return;
+    }
+
     try {
       setStatusUpdating(true);
       setStatusError(null);
@@ -119,9 +173,10 @@ export function OrderDashboard() {
       );
     } catch (err) {
       setStatusError(
-        err instanceof Error
-          ? err.message
-          : "No fue posible actualizar el estado del pedido.",
+        getOrderErrorMessage(
+          err,
+          "No fue posible actualizar el estado del pedido.",
+        ),
       );
     } finally {
       setStatusUpdating(false);
@@ -151,7 +206,7 @@ export function OrderDashboard() {
   ).length;
 
   return (
-    <main className="min-h-full bg-zinc-100 p-5 text-zinc-950 md:p-8">
+    <div className="min-h-full bg-zinc-100 p-5 text-zinc-950 md:p-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8">
           <p className="text-sm font-medium text-zinc-500">
@@ -166,6 +221,22 @@ export function OrderDashboard() {
             Consulta y gestiona los pedidos recibidos por LPDB AI
             Order Agent.
           </p>
+
+          {!canManageOrders && (
+            <div
+              className="mt-4 max-w-2xl rounded-lg border border-zinc-200 bg-white px-4 py-3"
+              role="status"
+            >
+              <p className="text-sm font-medium text-zinc-700">
+                Acceso de solo lectura
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-zinc-500">
+                Tu rol permite consultar pedidos, pero no modificar
+                su estado.
+              </p>
+            </div>
+          )}
         </div>
 
         <OrderMetrics
@@ -196,9 +267,10 @@ export function OrderDashboard() {
         error={detailError}
         statusUpdating={statusUpdating}
         statusError={statusError}
+        canManageOrders={canManageOrders}
         onClose={handleCloseOrder}
         onUpdateStatus={handleUpdateOrderStatus}
       />
-    </main>
+    </div>
   );
 }

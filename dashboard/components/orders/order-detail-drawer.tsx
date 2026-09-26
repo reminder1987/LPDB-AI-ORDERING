@@ -20,6 +20,7 @@ type OrderDetailDrawerProps = {
   error: string | null;
   statusUpdating: boolean;
   statusError: string | null;
+  canManageOrders: boolean;
   onClose: () => void;
   onUpdateStatus: (
     orderId: number,
@@ -33,6 +34,7 @@ export function OrderDetailDrawer({
   error,
   statusUpdating,
   statusError,
+  canManageOrders,
   onClose,
   onUpdateStatus,
 }: OrderDetailDrawerProps) {
@@ -63,6 +65,10 @@ export function OrderDetailDrawer({
   if (!isOpen) {
     return null;
   }
+
+  const hasManualActions =
+    order?.status === "created" ||
+    order?.status === "confirmed";
 
   return (
     <div
@@ -262,10 +268,7 @@ export function OrderDetailDrawer({
                         {item.combo.beverage && (
                           <p className="mt-1 break-words text-sm text-zinc-600">
                             Bebida:{" "}
-                            {
-                              item.combo.beverage
-                                .product
-                            }
+                            {item.combo.beverage.product}
                           </p>
                         )}
 
@@ -321,61 +324,76 @@ export function OrderDetailDrawer({
                 </div>
               )}
 
-              {order.status === "created" && (
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    disabled={statusUpdating}
-                    aria-busy={statusUpdating}
-                    onClick={() =>
-                      onUpdateStatus(
-                        order.id,
-                        "confirmed",
-                      )
-                    }
-                    className="min-h-11 flex-1 rounded-lg bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {statusUpdating
-                      ? "Actualizando..."
-                      : "Confirmar pedido"}
-                  </button>
+              {!canManageOrders && hasManualActions && (
+                <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                  <p className="text-sm font-medium text-zinc-700">
+                    Pedido disponible en modo lectura.
+                  </p>
 
-                  <button
-                    type="button"
-                    disabled={statusUpdating}
-                    onClick={() =>
-                      onUpdateStatus(
-                        order.id,
-                        "cancelled",
-                      )
-                    }
-                    className="min-h-11 flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Cancelar pedido
-                  </button>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    Tu rol no permite confirmar ni cancelar
+                    pedidos.
+                  </p>
                 </div>
               )}
 
-              {order.status === "confirmed" && (
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    disabled={statusUpdating}
-                    aria-busy={statusUpdating}
-                    onClick={() =>
-                      onUpdateStatus(
-                        order.id,
-                        "cancelled",
-                      )
-                    }
-                    className="min-h-11 w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {statusUpdating
-                      ? "Actualizando..."
-                      : "Cancelar pedido"}
-                  </button>
-                </div>
-              )}
+              {canManageOrders &&
+                order.status === "created" && (
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      aria-busy={statusUpdating}
+                      onClick={() =>
+                        onUpdateStatus(
+                          order.id,
+                          "confirmed",
+                        )
+                      }
+                      className="min-h-11 flex-1 rounded-lg bg-zinc-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {statusUpdating
+                        ? "Actualizando..."
+                        : "Confirmar pedido"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      onClick={() =>
+                        onUpdateStatus(
+                          order.id,
+                          "cancelled",
+                        )
+                      }
+                      className="min-h-11 flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancelar pedido
+                    </button>
+                  </div>
+                )}
+
+              {canManageOrders &&
+                order.status === "confirmed" && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      aria-busy={statusUpdating}
+                      onClick={() =>
+                        onUpdateStatus(
+                          order.id,
+                          "cancelled",
+                        )
+                      }
+                      className="min-h-11 w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {statusUpdating
+                        ? "Actualizando..."
+                        : "Cancelar pedido"}
+                    </button>
+                  </div>
+                )}
 
               {(order.status === "submitting" ||
                 order.status === "submitted" ||
@@ -383,8 +401,16 @@ export function OrderDetailDrawer({
                 order.status === "cancelled") && (
                 <div className="mt-4 rounded-lg bg-zinc-50 px-4 py-3">
                   <p className="text-sm font-medium text-zinc-600">
-                    No hay acciones manuales disponibles para este estado.
+                    No hay acciones manuales disponibles para este
+                    estado.
                   </p>
+
+                  {order.status === "submitting" && (
+                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                      El envio al proveedor externo esta siendo
+                      gestionado automaticamente.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
