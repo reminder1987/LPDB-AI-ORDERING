@@ -24,6 +24,12 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     enabled: true,
   },
   {
+    label: "Pagos",
+    href: "/pagos",
+    description: "Pagos y estado de transacciones",
+    enabled: true,
+  },
+  {
     label: "Operaciones",
     href: "/operaciones",
     description: "Incidentes y salud operacional",

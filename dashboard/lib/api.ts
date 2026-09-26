@@ -63,6 +63,31 @@ export interface OrderListResponse {
   orders: Order[];
 }
 
+export type PaymentStatus =
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "cancelled"
+  | "refunded";
+
+export interface Payment {
+  id: number;
+  order_id: number;
+  provider: string;
+  external_id: string | null;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaymentFilters {
+  status?: PaymentStatus;
+  provider?: string;
+}
+
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -133,5 +158,38 @@ export async function updateOrderStatus(
         status,
       }),
     },
+  );
+}
+
+export async function getPayments(
+  filters: PaymentFilters = {},
+): Promise<Payment[]> {
+  const searchParams = new URLSearchParams();
+
+  if (filters.status) {
+    searchParams.set("status", filters.status);
+  }
+
+  if (filters.provider?.trim()) {
+    searchParams.set(
+      "provider",
+      filters.provider.trim(),
+    );
+  }
+
+  const query = searchParams.toString();
+
+  return apiFetch<Payment[]>(
+    query
+      ? `/payments?${query}`
+      : "/payments",
+  );
+}
+
+export async function getPayment(
+  paymentId: number,
+): Promise<Payment> {
+  return apiFetch<Payment>(
+    `/payments/${paymentId}`,
   );
 }

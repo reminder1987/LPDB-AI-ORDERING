@@ -13,6 +13,7 @@ from app.api.channels import router as channels_router
 from app.api.health import router as health_router
 from app.api.orders import router as orders_router
 from app.api.operational import router as operational_router
+from app.api.payments import router as payments_router
 from app.api.products import router as products_router
 from app.api.webhooks import router as webhooks_router
 
@@ -88,6 +89,7 @@ app.include_router(channels_router)
 app.include_router(health_router)
 app.include_router(orders_router)
 app.include_router(operational_router)
+app.include_router(payments_router)
 app.include_router(products_router)
 app.include_router(webhooks_router)
 
