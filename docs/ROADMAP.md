@@ -904,7 +904,7 @@ Commits de cierre:
 - `8d55ad564afb853d51974ac072cf2b9cbbbd76a4` — responsive/accessibility;
 - `87499d0ea89faed7637dba832ef9d4c7f02a85cf` — tenant/role-ready architecture.
 
-**Punto de reanudación: 20.7 — Operación desde dashboard.**
+**Punto de reanudación: 20.8 — Métricas de negocio.**
 
 ## FASE 21 — Producción
 
@@ -1256,6 +1256,22 @@ Incluir:
 - alertas;
 - actividad operativa;
 - acciones seguras cuando correspondan.
+
+**Estado 20.7:** COMPLETADO / CERRADO
+
+Cierre validado con:
+
+- operación de pedidos y estados;
+- pagos operacionales read-only con métricas separadas por moneda;
+- clientes operacionales;
+- integraciones operacionales con sanitización de secretos;
+- errores, alertas e incidentes;
+- actividad operativa consolidada;
+- acciones de pedidos protegidas por permisos;
+- aislamiento multi-tenant y controles RBAC;
+- 765 tests backend aprobados;
+- 38 tests Playwright aprobados;
+- build, TypeScript, ESLint y git diff --check aprobados.
 
 ### 20.8 — Métricas de negocio
 
