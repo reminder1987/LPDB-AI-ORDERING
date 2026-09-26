@@ -42,6 +42,12 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     enabled: true,
   },
   {
+    label: "Integraciones",
+    href: "/integraciones",
+    description: "Proveedores y conexiones externas",
+    enabled: true,
+  },
+  {
     label: "Metricas",
     href: "/metricas",
     description: "Indicadores operativos y comerciales",

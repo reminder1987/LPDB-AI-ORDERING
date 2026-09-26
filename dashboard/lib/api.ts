@@ -117,6 +117,25 @@ export interface CustomerFilters {
   active?: boolean;
 }
 
+export interface Integration {
+  id: number;
+  provider: string;
+  integration_type: string;
+  external_id: string | null;
+  active: boolean;
+  configuration: Record<string, unknown>;
+  credential_names: string[];
+  credentials_configured: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IntegrationFilters {
+  provider?: string;
+  integration_type?: string;
+  active?: boolean;
+}
+
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -256,5 +275,48 @@ export async function getCustomer(
 ): Promise<CustomerDetail> {
   return apiFetch<CustomerDetail>(
     `/customers/${customerId}`,
+  );
+}
+
+export async function getIntegrations(
+  filters: IntegrationFilters = {},
+): Promise<Integration[]> {
+  const searchParams = new URLSearchParams();
+
+  if (filters.provider?.trim()) {
+    searchParams.set(
+      "provider",
+      filters.provider.trim(),
+    );
+  }
+
+  if (filters.integration_type?.trim()) {
+    searchParams.set(
+      "integration_type",
+      filters.integration_type.trim(),
+    );
+  }
+
+  if (filters.active !== undefined) {
+    searchParams.set(
+      "active",
+      String(filters.active),
+    );
+  }
+
+  const query = searchParams.toString();
+
+  return apiFetch<Integration[]>(
+    query
+      ? `/integrations?${query}`
+      : "/integrations",
+  );
+}
+
+export async function getIntegration(
+  integrationId: number,
+): Promise<Integration> {
+  return apiFetch<Integration>(
+    `/integrations/${integrationId}`,
   );
 }
