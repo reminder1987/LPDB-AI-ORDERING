@@ -48,6 +48,12 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     enabled: true,
   },
   {
+    label: "Actividad",
+    href: "/actividad",
+    description: "Actividad operativa consolidada",
+    enabled: true,
+  },
+  {
     label: "Metricas",
     href: "/metricas",
     description: "Indicadores operativos y comerciales",

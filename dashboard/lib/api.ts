@@ -136,6 +136,32 @@ export interface IntegrationFilters {
   active?: boolean;
 }
 
+export type OperationalActivitySource =
+  | "payment"
+  | "incident"
+  | "integration"
+  | "webhook";
+
+export interface OperationalActivity {
+  id: string;
+  source: OperationalActivitySource;
+  event_type: string;
+  title: string;
+  description: string;
+  occurred_at: string;
+  entity_type: string;
+  entity_id: string;
+  provider: string | null;
+  status: string | null;
+  severity: string | null;
+}
+
+export interface OperationalActivityFilters {
+  source?: OperationalActivitySource;
+  provider?: string;
+  limit?: number;
+}
+
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -318,5 +344,40 @@ export async function getIntegration(
 ): Promise<Integration> {
   return apiFetch<Integration>(
     `/integrations/${integrationId}`,
+  );
+}
+
+export async function getOperationalActivity(
+  filters: OperationalActivityFilters = {},
+): Promise<OperationalActivity[]> {
+  const searchParams = new URLSearchParams();
+
+  if (filters.source) {
+    searchParams.set(
+      "source",
+      filters.source,
+    );
+  }
+
+  if (filters.provider?.trim()) {
+    searchParams.set(
+      "provider",
+      filters.provider.trim(),
+    );
+  }
+
+  if (filters.limit !== undefined) {
+    searchParams.set(
+      "limit",
+      String(filters.limit),
+    );
+  }
+
+  const query = searchParams.toString();
+
+  return apiFetch<OperationalActivity[]>(
+    query
+      ? `/activity?${query}`
+      : "/activity",
   );
 }
