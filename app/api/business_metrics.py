@@ -13,6 +13,7 @@ from app.core.permissions import Permission
 from app.core.tenant_access_context import TenantAccessContext
 from app.services.business_metrics_service import (
     BusinessMetricsSummary,
+    BusinessMetricsTimePoint,
     business_metrics_service,
 )
 
@@ -27,6 +28,12 @@ def _serialize_summary(
     summary: BusinessMetricsSummary,
 ) -> dict[str, Any]:
     return asdict(summary)
+
+
+def _serialize_time_point(
+    point: BusinessMetricsTimePoint,
+) -> dict[str, Any]:
+    return asdict(point)
 
 
 def _validate_time_range(
@@ -68,6 +75,38 @@ def get_business_metrics_summary(
         )
 
         return _serialize_summary(summary)
+
+    finally:
+        session.close()
+
+
+@router.get("/evolution")
+def get_business_metrics_evolution(
+    start_at: datetime | None = Query(default=None),
+    end_at: datetime | None = Query(default=None),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.VIEW_DASHBOARD)
+    ),
+):
+    _validate_time_range(
+        start_at,
+        end_at,
+    )
+
+    session: Session = SessionLocal()
+
+    try:
+        evolution = business_metrics_service.get_daily_evolution(
+            session,
+            tenant_id=access_context.tenant.tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        return [
+            _serialize_time_point(point)
+            for point in evolution
+        ]
 
     finally:
         session.close()

@@ -216,3 +216,165 @@ def test_summary_handles_empty_result():
 
     finally:
         db.close()
+
+
+def test_daily_evolution_groups_orders_by_day_and_orders_chronologically():
+    db = database_module.SessionLocal()
+
+    try:
+        _create_order(
+            db,
+            total=Decimal("30.00"),
+            created_at=datetime(2026, 9, 3, 18, 0, 0),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("10.00"),
+            created_at=datetime(2026, 9, 1, 8, 0, 0),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("20.00"),
+            created_at=datetime(2026, 9, 1, 20, 0, 0),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("40.00"),
+            created_at=datetime(2026, 9, 2, 12, 0, 0),
+        )
+
+        evolution = business_metrics_service.get_daily_evolution(
+            db,
+            tenant_id=1,
+        )
+
+        assert len(evolution) == 3
+
+        assert evolution[0].date.isoformat() == "2026-09-01"
+        assert evolution[0].order_count == 2
+        assert evolution[0].total_order_value == Decimal("30.00")
+        assert evolution[0].average_ticket == Decimal("15.00")
+
+        assert evolution[1].date.isoformat() == "2026-09-02"
+        assert evolution[1].order_count == 1
+        assert evolution[1].total_order_value == Decimal("40.00")
+        assert evolution[1].average_ticket == Decimal("40.00")
+
+        assert evolution[2].date.isoformat() == "2026-09-03"
+        assert evolution[2].order_count == 1
+        assert evolution[2].total_order_value == Decimal("30.00")
+        assert evolution[2].average_ticket == Decimal("30.00")
+
+    finally:
+        db.close()
+
+
+def test_daily_evolution_respects_half_open_time_range():
+    db = database_module.SessionLocal()
+
+    try:
+        start_at = datetime(2026, 9, 2, 0, 0, 0)
+        end_at = datetime(2026, 9, 4, 0, 0, 0)
+
+        _create_order(
+            db,
+            total=Decimal("10.00"),
+            created_at=start_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("20.00"),
+            created_at=start_at,
+        )
+
+        _create_order(
+            db,
+            total=Decimal("30.00"),
+            created_at=end_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("40.00"),
+            created_at=end_at,
+        )
+
+        evolution = business_metrics_service.get_daily_evolution(
+            db,
+            tenant_id=1,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        assert len(evolution) == 2
+
+        assert evolution[0].date.isoformat() == "2026-09-02"
+        assert evolution[0].order_count == 1
+        assert evolution[0].total_order_value == Decimal("20.00")
+
+        assert evolution[1].date.isoformat() == "2026-09-03"
+        assert evolution[1].order_count == 1
+        assert evolution[1].total_order_value == Decimal("30.00")
+
+    finally:
+        db.close()
+
+
+def test_daily_evolution_ignores_orders_from_other_tenants():
+    db = database_module.SessionLocal()
+
+    try:
+        created_at = datetime(2026, 9, 5, 12, 0, 0)
+
+        _create_order(
+            db,
+            tenant_id=1,
+            location_id=1,
+            total=Decimal("25.00"),
+            created_at=created_at,
+        )
+
+        other_tenant, other_location = _create_second_tenant(db)
+
+        _create_order(
+            db,
+            tenant_id=other_tenant.id,
+            location_id=other_location.id,
+            total=Decimal("999.00"),
+            created_at=created_at,
+        )
+
+        evolution = business_metrics_service.get_daily_evolution(
+            db,
+            tenant_id=1,
+        )
+
+        assert len(evolution) == 1
+        assert evolution[0].date.isoformat() == "2026-09-05"
+        assert evolution[0].order_count == 1
+        assert evolution[0].total_order_value == Decimal("25.00")
+        assert evolution[0].average_ticket == Decimal("25.00")
+
+    finally:
+        db.close()
+
+
+def test_daily_evolution_handles_empty_result():
+    db = database_module.SessionLocal()
+
+    try:
+        evolution = business_metrics_service.get_daily_evolution(
+            db,
+            tenant_id=1,
+            start_at=datetime(2099, 1, 1, 0, 0, 0),
+            end_at=datetime(2099, 2, 1, 0, 0, 0),
+        )
+
+        assert evolution == []
+
+    finally:
+        db.close()

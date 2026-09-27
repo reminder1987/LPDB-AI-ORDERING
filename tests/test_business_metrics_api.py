@@ -352,3 +352,173 @@ def test_business_metrics_rejects_invalid_time_range(
     assert response.json()["detail"] == (
         "start_at debe ser anterior a end_at."
     )
+
+
+def test_business_metrics_evolution_requires_authentication(
+    monkeypatch,
+):
+    _configure_database(monkeypatch)
+
+    response = client.get(
+        "/business-metrics/evolution",
+        headers={
+            "X-Tenant": "lpdb",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_business_metrics_evolution_returns_daily_series_for_current_tenant(
+    monkeypatch,
+):
+    _ensure_tenant(
+        tenant_id=2,
+        slug="metrics-evolution-tenant-two",
+        name="Metrics Evolution Tenant Two",
+    )
+
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-evolution@example.com",
+    )
+
+    _persist_order(
+        order_id=95101,
+        tenant_id=1,
+        total=Decimal("10.00"),
+        status="created",
+        created_at=datetime(2026, 9, 1, 8, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95102,
+        tenant_id=1,
+        total=Decimal("20.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 1, 20, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95103,
+        tenant_id=1,
+        total=Decimal("40.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 2, 12, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95104,
+        tenant_id=2,
+        total=Decimal("999.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 1, 12, 0, 0),
+    )
+
+    response = client.get(
+        "/business-metrics/evolution",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 2
+
+    assert data[0]["date"] == "2026-09-01"
+    assert data[0]["order_count"] == 2
+    assert Decimal(data[0]["total_order_value"]) == Decimal("30.00")
+    assert Decimal(data[0]["average_ticket"]) == Decimal("15.00")
+
+    assert data[1]["date"] == "2026-09-02"
+    assert data[1]["order_count"] == 1
+    assert Decimal(data[1]["total_order_value"]) == Decimal("40.00")
+    assert Decimal(data[1]["average_ticket"]) == Decimal("40.00")
+
+
+def test_business_metrics_evolution_filters_by_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-evolution-range@example.com",
+    )
+
+    _persist_order(
+        order_id=95105,
+        tenant_id=1,
+        total=Decimal("10.00"),
+        status="created",
+        created_at=datetime(2026, 8, 31, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95106,
+        tenant_id=1,
+        total=Decimal("20.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 1, 0, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95107,
+        tenant_id=1,
+        total=Decimal("30.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 30, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95108,
+        tenant_id=1,
+        total=Decimal("40.00"),
+        status="submitted",
+        created_at=datetime(2026, 10, 1, 0, 0, 0),
+    )
+
+    response = client.get(
+        "/business-metrics/evolution",
+        params={
+            "start_at": "2026-09-01T00:00:00",
+            "end_at": "2026-10-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 2
+
+    assert data[0]["date"] == "2026-09-01"
+    assert data[0]["order_count"] == 1
+    assert Decimal(data[0]["total_order_value"]) == Decimal("20.00")
+
+    assert data[1]["date"] == "2026-09-30"
+    assert data[1]["order_count"] == 1
+    assert Decimal(data[1]["total_order_value"]) == Decimal("30.00")
+
+
+def test_business_metrics_evolution_rejects_invalid_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-evolution-invalid@example.com",
+    )
+
+    response = client.get(
+        "/business-metrics/evolution",
+        params={
+            "start_at": "2026-10-01T00:00:00",
+            "end_at": "2026-09-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "start_at debe ser anterior a end_at."
+    )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -18,6 +18,14 @@ class BusinessMetricsSummary:
     status_counts: dict[str, int]
 
 
+@dataclass(frozen=True)
+class BusinessMetricsTimePoint:
+    date: date
+    order_count: int
+    total_order_value: Decimal
+    average_ticket: Decimal
+
+
 class BusinessMetricsService:
     def get_summary(
         self,
@@ -27,19 +35,11 @@ class BusinessMetricsService:
         start_at: datetime | None = None,
         end_at: datetime | None = None,
     ) -> BusinessMetricsSummary:
-        filters = [
-            OrderDB.tenant_id == tenant_id,
-        ]
-
-        if start_at is not None:
-            filters.append(
-                OrderDB.created_at >= start_at
-            )
-
-        if end_at is not None:
-            filters.append(
-                OrderDB.created_at < end_at
-            )
+        filters = self._build_filters(
+            tenant_id=tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
 
         summary_row = session.execute(
             select(
@@ -64,27 +64,92 @@ class BusinessMetricsService:
             .group_by(OrderDB.status)
         ).all()
 
-        order_count = int(summary_row[0] or 0)
-
-        total_order_value = self._to_decimal(
-            summary_row[1]
-        )
-
-        average_ticket = self._to_decimal(
-            summary_row[2]
-        )
-
-        status_counts = {
-            str(status): int(count)
-            for status, count in status_rows
-        }
-
         return BusinessMetricsSummary(
-            order_count=order_count,
-            total_order_value=total_order_value,
-            average_ticket=average_ticket,
-            status_counts=status_counts,
+            order_count=int(summary_row[0] or 0),
+            total_order_value=self._to_decimal(
+                summary_row[1]
+            ),
+            average_ticket=self._to_decimal(
+                summary_row[2]
+            ),
+            status_counts={
+                str(status): int(count)
+                for status, count in status_rows
+            },
         )
+
+    def get_daily_evolution(
+        self,
+        session: Session,
+        *,
+        tenant_id: int,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> list[BusinessMetricsTimePoint]:
+        filters = self._build_filters(
+            tenant_id=tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        day_expression = func.date(
+            OrderDB.created_at
+        )
+
+        rows = session.execute(
+            select(
+                day_expression.label("metric_date"),
+                func.count(OrderDB.id),
+                func.coalesce(
+                    func.sum(OrderDB.total),
+                    Decimal("0.00"),
+                ),
+                func.coalesce(
+                    func.avg(OrderDB.total),
+                    Decimal("0.00"),
+                ),
+            )
+            .where(*filters)
+            .group_by(day_expression)
+            .order_by(day_expression)
+        ).all()
+
+        return [
+            BusinessMetricsTimePoint(
+                date=self._to_date(row[0]),
+                order_count=int(row[1] or 0),
+                total_order_value=self._to_decimal(
+                    row[2]
+                ),
+                average_ticket=self._to_decimal(
+                    row[3]
+                ),
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def _build_filters(
+        *,
+        tenant_id: int,
+        start_at: datetime | None,
+        end_at: datetime | None,
+    ) -> list:
+        filters = [
+            OrderDB.tenant_id == tenant_id,
+        ]
+
+        if start_at is not None:
+            filters.append(
+                OrderDB.created_at >= start_at
+            )
+
+        if end_at is not None:
+            filters.append(
+                OrderDB.created_at < end_at
+            )
+
+        return filters
 
     @staticmethod
     def _to_decimal(
@@ -98,12 +163,25 @@ class BusinessMetricsService:
 
         return Decimal(str(value))
 
+    @staticmethod
+    def _to_date(
+        value: date | datetime | str,
+    ) -> date:
+        if isinstance(value, datetime):
+            return value.date()
+
+        if isinstance(value, date):
+            return value
+
+        return date.fromisoformat(value)
+
 
 business_metrics_service = BusinessMetricsService()
 
 
 __all__ = [
     "BusinessMetricsSummary",
+    "BusinessMetricsTimePoint",
     "BusinessMetricsService",
     "business_metrics_service",
 ]
