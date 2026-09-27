@@ -1,4 +1,4 @@
-﻿import {
+import {
   clearSession,
   getAccessToken,
   getActiveTenant,
@@ -160,6 +160,47 @@ export interface OperationalActivityFilters {
   source?: OperationalActivitySource;
   provider?: string;
   limit?: number;
+}
+
+export interface BusinessMetricsFilters {
+  start_at?: string;
+  end_at?: string;
+}
+
+export interface BusinessMetricsSummary {
+  order_count: number;
+  total_order_value: number;
+  average_ticket: number;
+  status_counts: Record<string, number>;
+}
+
+export interface BusinessMetricsTimePoint {
+  date: string;
+  order_count: number;
+  total_order_value: number;
+  average_ticket: number;
+}
+
+export interface BusinessMetricsLocation {
+  location_id: number;
+  location_name: string;
+  city: string | null;
+  order_count: number;
+  total_order_value: number;
+  average_ticket: number;
+}
+
+export interface BusinessMetricsConversions {
+  total_orders: number;
+  created_count: number;
+  confirmed_count: number;
+  submitting_count: number;
+  submitted_count: number;
+  failed_count: number;
+  cancelled_count: number;
+  submitted_rate: number;
+  failed_rate: number;
+  cancelled_rate: number;
 }
 
 async function apiFetch<T>(
@@ -379,5 +420,54 @@ export async function getOperationalActivity(
     query
       ? `/activity?${query}`
       : "/activity",
+  );
+}
+function buildBusinessMetricsQuery(
+  filters: BusinessMetricsFilters = {},
+): string {
+  const searchParams = new URLSearchParams();
+
+  if (filters.start_at) {
+    searchParams.set("start_at", filters.start_at);
+  }
+
+  if (filters.end_at) {
+    searchParams.set("end_at", filters.end_at);
+  }
+
+  const query = searchParams.toString();
+
+  return query ? "?" + query : "";
+}
+
+export async function getBusinessMetricsSummary(
+  filters: BusinessMetricsFilters = {},
+): Promise<BusinessMetricsSummary> {
+  return apiFetch<BusinessMetricsSummary>(
+    "/business-metrics/summary" + buildBusinessMetricsQuery(filters),
+  );
+}
+
+export async function getBusinessMetricsEvolution(
+  filters: BusinessMetricsFilters = {},
+): Promise<BusinessMetricsTimePoint[]> {
+  return apiFetch<BusinessMetricsTimePoint[]>(
+    "/business-metrics/evolution" + buildBusinessMetricsQuery(filters),
+  );
+}
+
+export async function getBusinessMetricsLocations(
+  filters: BusinessMetricsFilters = {},
+): Promise<BusinessMetricsLocation[]> {
+  return apiFetch<BusinessMetricsLocation[]>(
+    "/business-metrics/locations" + buildBusinessMetricsQuery(filters),
+  );
+}
+
+export async function getBusinessMetricsConversions(
+  filters: BusinessMetricsFilters = {},
+): Promise<BusinessMetricsConversions> {
+  return apiFetch<BusinessMetricsConversions>(
+    "/business-metrics/conversions" + buildBusinessMetricsQuery(filters),
   );
 }

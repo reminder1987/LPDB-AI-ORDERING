@@ -1,4 +1,4 @@
-﻿export type DashboardNavigationItem = {
+export type DashboardNavigationItem = {
   label: string;
   href: string;
   description: string;
@@ -57,7 +57,7 @@ const dashboardNavigationItems: DashboardNavigationItem[] = [
     label: "Metricas",
     href: "/metricas",
     description: "Indicadores operativos y comerciales",
-    enabled: false,
+    enabled: true,
   },
   {
     label: "Configuracion",
