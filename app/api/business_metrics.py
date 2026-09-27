@@ -12,6 +12,7 @@ from app.core.database import SessionLocal
 from app.core.permissions import Permission
 from app.core.tenant_access_context import TenantAccessContext
 from app.services.business_metrics_service import (
+    BusinessMetricsLocation,
     BusinessMetricsSummary,
     BusinessMetricsTimePoint,
     business_metrics_service,
@@ -34,6 +35,12 @@ def _serialize_time_point(
     point: BusinessMetricsTimePoint,
 ) -> dict[str, Any]:
     return asdict(point)
+
+
+def _serialize_location(
+    location: BusinessMetricsLocation,
+) -> dict[str, Any]:
+    return asdict(location)
 
 
 def _validate_time_range(
@@ -106,6 +113,38 @@ def get_business_metrics_evolution(
         return [
             _serialize_time_point(point)
             for point in evolution
+        ]
+
+    finally:
+        session.close()
+
+
+@router.get("/locations")
+def get_business_metrics_locations(
+    start_at: datetime | None = Query(default=None),
+    end_at: datetime | None = Query(default=None),
+    access_context: TenantAccessContext = Depends(
+        require_permission(Permission.VIEW_DASHBOARD)
+    ),
+):
+    _validate_time_range(
+        start_at,
+        end_at,
+    )
+
+    session: Session = SessionLocal()
+
+    try:
+        locations = business_metrics_service.get_location_performance(
+            session,
+            tenant_id=access_context.tenant.tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        return [
+            _serialize_location(location)
+            for location in locations
         ]
 
     finally:

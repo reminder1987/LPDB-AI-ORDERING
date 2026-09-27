@@ -522,3 +522,219 @@ def test_business_metrics_evolution_rejects_invalid_time_range(
     assert response.json()["detail"] == (
         "start_at debe ser anterior a end_at."
     )
+
+
+def test_business_metrics_locations_requires_authentication(
+    monkeypatch,
+):
+    _configure_database(monkeypatch)
+
+    response = client.get(
+        "/business-metrics/locations",
+        headers={
+            "X-Tenant": "lpdb",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_business_metrics_locations_returns_performance_for_current_tenant(
+    monkeypatch,
+):
+    _ensure_tenant(
+        tenant_id=2,
+        slug="metrics-locations-tenant-two",
+        name="Metrics Locations Tenant Two",
+    )
+
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-locations@example.com",
+    )
+
+    second_location_id = 95201
+
+    db = database_module.SessionLocal()
+
+    try:
+        db.add(
+            LocationDB(
+                id=second_location_id,
+                tenant_id=1,
+                customer_name="Sunrise",
+                toast_name="Sunrise",
+                city="Sunrise",
+                address="Test Address",
+                active=True,
+            )
+        )
+        db.commit()
+
+    finally:
+        db.close()
+
+    created_at = datetime(2026, 9, 20, 12, 0, 0)
+
+    _persist_order(
+        order_id=95202,
+        tenant_id=1,
+        total=Decimal("10.00"),
+        status="created",
+        created_at=created_at,
+    )
+
+    _persist_order(
+        order_id=95203,
+        tenant_id=1,
+        total=Decimal("30.00"),
+        status="submitted",
+        created_at=created_at,
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        db.add(
+            OrderDB(
+                id=95204,
+                tenant_id=1,
+                customer_name="Business Metrics Location Test",
+                location_id=second_location_id,
+                product="Metrics Product",
+                quantity=1,
+                total=Decimal("50.00"),
+                status="submitted",
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        )
+        db.commit()
+
+    finally:
+        db.close()
+
+    _persist_order(
+        order_id=95205,
+        tenant_id=2,
+        total=Decimal("999.00"),
+        status="submitted",
+        created_at=created_at,
+    )
+
+    response = client.get(
+        "/business-metrics/locations",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    by_location = {
+        item["location_id"]: item
+        for item in data
+    }
+
+    assert 1 in by_location
+    assert second_location_id in by_location
+
+    primary = by_location[1]
+    assert primary["order_count"] == 2
+    assert Decimal(primary["total_order_value"]) == Decimal("40.00")
+    assert Decimal(primary["average_ticket"]) == Decimal("20.00")
+
+    sunrise = by_location[second_location_id]
+    assert sunrise["location_name"] == "Sunrise"
+    assert sunrise["city"] == "Sunrise"
+    assert sunrise["order_count"] == 1
+    assert Decimal(sunrise["total_order_value"]) == Decimal("50.00")
+    assert Decimal(sunrise["average_ticket"]) == Decimal("50.00")
+
+    assert all(
+        Decimal(item["total_order_value"]) != Decimal("999.00")
+        for item in data
+    )
+
+
+def test_business_metrics_locations_filters_by_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-locations-range@example.com",
+    )
+
+    _persist_order(
+        order_id=95206,
+        tenant_id=1,
+        total=Decimal("10.00"),
+        status="created",
+        created_at=datetime(2026, 8, 31, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95207,
+        tenant_id=1,
+        total=Decimal("20.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 1, 0, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95208,
+        tenant_id=1,
+        total=Decimal("30.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 30, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95209,
+        tenant_id=1,
+        total=Decimal("40.00"),
+        status="submitted",
+        created_at=datetime(2026, 10, 1, 0, 0, 0),
+    )
+
+    response = client.get(
+        "/business-metrics/locations",
+        params={
+            "start_at": "2026-09-01T00:00:00",
+            "end_at": "2026-10-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["location_id"] == 1
+    assert data[0]["order_count"] == 2
+    assert Decimal(data[0]["total_order_value"]) == Decimal("50.00")
+    assert Decimal(data[0]["average_ticket"]) == Decimal("25.00")
+
+
+def test_business_metrics_locations_rejects_invalid_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-locations-invalid@example.com",
+    )
+
+    response = client.get(
+        "/business-metrics/locations",
+        params={
+            "start_at": "2026-10-01T00:00:00",
+            "end_at": "2026-09-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "start_at debe ser anterior a end_at."
+    )

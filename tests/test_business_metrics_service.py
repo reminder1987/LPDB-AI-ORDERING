@@ -378,3 +378,184 @@ def test_daily_evolution_handles_empty_result():
 
     finally:
         db.close()
+
+
+def test_location_performance_groups_orders_by_location():
+    db = database_module.SessionLocal()
+
+    try:
+        second_location = LocationDB(
+            id=92001,
+            tenant_id=1,
+            customer_name="Sunrise",
+            toast_name="Sunrise",
+            city="Sunrise",
+            address="Test Address",
+            active=True,
+        )
+        db.add(second_location)
+        db.commit()
+
+        _create_order(
+            db,
+            tenant_id=1,
+            location_id=1,
+            total=Decimal("10.00"),
+            created_at=datetime(2026, 9, 10, 10, 0, 0),
+        )
+
+        _create_order(
+            db,
+            tenant_id=1,
+            location_id=1,
+            total=Decimal("30.00"),
+            created_at=datetime(2026, 9, 10, 11, 0, 0),
+        )
+
+        _create_order(
+            db,
+            tenant_id=1,
+            location_id=second_location.id,
+            total=Decimal("50.00"),
+            created_at=datetime(2026, 9, 10, 12, 0, 0),
+        )
+
+        performance = (
+            business_metrics_service.get_location_performance(
+                db,
+                tenant_id=1,
+            )
+        )
+
+        by_location = {
+            item.location_id: item
+            for item in performance
+        }
+
+        assert 1 in by_location
+        assert second_location.id in by_location
+
+        primary = by_location[1]
+        assert primary.order_count == 2
+        assert primary.total_order_value == Decimal("40.00")
+        assert primary.average_ticket == Decimal("20.00")
+
+        sunrise = by_location[second_location.id]
+        assert sunrise.location_name == "Sunrise"
+        assert sunrise.city == "Sunrise"
+        assert sunrise.order_count == 1
+        assert sunrise.total_order_value == Decimal("50.00")
+        assert sunrise.average_ticket == Decimal("50.00")
+
+    finally:
+        db.close()
+
+
+def test_location_performance_respects_half_open_time_range():
+    db = database_module.SessionLocal()
+
+    try:
+        start_at = datetime(2026, 9, 1, 0, 0, 0)
+        end_at = datetime(2026, 10, 1, 0, 0, 0)
+
+        _create_order(
+            db,
+            total=Decimal("10.00"),
+            created_at=start_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("20.00"),
+            created_at=start_at,
+        )
+
+        _create_order(
+            db,
+            total=Decimal("30.00"),
+            created_at=end_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            db,
+            total=Decimal("40.00"),
+            created_at=end_at,
+        )
+
+        performance = (
+            business_metrics_service.get_location_performance(
+                db,
+                tenant_id=1,
+                start_at=start_at,
+                end_at=end_at,
+            )
+        )
+
+        assert len(performance) == 1
+        assert performance[0].location_id == 1
+        assert performance[0].order_count == 2
+        assert performance[0].total_order_value == Decimal("50.00")
+        assert performance[0].average_ticket == Decimal("25.00")
+
+    finally:
+        db.close()
+
+
+def test_location_performance_ignores_other_tenants():
+    db = database_module.SessionLocal()
+
+    try:
+        created_at = datetime(2026, 9, 15, 12, 0, 0)
+
+        _create_order(
+            db,
+            tenant_id=1,
+            location_id=1,
+            total=Decimal("25.00"),
+            created_at=created_at,
+        )
+
+        other_tenant, other_location = _create_second_tenant(db)
+
+        _create_order(
+            db,
+            tenant_id=other_tenant.id,
+            location_id=other_location.id,
+            total=Decimal("999.00"),
+            created_at=created_at,
+        )
+
+        performance = (
+            business_metrics_service.get_location_performance(
+                db,
+                tenant_id=1,
+            )
+        )
+
+        assert len(performance) == 1
+        assert performance[0].location_id == 1
+        assert performance[0].order_count == 1
+        assert performance[0].total_order_value == Decimal("25.00")
+        assert performance[0].average_ticket == Decimal("25.00")
+
+    finally:
+        db.close()
+
+
+def test_location_performance_handles_empty_result():
+    db = database_module.SessionLocal()
+
+    try:
+        performance = (
+            business_metrics_service.get_location_performance(
+                db,
+                tenant_id=1,
+                start_at=datetime(2099, 1, 1, 0, 0, 0),
+                end_at=datetime(2099, 2, 1, 0, 0, 0),
+            )
+        )
+
+        assert performance == []
+
+    finally:
+        db.close()

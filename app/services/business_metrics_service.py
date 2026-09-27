@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.location_db import LocationDB
 from app.models.order_db import OrderDB
 
 
@@ -21,6 +22,16 @@ class BusinessMetricsSummary:
 @dataclass(frozen=True)
 class BusinessMetricsTimePoint:
     date: date
+    order_count: int
+    total_order_value: Decimal
+    average_ticket: Decimal
+
+
+@dataclass(frozen=True)
+class BusinessMetricsLocation:
+    location_id: int
+    location_name: str
+    city: str | None
     order_count: int
     total_order_value: Decimal
     average_ticket: Decimal
@@ -128,6 +139,69 @@ class BusinessMetricsService:
             for row in rows
         ]
 
+    def get_location_performance(
+        self,
+        session: Session,
+        *,
+        tenant_id: int,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> list[BusinessMetricsLocation]:
+        filters = self._build_filters(
+            tenant_id=tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        rows = session.execute(
+            select(
+                LocationDB.id,
+                LocationDB.customer_name,
+                LocationDB.city,
+                func.count(OrderDB.id),
+                func.coalesce(
+                    func.sum(OrderDB.total),
+                    Decimal("0.00"),
+                ),
+                func.coalesce(
+                    func.avg(OrderDB.total),
+                    Decimal("0.00"),
+                ),
+            )
+            .join(
+                OrderDB,
+                OrderDB.location_id == LocationDB.id,
+            )
+            .where(
+                LocationDB.tenant_id == tenant_id,
+                *filters,
+            )
+            .group_by(
+                LocationDB.id,
+                LocationDB.customer_name,
+                LocationDB.city,
+            )
+            .order_by(
+                LocationDB.id
+            )
+        ).all()
+
+        return [
+            BusinessMetricsLocation(
+                location_id=int(row[0]),
+                location_name=str(row[1]),
+                city=row[2],
+                order_count=int(row[3] or 0),
+                total_order_value=self._to_decimal(
+                    row[4]
+                ),
+                average_ticket=self._to_decimal(
+                    row[5]
+                ),
+            )
+            for row in rows
+        ]
+
     @staticmethod
     def _build_filters(
         *,
@@ -180,6 +254,7 @@ business_metrics_service = BusinessMetricsService()
 
 
 __all__ = [
+    "BusinessMetricsLocation",
     "BusinessMetricsSummary",
     "BusinessMetricsTimePoint",
     "BusinessMetricsService",
