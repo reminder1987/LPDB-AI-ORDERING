@@ -559,3 +559,184 @@ def test_location_performance_handles_empty_result():
 
     finally:
         db.close()
+
+
+def test_conversions_calculates_status_counts_and_rates():
+    session = database_module.SessionLocal()
+
+    try:
+        created_at = datetime(2026, 9, 20, 12, 0, 0)
+
+        statuses = [
+            "created",
+            "confirmed",
+            "submitting",
+            "submitted",
+            "submitted",
+            "submitted",
+            "failed",
+            "cancelled",
+        ]
+
+        for index, status in enumerate(statuses):
+            _create_order(
+                session,
+                tenant_id=1,
+                total=Decimal("10.00"),
+                status=status,
+                created_at=created_at,
+            )
+
+        session.commit()
+
+        metrics = business_metrics_service.get_conversions(
+            session,
+            tenant_id=1,
+        )
+
+        assert metrics.total_orders == 8
+        assert metrics.created_count == 1
+        assert metrics.confirmed_count == 1
+        assert metrics.submitting_count == 1
+        assert metrics.submitted_count == 3
+        assert metrics.failed_count == 1
+        assert metrics.cancelled_count == 1
+
+        assert metrics.submitted_rate == Decimal("0.3750")
+        assert metrics.failed_rate == Decimal("0.1250")
+        assert metrics.cancelled_rate == Decimal("0.1250")
+
+    finally:
+        session.close()
+
+
+def test_conversions_respects_half_open_time_range():
+    session = database_module.SessionLocal()
+
+    try:
+        start_at = datetime(2026, 9, 1, 0, 0, 0)
+        end_at = datetime(2026, 10, 1, 0, 0, 0)
+
+        _create_order(
+            session,
+            tenant_id=1,
+            total=Decimal("10.00"),
+            status="submitted",
+            created_at=start_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            session,
+            tenant_id=1,
+            total=Decimal("20.00"),
+            status="submitted",
+            created_at=start_at,
+        )
+
+        _create_order(
+            session,
+            tenant_id=1,
+            total=Decimal("30.00"),
+            status="failed",
+            created_at=end_at - timedelta(seconds=1),
+        )
+
+        _create_order(
+            session,
+            tenant_id=1,
+            total=Decimal("40.00"),
+            status="cancelled",
+            created_at=end_at,
+        )
+
+        session.commit()
+
+        metrics = business_metrics_service.get_conversions(
+            session,
+            tenant_id=1,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        assert metrics.total_orders == 2
+        assert metrics.submitted_count == 1
+        assert metrics.failed_count == 1
+        assert metrics.cancelled_count == 0
+
+        assert metrics.submitted_rate == Decimal("0.5000")
+        assert metrics.failed_rate == Decimal("0.5000")
+        assert metrics.cancelled_rate == Decimal("0.0000")
+
+    finally:
+        session.close()
+
+
+def test_conversions_ignores_other_tenants():
+    session = database_module.SessionLocal()
+
+    try:
+        other_tenant, other_location = _create_second_tenant(
+            session
+        )
+
+        created_at = datetime(2026, 9, 20, 12, 0, 0)
+
+        _create_order(
+            session,
+            tenant_id=1,
+            total=Decimal("25.00"),
+            status="submitted",
+            created_at=created_at,
+        )
+
+        _create_order(
+            session,
+            tenant_id=other_tenant.id,
+            location_id=other_location.id,
+            total=Decimal("999.00"),
+            status="failed",
+            created_at=created_at,
+        )
+
+        session.commit()
+
+        metrics = business_metrics_service.get_conversions(
+            session,
+            tenant_id=1,
+        )
+
+        assert metrics.total_orders == 1
+        assert metrics.submitted_count == 1
+        assert metrics.failed_count == 0
+        assert metrics.submitted_rate == Decimal("1.0000")
+        assert metrics.failed_rate == Decimal("0.0000")
+
+    finally:
+        session.close()
+
+
+def test_conversions_handles_empty_result():
+    session = database_module.SessionLocal()
+
+    try:
+        metrics = business_metrics_service.get_conversions(
+            session,
+            tenant_id=1,
+            start_at=datetime(2099, 1, 1, 0, 0, 0),
+            end_at=datetime(2099, 2, 1, 0, 0, 0),
+        )
+
+        assert metrics.total_orders == 0
+        assert metrics.created_count == 0
+        assert metrics.confirmed_count == 0
+        assert metrics.submitting_count == 0
+        assert metrics.submitted_count == 0
+        assert metrics.failed_count == 0
+        assert metrics.cancelled_count == 0
+
+        assert metrics.submitted_rate == Decimal("0.00")
+        assert metrics.failed_rate == Decimal("0.00")
+        assert metrics.cancelled_rate == Decimal("0.00")
+
+    finally:
+        session.close()

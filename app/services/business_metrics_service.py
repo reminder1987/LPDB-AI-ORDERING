@@ -7,6 +7,14 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.order_status import (
+    ORDER_STATUS_CANCELLED,
+    ORDER_STATUS_CONFIRMED,
+    ORDER_STATUS_CREATED,
+    ORDER_STATUS_FAILED,
+    ORDER_STATUS_SUBMITTED,
+    ORDER_STATUS_SUBMITTING,
+)
 from app.models.location_db import LocationDB
 from app.models.order_db import OrderDB
 
@@ -35,6 +43,20 @@ class BusinessMetricsLocation:
     order_count: int
     total_order_value: Decimal
     average_ticket: Decimal
+
+
+@dataclass(frozen=True)
+class BusinessMetricsConversions:
+    total_orders: int
+    created_count: int
+    confirmed_count: int
+    submitting_count: int
+    submitted_count: int
+    failed_count: int
+    cancelled_count: int
+    submitted_rate: Decimal
+    failed_rate: Decimal
+    cancelled_rate: Decimal
 
 
 class BusinessMetricsService:
@@ -202,6 +224,85 @@ class BusinessMetricsService:
             for row in rows
         ]
 
+    def get_conversions(
+        self,
+        session: Session,
+        *,
+        tenant_id: int,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
+    ) -> BusinessMetricsConversions:
+        filters = self._build_filters(
+            tenant_id=tenant_id,
+            start_at=start_at,
+            end_at=end_at,
+        )
+
+        rows = session.execute(
+            select(
+                OrderDB.status,
+                func.count(OrderDB.id),
+            )
+            .where(*filters)
+            .group_by(OrderDB.status)
+        ).all()
+
+        status_counts = {
+            str(status): int(count)
+            for status, count in rows
+        }
+
+        total_orders = sum(
+            status_counts.values()
+        )
+
+        created_count = status_counts.get(
+            ORDER_STATUS_CREATED,
+            0,
+        )
+        confirmed_count = status_counts.get(
+            ORDER_STATUS_CONFIRMED,
+            0,
+        )
+        submitting_count = status_counts.get(
+            ORDER_STATUS_SUBMITTING,
+            0,
+        )
+        submitted_count = status_counts.get(
+            ORDER_STATUS_SUBMITTED,
+            0,
+        )
+        failed_count = status_counts.get(
+            ORDER_STATUS_FAILED,
+            0,
+        )
+        cancelled_count = status_counts.get(
+            ORDER_STATUS_CANCELLED,
+            0,
+        )
+
+        return BusinessMetricsConversions(
+            total_orders=total_orders,
+            created_count=created_count,
+            confirmed_count=confirmed_count,
+            submitting_count=submitting_count,
+            submitted_count=submitted_count,
+            failed_count=failed_count,
+            cancelled_count=cancelled_count,
+            submitted_rate=self._calculate_rate(
+                submitted_count,
+                total_orders,
+            ),
+            failed_rate=self._calculate_rate(
+                failed_count,
+                total_orders,
+            ),
+            cancelled_rate=self._calculate_rate(
+                cancelled_count,
+                total_orders,
+            ),
+        )
+
     @staticmethod
     def _build_filters(
         *,
@@ -249,11 +350,27 @@ class BusinessMetricsService:
 
         return date.fromisoformat(value)
 
+    @staticmethod
+    def _calculate_rate(
+        count: int,
+        total: int,
+    ) -> Decimal:
+        if total == 0:
+            return Decimal("0.00")
+
+        return (
+            Decimal(count)
+            / Decimal(total)
+        ).quantize(
+            Decimal("0.0001")
+        )
+
 
 business_metrics_service = BusinessMetricsService()
 
 
 __all__ = [
+    "BusinessMetricsConversions",
     "BusinessMetricsLocation",
     "BusinessMetricsSummary",
     "BusinessMetricsTimePoint",

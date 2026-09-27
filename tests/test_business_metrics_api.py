@@ -738,3 +738,173 @@ def test_business_metrics_locations_rejects_invalid_time_range(
     assert response.json()["detail"] == (
         "start_at debe ser anterior a end_at."
     )
+
+
+def test_business_metrics_conversions_requires_authentication(
+    monkeypatch,
+):
+    _configure_database(monkeypatch)
+
+    response = client.get(
+        "/business-metrics/conversions",
+    )
+
+    assert response.status_code == 401
+
+
+def test_business_metrics_conversions_returns_status_counts_and_rates(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-conversions@example.com",
+    )
+
+    _ensure_tenant(
+        tenant_id=2,
+        slug="metrics-conversions-other",
+        name="Metrics Conversions Other",
+    )
+    _ensure_location(
+        tenant_id=2,
+    )
+
+    created_at = datetime(2026, 9, 20, 12, 0, 0)
+
+    statuses = [
+        "created",
+        "confirmed",
+        "submitting",
+        "submitted",
+        "submitted",
+        "submitted",
+        "failed",
+        "cancelled",
+    ]
+
+    for index, status in enumerate(statuses):
+        _persist_order(
+            order_id=95300 + index,
+            tenant_id=1,
+            total=Decimal("10.00"),
+            status=status,
+            created_at=created_at,
+        )
+
+    _persist_order(
+        order_id=95320,
+        tenant_id=2,
+        total=Decimal("999.00"),
+        status="failed",
+        created_at=created_at,
+    )
+
+    response = client.get(
+        "/business-metrics/conversions",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total_orders"] == 8
+    assert data["created_count"] == 1
+    assert data["confirmed_count"] == 1
+    assert data["submitting_count"] == 1
+    assert data["submitted_count"] == 3
+    assert data["failed_count"] == 1
+    assert data["cancelled_count"] == 1
+
+    assert Decimal(str(data["submitted_rate"])) == Decimal("0.3750")
+    assert Decimal(str(data["failed_rate"])) == Decimal("0.1250")
+    assert Decimal(str(data["cancelled_rate"])) == Decimal("0.1250")
+
+
+def test_business_metrics_conversions_filters_by_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-conversions-range@example.com",
+    )
+
+    _persist_order(
+        order_id=95330,
+        tenant_id=1,
+        total=Decimal("10.00"),
+        status="created",
+        created_at=datetime(2026, 8, 31, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95331,
+        tenant_id=1,
+        total=Decimal("20.00"),
+        status="submitted",
+        created_at=datetime(2026, 9, 1, 0, 0, 0),
+    )
+
+    _persist_order(
+        order_id=95332,
+        tenant_id=1,
+        total=Decimal("30.00"),
+        status="failed",
+        created_at=datetime(2026, 9, 30, 23, 59, 59),
+    )
+
+    _persist_order(
+        order_id=95333,
+        tenant_id=1,
+        total=Decimal("40.00"),
+        status="cancelled",
+        created_at=datetime(2026, 10, 1, 0, 0, 0),
+    )
+
+    response = client.get(
+        "/business-metrics/conversions",
+        params={
+            "start_at": "2026-09-01T00:00:00",
+            "end_at": "2026-10-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total_orders"] == 2
+    assert data["created_count"] == 0
+    assert data["confirmed_count"] == 0
+    assert data["submitting_count"] == 0
+    assert data["submitted_count"] == 1
+    assert data["failed_count"] == 1
+    assert data["cancelled_count"] == 0
+
+    assert Decimal(str(data["submitted_rate"])) == Decimal("0.5000")
+    assert Decimal(str(data["failed_rate"])) == Decimal("0.5000")
+    assert Decimal(str(data["cancelled_rate"])) == Decimal("0.0000")
+
+
+def test_business_metrics_conversions_rejects_invalid_time_range(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="business-metrics-conversions-invalid@example.com",
+    )
+
+    response = client.get(
+        "/business-metrics/conversions",
+        params={
+            "start_at": "2026-10-01T00:00:00",
+            "end_at": "2026-09-01T00:00:00",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "start_at debe ser anterior a end_at."
+    )
