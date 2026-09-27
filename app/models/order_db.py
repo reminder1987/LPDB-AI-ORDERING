@@ -1,7 +1,8 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -109,6 +110,28 @@ class OrderDB(Base):
     total: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 2),
         nullable=True,
+    )
+
+    # --------------------------------------------------------
+    # Timestamps
+    #
+    # created_at representa el momento de creación de la orden
+    # y es la fuente temporal para métricas de negocio.
+    #
+    # updated_at registra la última modificación de la orden.
+    # --------------------------------------------------------
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
     )
 
     # --------------------------------------------------------
