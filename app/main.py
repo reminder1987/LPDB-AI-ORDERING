@@ -11,6 +11,7 @@ from app.api.agent import router as agent_router
 from app.api.auth import router as auth_router
 from app.api.availability import router as availability_router
 from app.api.business_metrics import router as business_metrics_router
+from app.api.business_settings import router as business_settings_router
 from app.api.channels import router as channels_router
 from app.api.customers import router as customers_router
 from app.api.health import router as health_router
@@ -91,6 +92,7 @@ app.include_router(agent_router)
 app.include_router(auth_router)
 app.include_router(availability_router)
 app.include_router(business_metrics_router)
+app.include_router(business_settings_router)
 app.include_router(channels_router)
 app.include_router(customers_router)
 app.include_router(health_router)
