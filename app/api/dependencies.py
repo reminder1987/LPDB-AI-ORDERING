@@ -1,4 +1,4 @@
-﻿from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.security import HTTPBearer
 from sqlalchemy import select
@@ -138,6 +138,7 @@ def get_tenant_access_context(
             select(UserTenantDB).where(
                 UserTenantDB.user_id == current_user.id,
                 UserTenantDB.tenant_id == tenant_context.tenant_id,
+                UserTenantDB.active.is_(True),
             )
         )
 

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.activity import router as activity_router
 from app.api.admin_locations import router as admin_locations_router
+from app.api.admin_users import router as admin_users_router
 from app.api.agent import router as agent_router
 from app.api.auth import router as auth_router
 from app.api.availability import router as availability_router
@@ -90,6 +91,7 @@ app.add_middleware(
 
 app.include_router(activity_router)
 app.include_router(admin_locations_router)
+app.include_router(admin_users_router)
 app.include_router(agent_router)
 app.include_router(auth_router)
 app.include_router(availability_router)

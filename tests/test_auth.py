@@ -8,6 +8,7 @@ from app.api import dependencies as dependencies_api
 from app.core import database as database_module
 from app.core.config import settings
 from app.main import app
+from app.models.tenant_db import TenantDB
 from app.models.user_db import UserDB
 from app.models.user_tenant_db import UserTenantDB
 from app.services.jwt_service import create_access_token
@@ -650,3 +651,200 @@ def test_admin_cannot_manage_tenant(
     )
 
     assert response.status_code == 403
+
+def test_inactive_tenant_membership_denies_access(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        auth_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "inactive-membership@example.com",
+            "PruebaSegura123!",
+        )
+
+        user_id = user.id
+
+        db.add(
+            UserTenantDB(
+                user_id=user_id,
+                tenant_id=1,
+                role="admin",
+                active=False,
+            )
+        )
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "inactive-membership@example.com",
+            "password": "PruebaSegura123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    token = login_response.json()["access_token"]
+
+    response = client.get(
+        "/auth/tenant-access",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant": "lpdb",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == (
+        "El usuario no tiene acceso al tenant solicitado."
+    )
+
+
+def test_active_tenant_membership_allows_access(
+    monkeypatch,
+):
+    token, user_id = create_authenticated_user(
+        monkeypatch,
+        "active-membership@example.com",
+        "admin",
+    )
+
+    client = TestClient(app)
+
+    response = client.get(
+        "/auth/tenant-access",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant": "lpdb",
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["user_id"] == user_id
+    assert data["tenant_id"] == 1
+    assert data["tenant_slug"] == "lpdb"
+    assert data["role"] == "admin"
+
+
+def test_inactive_membership_in_one_tenant_does_not_disable_other_tenant(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        auth_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    monkeypatch.setattr(
+        dependencies_api,
+        "SessionLocal",
+        database_module.SessionLocal,
+    )
+
+    db = database_module.SessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "multi-tenant-membership@example.com",
+            "PruebaSegura123!",
+        )
+
+        user_id = user.id
+
+        second_tenant = TenantDB(
+            slug="membership-second",
+            name="Membership Second Tenant",
+            active=True,
+        )
+
+        db.add(second_tenant)
+        db.flush()
+
+        second_tenant_id = second_tenant.id
+
+        db.add_all(
+            [
+                UserTenantDB(
+                    user_id=user_id,
+                    tenant_id=1,
+                    role="admin",
+                    active=False,
+                ),
+                UserTenantDB(
+                    user_id=user_id,
+                    tenant_id=second_tenant_id,
+                    role="manager",
+                    active=True,
+                ),
+            ]
+        )
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    login_response = client.post(
+        "/auth/login",
+        json={
+            "email": "multi-tenant-membership@example.com",
+            "password": "PruebaSegura123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    token = login_response.json()["access_token"]
+
+    lpdb_response = client.get(
+        "/auth/tenant-access",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant": "lpdb",
+        },
+    )
+
+    assert lpdb_response.status_code == 403
+
+    second_response = client.get(
+        "/auth/tenant-access",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Tenant": "membership-second",
+        },
+    )
+
+    assert second_response.status_code == 200
+
+    data = second_response.json()
+
+    assert data["user_id"] == user_id
+    assert data["tenant_id"] == second_tenant_id
+    assert data["tenant_slug"] == "membership-second"
+    assert data["role"] == "manager"
