@@ -1284,6 +1284,48 @@ Incluir como mínimo:
 - performance por restaurante/location;
 - estados y conversiones operativas disponibles.
 
+#### Cierre tecnico de 20.8
+
+**Estado:** COMPLETADA
+
+Business Metrics quedo implementado de extremo a extremo con aislamiento por tenant, filtros temporales y autorizacion mediante `VIEW_DASHBOARD`.
+
+Subfases completadas:
+
+- **20.8A - Summary:** volumen de ordenes, valor total, ticket promedio y distribucion por estado.
+- **20.8B - Daily Evolution:** evolucion diaria de volumen, valor total y ticket promedio.
+- **20.8C - Performance by Location:** rendimiento por location con volumen, valor total y ticket promedio.
+- **20.8D - Estados / Conversiones:** distribucion del estado actual de las ordenes y tasas operativas de `submitted`, `failed` y `cancelled`. Estas metricas no se presentan como un funnel historico porque `OrderDB.status` representa el estado actual y no un historial de transiciones.
+- **20.8E - Business Metrics Dashboard:** dashboard `/metricas` integrado con summary, evolucion temporal, rendimiento por sede, estados, tasas y filtros de fecha.
+
+Endpoints consolidados:
+
+- `GET /business-metrics/summary`
+- `GET /business-metrics/evolution`
+- `GET /business-metrics/locations`
+- `GET /business-metrics/conversions`
+
+Validaciones de cierre de 20.8:
+
+- TypeScript aprobado.
+- ESLint aprobado.
+- build de produccion Next.js aprobado.
+- 40 pruebas Playwright aprobadas.
+- 108 pruebas de regresion backend relacionadas aprobadas.
+- `git diff --check` aprobado.
+- aislamiento multi-tenant y rangos temporales cubiertos por pruebas.
+- working tree limpio despues del checkpoint tecnico.
+
+Commits de implementacion:
+
+- `0fac6a4` - `feat: add business metrics summary API`
+- `7f703ab` - `feat: add business metrics daily evolution`
+- `3ac9375` - `feat: add business metrics by location`
+- `f22b398` - `feat: add business metrics conversions`
+- `63cca32` - `feat: add business metrics dashboard`
+
+**Punto de reanudacion despues del cierre documental: 20.9 - Administracion.**
+
 ### 20.9 — Administración
 
 Incluir:
