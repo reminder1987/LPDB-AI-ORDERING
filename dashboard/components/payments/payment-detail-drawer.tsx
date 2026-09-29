@@ -1,5 +1,7 @@
 import type { Payment } from "@/lib/api";
 
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
+
 type PaymentDetailDrawerProps = {
   payment: Payment | null;
   loading: boolean;
@@ -78,6 +80,9 @@ export function PaymentDetailDrawer({
     loading ||
     error !== null;
 
+  const closeButtonRef =
+    useDialogFocus(open);
+
   if (!open) {
     return null;
   }
@@ -121,6 +126,7 @@ export function PaymentDetailDrawer({
           </div>
 
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2"

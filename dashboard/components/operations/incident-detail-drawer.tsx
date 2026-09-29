@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 import { DashboardState } from "@/components/ui/dashboard-state";
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
 import type { OperationalIncident } from "@/lib/operational/incidents";
 
 type IncidentDetailDrawerProps = {
@@ -18,28 +17,10 @@ export function IncidentDetailDrawer({
   error,
   onClose,
 }: IncidentDetailDrawerProps) {
-  const closeButtonRef =
-    useRef<HTMLButtonElement | null>(null);
-
   const visible = loading || Boolean(error) || Boolean(incident);
 
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
-    window.requestAnimationFrame(() => {
-      closeButtonRef.current?.focus();
-    });
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [visible]);
+  const closeButtonRef =
+    useDialogFocus(visible);
 
   if (!visible) {
     return null;

@@ -1,5 +1,7 @@
 import type { Integration } from "@/lib/api";
 
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
+
 interface IntegrationDetailDrawerProps {
   integration: Integration | null;
   loading: boolean;
@@ -92,6 +94,9 @@ export function IntegrationDetailDrawer({
     Boolean(error) ||
     Boolean(integration);
 
+  const closeButtonRef =
+    useDialogFocus(isOpen);
+
   if (!isOpen) {
     return null;
   }
@@ -145,6 +150,7 @@ export function IntegrationDetailDrawer({
           </div>
 
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2"

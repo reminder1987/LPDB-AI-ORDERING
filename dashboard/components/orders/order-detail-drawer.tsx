@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-} from "react";
-
 import type { Order } from "@/lib/api";
 
 import { DashboardState } from "@/components/ui/dashboard-state";
+import { useDialogFocus } from "@/components/ui/use-dialog-focus";
 
 import {
   formatCurrency,
@@ -38,29 +34,12 @@ export function OrderDetailDrawer({
   onClose,
   onUpdateStatus,
 }: OrderDetailDrawerProps) {
-  const closeButtonRef =
-    useRef<HTMLButtonElement>(null);
-
   const isOpen = Boolean(
     order || loading || error,
   );
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-
-    return () => {
-      document.body.style.overflow =
-        previousOverflow;
-    };
-  }, [isOpen]);
+  const closeButtonRef =
+    useDialogFocus(isOpen);
 
   if (!isOpen) {
     return null;
