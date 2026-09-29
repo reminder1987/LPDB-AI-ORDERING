@@ -551,3 +551,402 @@ def test_viewer_can_read_integrations(
     )
 
     assert response.status_code == 200
+def test_admin_can_create_integration(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-create-admin@example.com",
+        role="admin",
+    )
+
+    response = client.post(
+        "/integrations",
+        headers=headers,
+        json={
+            "provider": "admin-api-create",
+            "integration_type": "pos",
+            "external_id": "restaurant-api-create",
+            "configuration": {
+                "api_version": "v1",
+            },
+            "credentials": {
+                "client_id": "ADMIN_API_CLIENT_ID",
+            },
+        },
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["provider"] == "admin-api-create"
+    assert data["integration_type"] == "pos"
+    assert data["external_id"] == "restaurant-api-create"
+    assert data["active"] is True
+    assert data["configuration"] == {
+        "api_version": "v1",
+    }
+    assert data["credential_names"] == [
+        "client_id",
+    ]
+    assert data["credentials_configured"] is True
+    assert "ADMIN_API_CLIENT_ID" not in response.text
+    assert "credentials" not in data
+
+
+def test_manager_cannot_create_integration(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-create-manager@example.com",
+        role="manager",
+    )
+
+    response = client.post(
+        "/integrations",
+        headers=headers,
+        json={
+            "provider": "admin-api-manager",
+            "integration_type": "pos",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_viewer_cannot_create_integration(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-create-viewer@example.com",
+        role="viewer",
+    )
+
+    response = client.post(
+        "/integrations",
+        headers=headers,
+        json={
+            "provider": "admin-api-viewer",
+            "integration_type": "pos",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_create_duplicate_returns_conflict(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-duplicate-admin@example.com",
+        role="admin",
+    )
+
+    payload = {
+        "provider": "admin-api-duplicate",
+        "integration_type": "pos",
+        "external_id": "duplicate-external-id",
+    }
+
+    first_response = client.post(
+        "/integrations",
+        headers=headers,
+        json=payload,
+    )
+
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        "/integrations",
+        headers=headers,
+        json=payload,
+    )
+
+    assert second_response.status_code == 409
+
+
+def test_admin_can_update_integration(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-update-admin@example.com",
+        role="admin",
+    )
+
+    _persist_integration(
+        integration_id=98201,
+        tenant_id=1,
+        provider="admin-api-update",
+        integration_type="pos",
+        configuration={
+            "api_version": "v1",
+        },
+        credentials={
+            "client_id": "OLD_ADMIN_API_CLIENT_ID",
+        },
+    )
+
+    response = client.patch(
+        "/integrations/98201",
+        headers=headers,
+        json={
+            "configuration": {
+                "api_version": "v2",
+            },
+            "credentials": {
+                "client_id": "NEW_ADMIN_API_CLIENT_ID",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["configuration"] == {
+        "api_version": "v2",
+    }
+    assert data["credential_names"] == [
+        "client_id",
+    ]
+    assert "NEW_ADMIN_API_CLIENT_ID" not in response.text
+    assert "credentials" not in data
+
+
+def test_manager_cannot_update_integration(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-update-manager@example.com",
+        role="manager",
+    )
+
+    _persist_integration(
+        integration_id=98202,
+        tenant_id=1,
+        provider="admin-api-update-manager",
+        integration_type="pos",
+    )
+
+    response = client.patch(
+        "/integrations/98202",
+        headers=headers,
+        json={
+            "configuration": {
+                "api_version": "v2",
+            },
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_update_foreign_tenant_returns_not_found(monkeypatch):
+    _ensure_tenant(
+        tenant_id=4,
+        slug="integrations-admin-foreign",
+        name="Integrations Admin Foreign",
+    )
+
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-update-foreign@example.com",
+        role="admin",
+    )
+
+    _persist_integration(
+        integration_id=98203,
+        tenant_id=4,
+        provider="admin-api-foreign",
+        integration_type="pos",
+    )
+
+    response = client.patch(
+        "/integrations/98203",
+        headers=headers,
+        json={
+            "configuration": {
+                "changed": True,
+            },
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_admin_can_deactivate_and_reactivate_integration(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-active-admin@example.com",
+        role="admin",
+    )
+
+    _persist_integration(
+        integration_id=98204,
+        tenant_id=1,
+        provider="admin-api-active",
+        integration_type="pos",
+        active=True,
+    )
+
+    deactivate_response = client.patch(
+        "/integrations/98204/active",
+        headers=headers,
+        json={
+            "active": False,
+        },
+    )
+
+    assert deactivate_response.status_code == 200
+    assert deactivate_response.json()["active"] is False
+
+    reactivate_response = client.patch(
+        "/integrations/98204/active",
+        headers=headers,
+        json={
+            "active": True,
+        },
+    )
+
+    assert reactivate_response.status_code == 200
+    assert reactivate_response.json()["active"] is True
+
+
+def test_manager_cannot_change_integration_active_state(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-active-manager@example.com",
+        role="manager",
+    )
+
+    _persist_integration(
+        integration_id=98205,
+        tenant_id=1,
+        provider="admin-api-active-manager",
+        integration_type="pos",
+    )
+
+    response = client.patch(
+        "/integrations/98205/active",
+        headers=headers,
+        json={
+            "active": False,
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_active_change_foreign_tenant_returns_not_found(
+    monkeypatch,
+):
+    _ensure_tenant(
+        tenant_id=5,
+        slug="integrations-active-foreign",
+        name="Integrations Active Foreign",
+    )
+
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-active-foreign@example.com",
+        role="admin",
+    )
+
+    _persist_integration(
+        integration_id=98206,
+        tenant_id=5,
+        provider="admin-api-active-foreign",
+        integration_type="pos",
+    )
+
+    response = client.patch(
+        "/integrations/98206/active",
+        headers=headers,
+        json={
+            "active": False,
+        },
+    )
+
+    assert response.status_code == 404
+
+def test_create_rejects_raw_credential_value(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-invalid-secret-admin@example.com",
+        role="admin",
+    )
+
+    response = client.post(
+        "/integrations",
+        headers=headers,
+        json={
+            "provider": "admin-api-invalid-secret",
+            "integration_type": "pos",
+            "credentials": {
+                "client_secret": "this-is-a-raw-secret",
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_rejects_raw_credential_value(monkeypatch):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-invalid-update-admin@example.com",
+        role="admin",
+    )
+
+    _persist_integration(
+        integration_id=98207,
+        tenant_id=1,
+        provider="admin-api-invalid-update-secret",
+        integration_type="pos",
+        credentials={
+            "client_id": "VALID_EXISTING_REFERENCE",
+        },
+    )
+
+    response = client.patch(
+        "/integrations/98207",
+        headers=headers,
+        json={
+            "credentials": {
+                "client_secret": "this-is-a-raw-secret",
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_valid_credential_reference_is_not_exposed(
+    monkeypatch,
+):
+    headers = _authenticated_headers(
+        monkeypatch,
+        email="integration-safe-secret-admin@example.com",
+        role="admin",
+    )
+
+    response = client.post(
+        "/integrations",
+        headers=headers,
+        json={
+            "provider": "admin-api-safe-secret",
+            "integration_type": "pos",
+            "credentials": {
+                "client_secret": "LPDB_SAFE_SECRET_REFERENCE",
+            },
+        },
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["credential_names"] == [
+        "client_secret",
+    ]
+    assert data["credentials_configured"] is True
+    assert "LPDB_SAFE_SECRET_REFERENCE" not in response.text
+    assert "credentials" not in data
