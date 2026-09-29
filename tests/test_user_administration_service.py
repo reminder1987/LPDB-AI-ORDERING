@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from sqlalchemy import select
 
 from app.models.tenant_db import TenantDB
@@ -9,7 +9,8 @@ from app.services.password_service import (
     verify_password,
 )
 from app.services.user_administration_service import (
-    UserAdministrationDuplicateError,
+    UserAdministrationConflictError,
+            UserAdministrationDuplicateError,
     UserAdministrationNotFoundError,
     UserAdministrationValidationError,
     user_administration_service,
@@ -636,6 +637,210 @@ def test_set_membership_active_rejects_foreign_tenant_user():
 
         assert membership is not None
         assert membership.active is True
+
+    finally:
+        db.close()
+
+
+
+def test_cannot_deactivate_last_effective_owner():
+    db = TestingSessionLocal()
+
+    try:
+        tenant = create_tenant(
+            db,
+            slug="user-admin-last-owner",
+            name="Last Owner",
+        )
+
+        owner = create_global_user(
+            db,
+            email="last-owner@example.com",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=owner.id,
+                tenant_id=tenant.id,
+                role="owner",
+                active=True,
+            )
+        )
+        db.commit()
+
+        with pytest.raises(
+            match=(
+                "^No se puede desactivar al ultimo owner activo "
+                r"del tenant\.$"
+            ),
+        ):
+            user_administration_service.set_membership_active(
+                db,
+                tenant_id=tenant.id,
+                user_id=owner.id,
+                active=False,
+            )
+
+        membership = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == owner.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        assert membership is not None
+        assert membership.active is True
+
+    finally:
+        db.close()
+
+
+def test_can_deactivate_owner_when_another_effective_owner_exists():
+    db = TestingSessionLocal()
+
+    try:
+        tenant = create_tenant(
+            db,
+            slug="user-admin-multiple-owners",
+            name="Multiple Owners",
+        )
+
+        first_owner = create_global_user(
+            db,
+            email="first-owner@example.com",
+        )
+
+        second_owner = create_global_user(
+            db,
+            email="second-owner@example.com",
+        )
+
+        db.add_all(
+            [
+                UserTenantDB(
+                    user_id=first_owner.id,
+                    tenant_id=tenant.id,
+                    role="owner",
+                    active=True,
+                ),
+                UserTenantDB(
+                    user_id=second_owner.id,
+                    tenant_id=tenant.id,
+                    role="owner",
+                    active=True,
+                ),
+            ]
+        )
+        db.commit()
+
+        result = user_administration_service.set_membership_active(
+            db,
+            tenant_id=tenant.id,
+            user_id=first_owner.id,
+            active=False,
+        )
+
+        assert result.user_id == first_owner.id
+        assert result.role == "owner"
+        assert result.membership_active is False
+
+        first_membership = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == first_owner.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        second_membership = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == second_owner.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        assert first_membership is not None
+        assert first_membership.active is False
+
+        assert second_membership is not None
+        assert second_membership.active is True
+
+    finally:
+        db.close()
+
+
+def test_globally_inactive_owner_does_not_count_as_effective_owner():
+    db = TestingSessionLocal()
+
+    try:
+        tenant = create_tenant(
+            db,
+            slug="user-admin-inactive-owner",
+            name="Inactive Owner",
+        )
+
+        effective_owner = create_global_user(
+            db,
+            email="effective-owner@example.com",
+        )
+
+        inactive_owner = create_global_user(
+            db,
+            email="inactive-owner@example.com",
+        )
+
+        inactive_owner.active = False
+
+        db.add_all(
+            [
+                UserTenantDB(
+                    user_id=effective_owner.id,
+                    tenant_id=tenant.id,
+                    role="owner",
+                    active=True,
+                ),
+                UserTenantDB(
+                    user_id=inactive_owner.id,
+                    tenant_id=tenant.id,
+                    role="owner",
+                    active=True,
+                ),
+            ]
+        )
+        db.commit()
+
+        with pytest.raises(
+            match=(
+                "^No se puede desactivar al ultimo owner activo "
+                r"del tenant\.$"
+            ),
+        ):
+            user_administration_service.set_membership_active(
+                db,
+                tenant_id=tenant.id,
+                user_id=effective_owner.id,
+                active=False,
+            )
+
+        effective_membership = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == effective_owner.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        inactive_membership = db.scalar(
+            select(UserTenantDB).where(
+                UserTenantDB.user_id == inactive_owner.id,
+                UserTenantDB.tenant_id == tenant.id,
+            )
+        )
+
+        assert effective_membership is not None
+        assert effective_membership.active is True
+
+        assert inactive_membership is not None
+        assert inactive_membership.active is True
+        assert inactive_owner.active is False
 
     finally:
         db.close()

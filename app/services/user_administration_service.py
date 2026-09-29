@@ -21,6 +21,10 @@ class UserAdministrationDuplicateError(UserAdministrationError):
     """La membresia solicitada ya existe."""
 
 
+class UserAdministrationConflictError(UserAdministrationError):
+    """La operacion viola una restriccion administrativa del tenant."""
+
+
 class UserAdministrationValidationError(UserAdministrationError):
     """Los datos administrativos no son validos."""
 
@@ -238,6 +242,32 @@ class UserAdministrationService:
             )
 
         user, membership = row
+
+        if (
+            membership.active
+            and not active
+            and membership.role == "owner"
+        ):
+            other_active_owner = db.execute(
+                select(UserTenantDB.user_id)
+                .join(
+                    UserDB,
+                    UserDB.id == UserTenantDB.user_id,
+                )
+                .where(
+                    UserTenantDB.tenant_id == tenant_id,
+                    UserTenantDB.role == "owner",
+                    UserTenantDB.active.is_(True),
+                    UserDB.active.is_(True),
+                    UserTenantDB.user_id != user_id,
+                )
+                .limit(1)
+            ).first()
+
+            if other_active_owner is None:
+                raise UserAdministrationConflictError(
+                    "No se puede desactivar al ultimo owner activo del tenant."
+                )
 
         membership.active = active
 

@@ -7,6 +7,7 @@ from app.core.permissions import Permission
 from app.core.tenant_access_context import TenantAccessContext
 from app.services.user_administration_service import (
     TenantUser,
+    UserAdministrationConflictError,
     UserAdministrationDuplicateError,
     UserAdministrationNotFoundError,
     UserAdministrationValidationError,
@@ -185,6 +186,12 @@ def set_user_membership_active(
     except UserAdministrationNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except UserAdministrationConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
 

@@ -337,3 +337,544 @@ def test_add_existing_active_membership_returns_conflict(monkeypatch):
 
     finally:
         db.close()
+
+
+def test_add_user_reactivates_inactive_membership_preserving_role(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-reactivate-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "inactive-member@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=user.id,
+                tenant_id=1,
+                role="manager",
+                active=False,
+            )
+        )
+
+        db.commit()
+        inactive_user_id = user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/users",
+        headers=auth_headers(token),
+        json={
+            "email": "inactive-member@example.com",
+        },
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["user_id"] == inactive_user_id
+    assert data["role"] == "manager"
+    assert data["membership_active"] is True
+
+    db = TestingSessionLocal()
+
+    try:
+        memberships = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == inactive_user_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .all()
+        )
+
+        assert len(memberships) == 1
+        assert memberships[0].role == "manager"
+        assert memberships[0].active is True
+
+    finally:
+        db.close()
+
+
+def test_deactivate_membership_preserves_global_user(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-deactivate-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "member-to-deactivate@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=user.id,
+                tenant_id=1,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_user_id = user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_user_id}/active",
+        headers=auth_headers(token),
+        json={
+            "active": False,
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["user_id"] == target_user_id
+    assert data["user_active"] is True
+    assert data["membership_active"] is False
+    assert data["role"] == "viewer"
+
+    db = TestingSessionLocal()
+
+    try:
+        stored_user = db.get(UserDB, target_user_id)
+
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_user_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert stored_user is not None
+        assert stored_user.active is True
+        assert membership.active is False
+
+    finally:
+        db.close()
+
+
+def test_reactivate_membership_with_patch_preserves_role(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-patch-reactivate-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "member-to-reactivate@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=user.id,
+                tenant_id=1,
+                role="manager",
+                active=False,
+            )
+        )
+
+        db.commit()
+        target_user_id = user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_user_id}/active",
+        headers=auth_headers(token),
+        json={
+            "active": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["user_id"] == target_user_id
+    assert data["user_active"] is True
+    assert data["membership_active"] is True
+    assert data["role"] == "manager"
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_user_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert membership.active is True
+        assert membership.role == "manager"
+
+    finally:
+        db.close()
+
+
+def test_user_from_other_tenant_is_not_visible(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-isolation-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        other_tenant = TenantDB(
+            id=2,
+            slug="other-tenant",
+            name="Other Tenant",
+            active=True,
+        )
+        db.add(other_tenant)
+        db.flush()
+
+        foreign_user = user_service.create_user(
+            db,
+            "foreign-tenant-user@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=foreign_user.id,
+                tenant_id=2,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        foreign_user_id = foreign_user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    list_response = client.get(
+        "/admin/users",
+        headers=auth_headers(token),
+    )
+
+    assert list_response.status_code == 200
+    assert all(
+        user["user_id"] != foreign_user_id
+        for user in list_response.json()
+    )
+
+    get_response = client.get(
+        f"/admin/users/{foreign_user_id}",
+        headers=auth_headers(token),
+    )
+
+    assert get_response.status_code == 404
+
+
+def test_patch_foreign_tenant_user_returns_not_found(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-foreign-patch-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        other_tenant = TenantDB(
+            id=2,
+            slug="other-tenant",
+            name="Other Tenant",
+            active=True,
+        )
+        db.add(other_tenant)
+        db.flush()
+
+        foreign_user = user_service.create_user(
+            db,
+            "foreign-patch-user@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=foreign_user.id,
+                tenant_id=2,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        foreign_user_id = foreign_user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{foreign_user_id}/active",
+        headers=auth_headers(token),
+        json={
+            "active": False,
+        },
+    )
+
+    assert response.status_code == 404
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == foreign_user_id,
+                UserTenantDB.tenant_id == 2,
+            )
+            .one()
+        )
+
+        assert membership.active is True
+
+    finally:
+        db.close()
+
+
+def test_patch_cannot_deactivate_last_effective_owner(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-last-owner-admin@example.com",
+        role="admin",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        owner = user_service.create_user(
+            db,
+            "admin-users-last-owner@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=owner.id,
+                tenant_id=1,
+                role="owner",
+                active=True,
+            )
+        )
+
+        db.commit()
+        owner_id = owner.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{owner_id}/active",
+        headers=auth_headers(token),
+        json={
+            "active": False,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": (
+            "No se puede desactivar al ultimo owner activo del tenant."
+        )
+    }
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == owner_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert membership.active is True
+
+    finally:
+        db.close()
+
+
+def test_get_tenant_user_success(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-get-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        user = user_service.create_user(
+            db,
+            "admin-users-get-member@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=user.id,
+                tenant_id=1,
+                role="manager",
+                active=False,
+            )
+        )
+
+        db.commit()
+        user_id = user.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.get(
+        f"/admin/users/{user_id}",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": user_id,
+        "email": "admin-users-get-member@example.com",
+        "user_active": True,
+        "role": "manager",
+        "membership_active": False,
+    }
+
+
+def test_create_new_user_without_password_returns_validation_error(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-no-password-owner@example.com",
+        role="owner",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/users",
+        headers=auth_headers(token),
+        json={
+            "email": "admin-users-no-password@example.com",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "La contrasena inicial es obligatoria para un usuario nuevo."
+    }
+
+    db = TestingSessionLocal()
+
+    try:
+        user = (
+            db.query(UserDB)
+            .filter(
+                UserDB.email == "admin-users-no-password@example.com",
+            )
+            .one_or_none()
+        )
+
+        assert user is None
+
+    finally:
+        db.close()
+
+
+
+def test_create_user_cannot_inject_owner_role(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="admin-users-role-injection-owner@example.com",
+        role="owner",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/users",
+        headers=auth_headers(token),
+        json={
+            "email": "admin-users-role-injection@example.com",
+            "password": "ClaveSegura123!",
+            "role": "owner",
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["email"] == "admin-users-role-injection@example.com"
+    assert body["role"] == "viewer"
+    assert body["membership_active"] is True
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.tenant_id == 1,
+                UserTenantDB.user_id == body["user_id"],
+            )
+            .one()
+        )
+
+        assert membership.role == "viewer"
+        assert membership.active is True
+
+    finally:
+        db.close()
