@@ -1326,16 +1326,177 @@ Commits de implementacion:
 
 **Punto de reanudacion despues del cierre documental: 20.9 - Administracion.**
 
-### 20.9 — Administración
+### 20.9 - Administracion
 
-Incluir:
+**Estado:** COMPLETADA
 
-- configuración del restaurante;
-- locations;
-- usuarios;
-- roles/permisos;
-- integraciones;
-- estado de configuración.
+La capa administrativa del backend quedo consolidada sobre la
+arquitectura multi-tenant y RBAC existente, sin crear sistemas
+paralelos de autorizacion, configuracion o integraciones.
+
+#### 20.9A - Restaurant / Tenant Administration
+
+Implementado:
+
+- lectura de la configuracion del restaurante/tenant;
+- actualizacion controlada del nombre comercial;
+- aislamiento por tenant;
+- `VIEW_DASHBOARD` para lectura;
+- `MANAGE_BUSINESS_SETTINGS` para escritura;
+- proteccion de campos estructurales como `slug` y `active`.
+
+Endpoints:
+
+- `GET /business-settings`
+- `PATCH /business-settings`
+
+Commit:
+
+- `0244574` - `feat: add tenant business settings administration`
+
+#### 20.9B - Location Administration
+
+Implementado:
+
+- listado y detalle de locations;
+- creacion y actualizacion;
+- activacion y desactivacion;
+- administracion de horarios;
+- validacion de dias y horarios;
+- aislamiento por tenant;
+- autorizacion mediante los permisos existentes de locations.
+
+Commit:
+
+- `4ac120d` - `feat: add location administration`
+
+#### 20.9C - User Administration
+
+Implementado:
+
+- listado y detalle de usuarios del tenant;
+- creacion de nuevos usuarios;
+- asociacion de usuarios globales existentes al tenant;
+- reactivacion de memberships inactivos;
+- activacion y desactivacion de acceso por tenant;
+- separacion entre estado global de `UserDB` y acceso de
+  `UserTenantDB`;
+- proteccion contra la desactivacion del ultimo owner efectivo;
+- aislamiento por tenant;
+- administracion mediante `MANAGE_USERS`.
+
+No se implemento eliminacion fisica de usuarios.
+
+Commits:
+
+- `743e1c7` - `feat: checkpoint tenant user administration`
+- `f649bc7` - `feat: complete tenant user administration`
+
+#### 20.9D - Roles & Permissions
+
+Implementado sobre el RBAC existente:
+
+- roles `owner`, `admin`, `manager` y `viewer`;
+- asignacion ordinaria mediante `ASSIGN_ROLES`;
+- roles ordinariamente asignables: `admin`, `manager` y `viewer`;
+- proteccion del rol `owner`;
+- transferencia explicita mediante `TRANSFER_OWNERSHIP`;
+- soporte para multiples owners;
+- aislamiento por tenant.
+
+Endpoints:
+
+- `PATCH /admin/users/{user_id}/role`
+- `POST /admin/users/{user_id}/transfer-ownership`
+
+Commit:
+
+- `1faa8e0` - `feat: add roles and ownership administration`
+
+#### 20.9E - Integration Administration
+
+Implementado sobre la arquitectura de integraciones existente:
+
+- creacion y actualizacion de integraciones;
+- referencias de credenciales;
+- activacion y desactivacion;
+- deteccion de duplicados;
+- aislamiento por tenant;
+- `MANAGE_INTEGRATIONS` para administracion;
+- `VIEW_DASHBOARD` para lectura;
+- proteccion de secretos.
+
+Las respuestas API no exponen valores ni referencias de
+credenciales.
+
+Endpoints:
+
+- `GET /integrations`
+- `GET /integrations/{integration_id}`
+- `POST /integrations`
+- `PATCH /integrations/{integration_id}`
+- `PATCH /integrations/{integration_id}/active`
+
+Commit:
+
+- `c07ab5b` - `feat: add integration administration`
+
+#### 20.9F - Configuration Status
+
+Implementado:
+
+- estado del negocio;
+- estado de locations;
+- estado de integraciones de proveedor;
+- estado de integraciones de canales;
+- indicador agregado de readiness;
+- aislamiento por tenant;
+- autorizacion mediante `VIEW_DASHBOARD`.
+
+El readiness representa la configuracion registrada en base de
+datos, no conectividad en tiempo real con proveedores externos.
+
+El endpoint no expone secretos, valores o referencias de
+credenciales ni configuracion privada de proveedores.
+
+Endpoint:
+
+- `GET /configuracion`
+
+Commit:
+
+- `9a72d31` - `feat: add configuration readiness status`
+
+#### 20.9G - Cierre integral de Administracion
+
+**Estado:** COMPLETADA
+
+Validacion final:
+
+- 20.9A-20.9F implementadas y almacenadas en Git;
+- 190 pruebas de regresion administrativa A-F aprobadas;
+- suite backend completa: **981 passed, 0 failed**;
+- aislamiento multi-tenant cubierto por pruebas;
+- autorizacion RBAC cubierta por pruebas;
+- Configuration Status validado sin exposicion de secretos;
+- compilacion de los modulos de 20.9F aprobada;
+- `git diff --check` aprobado;
+- Alembic confirmado en `c702abe49beb (head)`.
+
+Commits funcionales:
+
+- `0244574` - `feat: add tenant business settings administration`
+- `4ac120d` - `feat: add location administration`
+- `743e1c7` - `feat: checkpoint tenant user administration`
+- `f649bc7` - `feat: complete tenant user administration`
+- `1faa8e0` - `feat: add roles and ownership administration`
+- `c07ab5b` - `feat: add integration administration`
+- `9a72d31` - `feat: add configuration readiness status`
+
+**Resultado:** 20.9 - Administracion completada.
+
+**Punto de reanudacion:** 20.10 - Finalizacion y regresion de
+Fase 20.
 
 ### 20.10 — Finalización y regresión de Fase 20
 
