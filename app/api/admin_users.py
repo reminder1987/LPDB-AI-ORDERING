@@ -5,6 +5,12 @@ from app.api.authorization import require_permission
 from app.core import database as database_module
 from app.core.permissions import Permission
 from app.core.tenant_access_context import TenantAccessContext
+from app.services.role_administration_service import (
+    RoleAdministrationConflictError,
+    RoleAdministrationNotFoundError,
+    RoleAdministrationValidationError,
+    role_administration_service,
+)
 from app.services.user_administration_service import (
     TenantUser,
     UserAdministrationConflictError,
@@ -42,6 +48,13 @@ class TenantUserCreateRequest(BaseModel):
 
 class TenantUserActiveRequest(BaseModel):
     active: bool
+
+
+class TenantUserRoleRequest(BaseModel):
+    role: str = Field(
+        min_length=1,
+        max_length=50,
+    )
 
 
 def _serialize_tenant_user(
@@ -198,5 +211,123 @@ def set_user_membership_active(
     finally:
         session.close()
 
+
+@router.patch(
+    "/{user_id}/role",
+    response_model=TenantUserResponse,
+)
+def set_user_role(
+    user_id: int,
+    payload: TenantUserRoleRequest,
+    access_context: TenantAccessContext = Depends(
+        require_permission(
+            Permission.ASSIGN_ROLES,
+        )
+    ),
+):
+    session = database_module.SessionLocal()
+
+    try:
+        role_administration_service.assign_role(
+            session,
+            tenant_id=access_context.tenant.tenant_id,
+            user_id=user_id,
+            role=payload.role,
+        )
+
+        user = user_administration_service.get_user(
+            session,
+            tenant_id=access_context.tenant.tenant_id,
+            user_id=user_id,
+        )
+
+        return _serialize_tenant_user(user)
+
+    except RoleAdministrationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAdministrationConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAdministrationValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    finally:
+        session.close()
+
+
+
+class OwnershipMemberResponse(BaseModel):
+    user_id: int
+    role: str
+
+
+class OwnershipTransferResponse(BaseModel):
+    previous_owner: OwnershipMemberResponse
+    new_owner: OwnershipMemberResponse
+
+
+@router.post(
+    "/{user_id}/transfer-ownership",
+    response_model=OwnershipTransferResponse,
+)
+def transfer_ownership(
+    user_id: int,
+    access_context: TenantAccessContext = Depends(
+        require_permission(
+            Permission.TRANSFER_OWNERSHIP,
+        )
+    ),
+):
+    session = database_module.SessionLocal()
+
+    try:
+        result = role_administration_service.transfer_ownership(
+            session,
+            tenant_id=access_context.tenant.tenant_id,
+            current_owner_user_id=access_context.user_id,
+            new_owner_user_id=user_id,
+        )
+
+        return OwnershipTransferResponse(
+            previous_owner=OwnershipMemberResponse(
+                user_id=result.previous_owner.user_id,
+                role=result.previous_owner.role,
+            ),
+            new_owner=OwnershipMemberResponse(
+                user_id=result.new_owner.user_id,
+                role=result.new_owner.role,
+            ),
+        )
+
+    except RoleAdministrationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAdministrationConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAdministrationValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    finally:
+        session.close()
 
 __all__ = ["router"]

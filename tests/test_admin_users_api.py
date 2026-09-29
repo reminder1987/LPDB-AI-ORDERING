@@ -878,3 +878,503 @@ def test_create_user_cannot_inject_owner_role(monkeypatch):
 
     finally:
         db.close()
+
+
+def test_patch_role_owner_can_assign_manager(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        target = user_service.create_user(
+            db,
+            "role-api-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_id}/role",
+        headers=auth_headers(token),
+        json={"role": "manager"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == target_id
+    assert response.json()["role"] == "manager"
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert membership.role == "manager"
+
+    finally:
+        db.close()
+
+
+def test_patch_role_admin_can_assign_manager(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-admin@example.com",
+        role="admin",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        target = user_service.create_user(
+            db,
+            "role-api-admin-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_id}/role",
+        headers=auth_headers(token),
+        json={"role": "manager"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "manager"
+
+
+def test_patch_role_manager_forbidden(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-manager@example.com",
+        role="manager",
+    )
+
+    client = TestClient(app)
+
+    response = client.patch(
+        "/admin/users/999999/role",
+        headers=auth_headers(token),
+        json={"role": "viewer"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_patch_role_viewer_forbidden(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-viewer@example.com",
+        role="viewer",
+    )
+
+    client = TestClient(app)
+
+    response = client.patch(
+        "/admin/users/999999/role",
+        headers=auth_headers(token),
+        json={"role": "viewer"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_patch_role_cannot_assign_owner(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-reject-owner@example.com",
+        role="admin",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        target = user_service.create_user(
+            db,
+            "role-api-reject-owner-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="viewer",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_id}/role",
+        headers=auth_headers(token),
+        json={"role": "owner"},
+    )
+
+    assert response.status_code == 422
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert membership.role == "viewer"
+
+    finally:
+        db.close()
+
+
+def test_patch_role_cannot_change_existing_owner(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="role-api-owner-guard-admin@example.com",
+        role="admin",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        target = user_service.create_user(
+            db,
+            "role-api-existing-owner@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="owner",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/admin/users/{target_id}/role",
+        headers=auth_headers(token),
+        json={"role": "viewer"},
+    )
+
+    assert response.status_code == 409
+
+    db = TestingSessionLocal()
+
+    try:
+        membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert membership.role == "owner"
+
+    finally:
+        db.close()
+
+
+def test_transfer_ownership_owner_can_transfer(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        current_owner = (
+            db.query(UserDB)
+            .filter(
+                UserDB.email == "ownership-api-owner@example.com",
+            )
+            .one()
+        )
+
+        current_owner_id = current_owner.id
+
+        target = user_service.create_user(
+            db,
+            "ownership-api-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="manager",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.post(
+        f"/admin/users/{target_id}/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["previous_owner"]["user_id"] == current_owner_id
+    assert body["previous_owner"]["role"] == "admin"
+    assert body["new_owner"]["user_id"] == target_id
+    assert body["new_owner"]["role"] == "owner"
+
+    db = TestingSessionLocal()
+
+    try:
+        current_membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == current_owner_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        target_membership = (
+            db.query(UserTenantDB)
+            .filter(
+                UserTenantDB.user_id == target_id,
+                UserTenantDB.tenant_id == 1,
+            )
+            .one()
+        )
+
+        assert current_membership.role == "admin"
+        assert target_membership.role == "owner"
+
+    finally:
+        db.close()
+
+
+def test_transfer_ownership_admin_forbidden(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-admin@example.com",
+        role="admin",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/users/999999/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_transfer_ownership_manager_forbidden(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-manager@example.com",
+        role="manager",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/admin/users/999999/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 403
+
+
+def test_transfer_ownership_foreign_target_returns_not_found(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-foreign-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        other_tenant = TenantDB(
+            id=2,
+            slug="ownership-other-tenant",
+            name="Ownership Other Tenant",
+            active=True,
+        )
+        db.add(other_tenant)
+        db.flush()
+
+        target = user_service.create_user(
+            db,
+            "ownership-api-foreign-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=2,
+                role="manager",
+                active=True,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.post(
+        f"/admin/users/{target_id}/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 404
+
+
+def test_transfer_ownership_self_returns_validation_error(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-self-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        owner = (
+            db.query(UserDB)
+            .filter(
+                UserDB.email == "ownership-api-self-owner@example.com",
+            )
+            .one()
+        )
+        owner_id = owner.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.post(
+        f"/admin/users/{owner_id}/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
+def test_transfer_ownership_inactive_target_returns_conflict(monkeypatch):
+    token = create_authenticated_user(
+        monkeypatch,
+        email="ownership-api-inactive-owner@example.com",
+        role="owner",
+    )
+
+    db = TestingSessionLocal()
+
+    try:
+        target = user_service.create_user(
+            db,
+            "ownership-api-inactive-target@example.com",
+            "ClaveSegura123!",
+        )
+
+        db.add(
+            UserTenantDB(
+                user_id=target.id,
+                tenant_id=1,
+                role="manager",
+                active=False,
+            )
+        )
+
+        db.commit()
+        target_id = target.id
+
+    finally:
+        db.close()
+
+    client = TestClient(app)
+
+    response = client.post(
+        f"/admin/users/{target_id}/transfer-ownership",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 409
