@@ -77,5 +77,48 @@
       retries: 6
       start_period: 10s
 
+  backup:
+    image: postgres:16
+    profiles:
+      - operations
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    command:
+      [
+        "sh",
+        "-c",
+        "pg_dump --host=db --port=5432 --username=postgres --dbname=lpdb --format=custom --no-owner --no-acl --file=/backups/lpdb_backup.dump",
+      ]
+    restart: "no"
+
+  restore:
+    image: postgres:16
+    profiles:
+      - operations
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: lpdb
+      DATABASE_USER: postgres
+      BACKUP_FILE: /backups/lpdb_backup.dump
+    volumes:
+      - ./backups:/backups:ro
+      - ./scripts/restore_database.sh:/scripts/restore_database.sh:ro
+    command:
+      [
+        "sh",
+        "/scripts/restore_database.sh",
+      ]
+    restart: "no"
+
 volumes:
   postgres_data:

@@ -15,7 +15,13 @@ database_url = URL.create(
 )
 
 
-engine = create_engine(database_url)
+engine = create_engine(
+    database_url,
+    pool_pre_ping=True,
+    pool_size=settings.database_pool_size,
+    max_overflow=settings.database_max_overflow,
+    pool_recycle=settings.database_pool_recycle_seconds,
+)
 
 
 SessionLocal = sessionmaker(

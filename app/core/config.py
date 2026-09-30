@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     database_name: str = "lpdb"
     database_user: str = "postgres"
     database_password: str
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+    database_pool_recycle_seconds: int = 1800
 
     # ============================================================
     # OPENAI

@@ -66,3 +66,28 @@ def test_cors_allowed_origins_can_be_loaded_from_environment(
         "https://orders.example.com",
         "https://dashboard.example.com",
     ]
+
+
+def test_database_pool_has_production_defaults():
+    settings = _settings()
+
+    assert settings.database_pool_size == 5
+    assert settings.database_max_overflow == 10
+    assert settings.database_pool_recycle_seconds == 1800
+
+
+def test_database_pool_can_be_loaded_from_environment(
+    monkeypatch,
+):
+    monkeypatch.setenv("DATABASE_POOL_SIZE", "8")
+    monkeypatch.setenv("DATABASE_MAX_OVERFLOW", "16")
+    monkeypatch.setenv(
+        "DATABASE_POOL_RECYCLE_SECONDS",
+        "900",
+    )
+
+    settings = _settings()
+
+    assert settings.database_pool_size == 8
+    assert settings.database_max_overflow == 16
+    assert settings.database_pool_recycle_seconds == 900
