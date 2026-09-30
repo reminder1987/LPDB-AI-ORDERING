@@ -1024,9 +1024,9 @@ FASE 18 — Staging                                     ✅
 
 FASE 19 — Integraciones externas                      ✅
 
-FASE 20 — Observabilidad                              ▶️ ACTUAL
+FASE 20 — Observabilidad    COMPLETADA
 
-FASE 21 — Producción                                  ⏳
+FASE 21 — Producción    ACTUAL
 
 FASE 22 — Documentación / entrega                     ⏳
 
@@ -1086,8 +1086,8 @@ Checkpoint de continuidad creado después del cierre formal de Fase 19.
 - FASE 17 — Docker / despliegue — COMPLETADA
 - FASE 18 — Staging — COMPLETADA
 - FASE 19 — Integraciones externas — COMPLETADA
-- FASE 20 — Observabilidad, operación y dashboard operativo — ACTUAL
-- FASE 21 — Producción — PENDIENTE
+- FASE 20 — Observabilidad, operación y dashboard operativo — COMPLETADA
+- FASE 21 — Producción — ACTUAL
 - FASE 22 — Documentación / entrega — PENDIENTE
 
 ## Cierre técnico confirmado de Fase 19
@@ -1498,19 +1498,43 @@ Commits funcionales:
 **Punto de reanudacion:** 20.10 - Finalizacion y regresion de
 Fase 20.
 
-### 20.10 — Finalización y regresión de Fase 20
+### 20.10 - Finalizacion y regresion de Fase 20
 
-Completar:
+**Estado:** COMPLETADA
 
-- diseño visual final;
-- responsive;
-- accesibilidad básica;
-- manejo de errores;
-- pruebas backend;
-- pruebas frontend;
-- pruebas E2E;
-- regresión integral;
-- checkpoint final antes de Fase 21.
+Alcance completado:
+
+- diseno visual final revisado;
+- responsive validado en mobile y desktop;
+- accesibilidad basica implementada y validada;
+- manejo de errores del dashboard implementado y validado;
+- pruebas backend completas aprobadas;
+- lint y build de produccion del frontend aprobados;
+- pruebas E2E globales aprobadas;
+- regresion integral aprobada;
+- checkpoint final preparado antes de Fase 21.
+
+Validacion final:
+
+- backend: **981 passed, 0 failed**;
+- frontend lint: **PASS**;
+- frontend production build y TypeScript: **PASS**;
+- E2E global: **48 passed, 0 failed**;
+- estabilidad de accessibility: **10 passed, 0 failed**;
+- Alembic: `c702abe49beb (head)`;
+- `git diff --check`: **PASS**;
+- working tree limpio al finalizar la regresion;
+- checkpoint tecnico previo: `68d571d140d3a4980d70b7dee953b29a5fbe137e`.
+
+Commits funcionales de finalizacion:
+
+- `a3513dd` - `test: add responsive dashboard coverage`
+- `ac8605b` - `feat: improve dashboard dialog accessibility`
+- `68d571d` - `feat: improve dashboard error handling`
+
+**Resultado:** Fase 20 completada tecnicamente.
+
+**Punto de reanudacion:** Fase 21 - Produccion.
 
 ## Disciplina de trabajo para Fase 20
 
