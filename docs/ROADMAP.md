@@ -1660,3 +1660,26 @@ El siguiente trabajo comienza siempre desde el último checkpoint confirmado en 
 **Resultado:** backend productivo publico, saludable y conectado a su base de datos productiva independiente.
 
 **Punto exacto de reanudacion:** 21.6 - Deploy publico dashboard + `NEXT_PUBLIC_API_URL` + dominio/HTTPS.
+
+
+## 21.6 - Deploy publico dashboard + API productiva
+
+**Estado:** COMPLETADA
+
+- Dashboard Next.js desplegado en Railway PRODUCTION desde `/dashboard`.
+- Rama productiva conectada a `master`.
+- Build y runtime productivos validados.
+- `NEXT_PUBLIC_API_URL` configurada contra el backend productivo.
+- Dashboard publico habilitado mediante HTTPS.
+- Dominio productivo del dashboard: `https://giving-dedication-production-53f8.up.railway.app`.
+- `CORS_ALLOWED_ORIGINS` configurado en el backend para autorizar el dashboard productivo.
+- PostgreSQL productivo migrado mediante Alembic hasta `c702abe49beb (head)`.
+- Tenant inicial `lpdb` provisionado mediante el mecanismo oficial `scripts.seed_tenant`.
+- OWNER productivo provisionado con acceso `owner` al tenant LPDB.
+- Login real desde dashboard productivo validado correctamente.
+- Vista `/pedidos` cargada correctamente contra la API y base de datos productivas.
+- Backend, dashboard y PostgreSQL confirmados Online durante la validacion.
+
+**Resultado:** dashboard productivo publico y autenticado, conectado por HTTPS al backend y a PostgreSQL productivo.
+
+**Punto exacto de reanudacion:** 21.7 - Monitoring / health / readiness productivos.
