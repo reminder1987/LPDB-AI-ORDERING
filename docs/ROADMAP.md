@@ -1594,3 +1594,69 @@ Antes de cerrar una fase se debe:
 6. Verificar que el working tree quede limpio.
 
 El siguiente trabajo comienza siempre desde el último checkpoint confirmado en este documento y en GitHub.
+
+---
+# FASE 21 - PRODUCCION - EJECUCION
+
+**Estado general:** EN PROGRESO
+
+## 21.1 - Auditoria de preparacion para produccion
+
+**Estado:** COMPLETADA
+
+- Dockerfile, Docker Compose, configuracion, health endpoints y dependencias de produccion auditados.
+- Variables sensibles confirmadas fuera del repositorio.
+- Alembic y configuracion de integraciones revisados.
+
+## 21.2 - Configuracion productiva y hardening basico
+
+**Estado:** COMPLETADA
+
+- CORS configurable por entorno.
+- Artefactos temporales excluidos del repositorio.
+- Configuracion productiva cubierta por pruebas.
+- Checkpoint: `51f63c0` - `feat: harden production configuration`.
+
+## 21.3 - Contenedores y runtime productivo
+
+**Estado:** COMPLETADA
+
+- Migraciones ejecutables antes del arranque de API.
+- Healthcheck del contenedor configurado.
+- Dependencias de arranque endurecidas.
+- Runtime Docker validado con PostgreSQL.
+- Checkpoint: `f07d6e6` - `feat: harden production container runtime`.
+
+## 21.4 - Base de datos productiva, migraciones y recuperacion
+
+**Estado:** COMPLETADA
+
+- Pool de conexiones endurecido.
+- Estrategia de backup y restore implementada.
+- Backup/restore real validado en entorno aislado.
+- Alembic confirmado en `c702abe49beb (head)`.
+- Regresion backend: **985 passed, 0 failed**.
+- Checkpoint: `c0d2306` - `feat: harden production database recovery`.
+
+## 21.5 - Deploy publico backend + HTTPS + dominio/API
+
+**Estado:** COMPLETADA
+
+- `master` promovida mediante fast-forward hasta `c0d2306`.
+- `master` local y `origin/master` verificados en `c0d23066f2705e88cf9cad1fb354eac2d34cca7b`.
+- Railway PRODUCTION conectado a `master`.
+- PostgreSQL productivo independiente provisionado con volumen persistente.
+- Variables productivas configuradas mediante referencias seguras para la base de datos.
+- `ENVIRONMENT=production`.
+- `PORT=8000`.
+- `JWT_SECRET_KEY` y credenciales OWNER exclusivas de produccion.
+- Healthcheck de Railway configurado en `/health/ready`.
+- Backend productivo desplegado correctamente.
+- HTTPS publico habilitado.
+- Dominio productivo: `https://lpdb-ai-ordering-production.up.railway.app`.
+- `/health/ready`: `status=ready`, `database=ok`.
+- `/health`: `status=ok`, `api=ok`, `database=ok`.
+
+**Resultado:** backend productivo publico, saludable y conectado a su base de datos productiva independiente.
+
+**Punto exacto de reanudacion:** 21.6 - Deploy publico dashboard + `NEXT_PUBLIC_API_URL` + dominio/HTTPS.
