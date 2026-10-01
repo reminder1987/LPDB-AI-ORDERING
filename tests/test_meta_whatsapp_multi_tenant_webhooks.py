@@ -165,9 +165,26 @@ def test_tenant_a_webhook_uses_tenant_a_configuration():
         ) as resolve_tenant,
         patch(
             "app.api.webhooks."
+            "provider_webhook_event_service.register_event",
+            return_value=SimpleNamespace(
+                duplicate=False,
+            ),
+        ) as register_event,
+        patch(
+            "app.api.webhooks."
             "channel_service.process_message",
             return_value=build_channel_response(),
         ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+            return_value={
+                "success": True,
+                "message_id": "wamid.outbound-test",
+                "error": None,
+            },
+        ) as send_text_response,
+
     ):
         response = client.post(
             (
@@ -196,6 +213,12 @@ def test_tenant_a_webhook_uses_tenant_a_configuration():
     assert (
         process_message.call_args.kwargs["tenant"]
         is tenant_a
+    )
+
+    send_text_response.assert_called_once_with(
+        configuration=integration_a.configuration,
+        recipient="573001111111",
+        message="Respuesta del agente",
     )
 
 
@@ -242,9 +265,25 @@ def test_tenant_b_webhook_uses_tenant_b_configuration():
         ) as resolve_tenant,
         patch(
             "app.api.webhooks."
+            "provider_webhook_event_service.register_event",
+            return_value=SimpleNamespace(
+                duplicate=False,
+            ),
+        ) as register_event,
+        patch(
+            "app.api.webhooks."
             "channel_service.process_message",
             return_value=build_channel_response(),
         ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+            return_value={
+                "success": True,
+                "message_id": "wamid.outbound-test",
+                "error": None,
+            },
+        ) as send_text_response,
     ):
         response = client.post(
             (
@@ -273,6 +312,12 @@ def test_tenant_b_webhook_uses_tenant_b_configuration():
     assert (
         process_message.call_args.kwargs["tenant"]
         is tenant_b
+    )
+
+    send_text_response.assert_called_once_with(
+        configuration=integration_b.configuration,
+        recipient="573002222222",
+        message="Respuesta del agente",
     )
 
 

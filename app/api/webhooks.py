@@ -31,8 +31,13 @@ from app.services.meta_whatsapp_configuration_service import (
 from app.services.meta_whatsapp_integration_service import (
     meta_whatsapp_integration_service,
 )
+from app.services.meta_whatsapp_delivery_service import (
+    meta_whatsapp_delivery_service,
+)
 from app.services.meta_whatsapp_service import (
     MetaWhatsAppPayloadError,
+    get_meta_whatsapp_phone_number_id,
+    is_meta_whatsapp_status_event,
     parse_meta_whatsapp_message,
     verify_meta_challenge,
     verify_meta_signature,
@@ -315,8 +320,10 @@ async def process_meta_whatsapp_webhook(
         ) from exc
 
     try:
-        meta_message = parse_meta_whatsapp_message(
-            raw_payload
+        payload_phone_number_id = (
+            get_meta_whatsapp_phone_number_id(
+                raw_payload
+            )
         )
 
     except MetaWhatsAppPayloadError as exc:
@@ -325,7 +332,7 @@ async def process_meta_whatsapp_webhook(
             detail=str(exc),
         ) from exc
 
-    if meta_message.phone_number_id != phone_number_id.strip():
+    if payload_phone_number_id != phone_number_id.strip():
         raise HTTPException(
             status_code=400,
             detail=(
@@ -357,7 +364,7 @@ async def process_meta_whatsapp_webhook(
     ) as exc:
         raise HTTPException(
             status_code=503,
-            detail="Configuración de Meta no disponible.",
+            detail="Configuracion de Meta no disponible.",
         ) from exc
 
     if not verify_meta_signature(
@@ -372,11 +379,43 @@ async def process_meta_whatsapp_webhook(
             detail="Firma de Meta inválida.",
         )
 
+    if is_meta_whatsapp_status_event(
+        raw_payload
+    ):
+        return {"status": "received"}
+
+    try:
+        meta_message = parse_meta_whatsapp_message(
+            raw_payload
+        )
+
+    except MetaWhatsAppPayloadError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
     tenant = channel_integration_service.resolve_tenant(
         channel="whatsapp",
         provider="meta",
         external_id=phone_number_id,
     )
+
+    webhook_event = (
+        provider_webhook_event_service.register_event(
+            tenant_id=tenant.tenant_id,
+            provider="meta",
+            event_id=meta_message.message_id,
+            event_type="whatsapp_message",
+            external_entity_id=(
+                meta_message.external_id
+            ),
+            payload=raw_payload,
+        )
+    )
+
+    if webhook_event.duplicate:
+        return {"status": "received"}
 
     adapter = WhatsAppAdapter()
 
@@ -394,6 +433,12 @@ async def process_meta_whatsapp_webhook(
     channel_response = channel_service.process_message(
         message=channel_message,
         tenant=tenant,
+    )
+
+    meta_whatsapp_delivery_service.send_text_response(
+        configuration=meta_integration.configuration,
+        recipient=meta_message.external_id,
+        message=channel_response.message,
     )
 
     return adapter.build_response(

@@ -125,6 +125,7 @@ def test_parse_meta_whatsapp_text_message():
     )
 
     assert parsed.phone_number_id == "phone-number-123"
+    assert parsed.message_id == "wamid.test-123"
     assert parsed.external_id == "573001234567"
     assert parsed.session_id == "573001234567"
     assert parsed.customer_name == "Cliente Meta"

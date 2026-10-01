@@ -17,6 +17,7 @@ class MetaWhatsAppMessage:
     """Mensaje de WhatsApp normalizado desde un webhook de Meta."""
 
     phone_number_id: str
+    message_id: str
     external_id: str
     session_id: str
     customer_name: str
@@ -84,6 +85,71 @@ def verify_meta_challenge(
         return None
 
     return challenge
+
+
+def get_meta_whatsapp_phone_number_id(
+    payload: dict,
+) -> str:
+    """Extrae el phone_number_id del webhook de Meta."""
+
+    try:
+        entry = payload["entry"][0]
+        change = entry["changes"][0]
+        value = change["value"]
+        metadata = value["metadata"]
+
+        phone_number_id = str(
+            metadata["phone_number_id"]
+        ).strip()
+
+    except (
+        KeyError,
+        IndexError,
+        TypeError,
+        AttributeError,
+    ) as exc:
+        raise MetaWhatsAppPayloadError(
+            "Payload de Meta invalido o sin metadata."
+        ) from exc
+
+    if not phone_number_id:
+        raise MetaWhatsAppPayloadError(
+            "El phone_number_id de Meta es obligatorio."
+        )
+
+    return phone_number_id
+
+
+def is_meta_whatsapp_status_event(
+    payload: dict,
+) -> bool:
+    """Detecta callbacks de estado enviados por Meta."""
+
+    try:
+        entry = payload["entry"][0]
+        change = entry["changes"][0]
+        value = change["value"]
+        metadata = value["metadata"]
+
+        phone_number_id = str(
+            metadata["phone_number_id"]
+        ).strip()
+
+        statuses = value["statuses"]
+
+    except (
+        KeyError,
+        IndexError,
+        TypeError,
+        AttributeError,
+    ):
+        return False
+
+    return bool(
+        phone_number_id
+        and isinstance(statuses, list)
+        and statuses
+    )
 
 
 def parse_meta_whatsapp_message(
@@ -183,6 +249,7 @@ def parse_meta_whatsapp_message(
 
     return MetaWhatsAppMessage(
         phone_number_id=phone_number_id,
+        message_id=message_id,
         external_id=sender,
         session_id=sender,
         customer_name=customer_name,
@@ -195,6 +262,8 @@ __all__ = [
     "META_SIGNATURE_PREFIX",
     "MetaWhatsAppMessage",
     "MetaWhatsAppPayloadError",
+    "get_meta_whatsapp_phone_number_id",
+    "is_meta_whatsapp_status_event",
     "parse_meta_whatsapp_message",
     "verify_meta_challenge",
     "verify_meta_signature",

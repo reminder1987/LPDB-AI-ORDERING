@@ -1,4 +1,4 @@
-import hashlib
+﻿import hashlib
 import hmac
 import json
 from types import SimpleNamespace
@@ -254,8 +254,9 @@ def test_meta_webhook_processes_signed_message():
     )
 
     tenant = SimpleNamespace(
-        id=1,
-        slug="lpdb",
+        tenant_id=1,
+        tenant_slug="lpdb",
+        tenant_name="LPDB",
     )
 
     channel_response = SimpleNamespace(
@@ -279,9 +280,25 @@ def test_meta_webhook_processes_signed_message():
         ),
         patch(
             "app.api.webhooks."
+            "provider_webhook_event_service.register_event",
+            return_value=SimpleNamespace(
+                duplicate=False,
+            ),
+        ) as register_event,
+        patch(
+            "app.api.webhooks."
             "channel_service.process_message",
             return_value=channel_response,
         ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+            return_value={
+                "success": True,
+                "message_id": "wamid.outbound-123",
+                "error": None,
+            },
+        ) as send_text_response,
     ):
         response = client.post(
             META_WEBHOOK_URL,
@@ -293,7 +310,23 @@ def test_meta_webhook_processes_signed_message():
         )
 
     assert response.status_code == 200
+
+    register_event.assert_called_once_with(
+        tenant_id=1,
+        provider="meta",
+        event_id="wamid.test-message",
+        event_type="whatsapp_message",
+        external_entity_id="573001234567",
+        payload=payload,
+    )
+
     assert process_message.call_count == 1
+
+    send_text_response.assert_called_once_with(
+        configuration=resolved_integration.configuration,
+        recipient="573001234567",
+        message="Claro, te ayudo con tu pedido.",
+    )
 
     channel_message = (
         process_message.call_args.kwargs[
@@ -328,6 +361,82 @@ def test_meta_webhook_processes_signed_message():
         "customer_id": 1,
     }
 
+
+def test_meta_webhook_ignores_duplicate_message():
+    payload = build_meta_payload(
+        message="Quiero pedir dos perros",
+    )
+
+    raw_body = json.dumps(
+        payload,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    signature = build_signature(raw_body)
+
+    resolved_integration = (
+        build_resolved_integration()
+    )
+
+    tenant = SimpleNamespace(
+        tenant_id=1,
+        tenant_slug="lpdb",
+        tenant_name="LPDB",
+    )
+
+    duplicate_result = SimpleNamespace(
+        duplicate=True,
+    )
+
+    with (
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_integration_service.resolve",
+            return_value=resolved_integration,
+        ),
+        patch(
+            "app.api.webhooks."
+            "channel_integration_service.resolve_tenant",
+            return_value=tenant,
+        ),
+        patch(
+            "app.api.webhooks."
+            "provider_webhook_event_service.register_event",
+            return_value=duplicate_result,
+        ) as register_event,
+        patch(
+            "app.api.webhooks."
+            "channel_service.process_message",
+        ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+        ) as send_text_response,
+    ):
+        response = client.post(
+            META_WEBHOOK_URL,
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Hub-Signature-256": signature,
+            },
+        )
+
+    assert response.status_code == 200
+
+    register_event.assert_called_once_with(
+        tenant_id=1,
+        provider="meta",
+        event_id="wamid.test-message",
+        event_type="whatsapp_message",
+        external_entity_id="573001234567",
+        payload=payload,
+    )
+
+    process_message.assert_not_called()
+    send_text_response.assert_not_called()
+
+    assert response.json() == {"status": "received"}
 
 def test_meta_verification_requires_parameters():
     response = client.get(
@@ -410,3 +519,155 @@ def test_meta_verification_rejects_unknown_integration():
         )
 
     assert response.status_code == 404
+
+
+def test_meta_webhook_acknowledges_status_event():
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "business-account-123",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": (
+                                    "15550000000"
+                                ),
+                                "phone_number_id": (
+                                    PHONE_NUMBER_ID
+                                ),
+                            },
+                            "statuses": [
+                                {
+                                    "id": "wamid.outbound-123",
+                                    "status": "delivered",
+                                    "timestamp": "1758390001",
+                                    "recipient_id": (
+                                        "573001234567"
+                                    ),
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    raw_body = json.dumps(
+        payload,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    signature = build_signature(raw_body)
+
+    resolved_integration = (
+        build_resolved_integration()
+    )
+
+    with (
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_integration_service.resolve",
+            return_value=resolved_integration,
+        ),
+        patch(
+            "app.api.webhooks."
+            "channel_service.process_message",
+        ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+        ) as send_text_response,
+    ):
+        response = client.post(
+            META_WEBHOOK_URL,
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Hub-Signature-256": signature,
+            },
+        )
+
+    assert response.status_code == 200
+    process_message.assert_not_called()
+    send_text_response.assert_not_called()
+
+
+def test_meta_webhook_rejects_status_event_with_invalid_signature():
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "business-account-123",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": (
+                                    "15550000000"
+                                ),
+                                "phone_number_id": (
+                                    PHONE_NUMBER_ID
+                                ),
+                            },
+                            "statuses": [
+                                {
+                                    "id": "wamid.outbound-123",
+                                    "status": "delivered",
+                                    "timestamp": "1758390001",
+                                    "recipient_id": (
+                                        "573001234567"
+                                    ),
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    raw_body = json.dumps(
+        payload,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    resolved_integration = (
+        build_resolved_integration()
+    )
+
+    with (
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_integration_service.resolve",
+            return_value=resolved_integration,
+        ),
+        patch(
+            "app.api.webhooks."
+            "channel_service.process_message",
+        ) as process_message,
+        patch(
+            "app.api.webhooks."
+            "meta_whatsapp_delivery_service.send_text_response",
+        ) as send_text_response,
+    ):
+        response = client.post(
+            META_WEBHOOK_URL,
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Hub-Signature-256": (
+                    "sha256=invalid-signature"
+                ),
+            },
+        )
+
+    assert response.status_code == 401
+    process_message.assert_not_called()
+    send_text_response.assert_not_called()
