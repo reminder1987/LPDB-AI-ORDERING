@@ -1683,3 +1683,27 @@ El siguiente trabajo comienza siempre desde el último checkpoint confirmado en 
 **Resultado:** dashboard productivo publico y autenticado, conectado por HTTPS al backend y a PostgreSQL productivo.
 
 **Punto exacto de reanudacion:** 21.7 - Monitoring / health / readiness productivos.
+
+
+## 21.7 - Monitoring / health / readiness productivos
+
+**Estado:** COMPLETADA
+
+- Readiness productivo endurecido para validar conectividad PostgreSQL y estado real del esquema Alembic.
+- `/health/ready` devuelve `503 not_ready` cuando la base de datos no esta disponible o el esquema no coincide con el head esperado.
+- `/health` distingue API, base de datos y esquema.
+- Head esperado de Alembic resuelto dinamicamente desde la configuracion del proyecto, sin revision hardcodeada.
+- Incidentes operacionales pendientes preservados cuando falla temporalmente su persistencia.
+- Reintento de persistencia validado incluso cuando no existen nuevos deltas de metricas.
+- Worker `operational_monitor` confirmado activo en produccion.
+- Deployment productivo del checkpoint `fc35a84` validado correctamente en Railway.
+- `/health/live` productivo: `status=ok`, `environment=production`.
+- `/health/ready` productivo: `status=ready`, `database=ok`, `schema=ok`.
+- `/health` productivo: `status=ok`, `api=ok`, `database=ok`, `schema=ok`.
+- Suite especifica de monitoring/health: **65 passed, 0 failed**.
+- Regresion backend completa: **992 passed, 0 failed**.
+- Checkpoint de codigo: `fc35a84` - `feat: harden production health monitoring`.
+
+**Resultado:** health, readiness y monitor operacional endurecidos y validados contra el runtime, PostgreSQL y esquema reales de produccion.
+
+**Punto exacto de reanudacion:** 21.8 - Webhooks + Meta/WhatsApp productivos.
