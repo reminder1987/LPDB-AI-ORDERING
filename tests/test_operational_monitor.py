@@ -318,3 +318,40 @@ def test_unrelated_metric_delta_does_not_retrigger_old_incident():
 
     assert len(open_incidents) == 1
     assert open_incidents[0].occurrence_count == 1
+
+def test_failed_incident_sink_is_retried_without_new_delta():
+    attempts = []
+
+    def sink(incidents):
+        attempts.append(list(incidents))
+
+        if len(attempts) == 1:
+            raise RuntimeError("database unavailable")
+
+    metrics, registry, monitor = build_monitor(
+        incident_sink=sink,
+    )
+
+    monitor.poll()
+
+    record_provider_failure(
+        metrics,
+        count=3,
+    )
+
+    try:
+        monitor.poll()
+    except RuntimeError:
+        pass
+
+    assert len(attempts) == 1
+    assert len(attempts[0]) == 1
+
+    incident_id = attempts[0][0].id
+
+    result = monitor.poll()
+
+    assert result == []
+    assert len(attempts) == 2
+    assert len(attempts[1]) == 1
+    assert attempts[1][0].id == incident_id

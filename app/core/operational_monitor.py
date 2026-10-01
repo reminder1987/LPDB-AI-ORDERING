@@ -62,14 +62,16 @@ class OperationalMonitor:
             float,
         ] = defaultdict(float)
 
+        self._pending_incidents: dict[
+            str,
+            Incident,
+        ] = {}
+
         self._lock = RLock()
 
     def poll(self) -> list[Incident]:
         snapshot = self.metrics.snapshot()
         deltas = self.cursor.delta(snapshot)
-
-        if not deltas:
-            return []
 
         changed_snapshot: list[MetricSnapshot] = []
 
@@ -91,8 +93,26 @@ class OperationalMonitor:
             changed_snapshot
         )
 
-        if incidents and self.incident_sink is not None:
-            self.incident_sink(incidents)
+        if self.incident_sink is not None:
+            with self._lock:
+                for incident in incidents:
+                    self._pending_incidents[
+                        incident.id
+                    ] = incident
+
+                pending = list(
+                    self._pending_incidents.values()
+                )
+
+            if pending:
+                self.incident_sink(pending)
+
+                with self._lock:
+                    for incident in pending:
+                        self._pending_incidents.pop(
+                            incident.id,
+                            None,
+                        )
 
         return incidents
 
@@ -100,6 +120,7 @@ class OperationalMonitor:
         with self._lock:
             self.cursor.reset()
             self._accumulated.clear()
+            self._pending_incidents.clear()
 
 
 def _persist_incidents(

@@ -33,6 +33,19 @@ def readiness():
                 "status": "not_ready",
                 "checks": {
                     "database": "unavailable",
+                    "schema": "unknown",
+                },
+            },
+        )
+
+    if not database.schema_ready:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "checks": {
+                    "database": "ok",
+                    "schema": "outdated",
                 },
             },
         )
@@ -41,6 +54,7 @@ def readiness():
         "status": "ready",
         "checks": {
             "database": "ok",
+            "schema": "ok",
         },
     }
 
@@ -57,6 +71,20 @@ def health():
                 "checks": {
                     "api": "ok",
                     "database": "unavailable",
+                    "schema": "unknown",
+                },
+            },
+        )
+
+    if not database.schema_ready:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "checks": {
+                    "api": "ok",
+                    "database": "ok",
+                    "schema": "outdated",
                 },
             },
         )
@@ -66,5 +94,6 @@ def health():
         "checks": {
             "api": "ok",
             "database": "ok",
+            "schema": "ok",
         },
     }
