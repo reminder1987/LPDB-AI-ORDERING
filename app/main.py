@@ -27,6 +27,9 @@ from app.api.webhooks import router as webhooks_router
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.meta_whatsapp_delivery_worker import (
+    MetaWhatsAppDeliveryWorker,
+)
 from app.core.observability_middleware import (
     ObservabilityMiddleware,
 )
@@ -41,31 +44,59 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    worker: OperationalMonitorWorker | None = None
-    task: asyncio.Task[None] | None = None
+    operational_worker: OperationalMonitorWorker | None = None
+    operational_task: asyncio.Task[None] | None = None
+
+    meta_worker: MetaWhatsAppDeliveryWorker | None = None
+    meta_task: asyncio.Task[None] | None = None
 
     if settings.operational_monitor_enabled:
-        worker = OperationalMonitorWorker(
+        operational_worker = OperationalMonitorWorker(
             poll=operational_monitor.poll,
             interval_seconds=(
                 settings.operational_monitor_interval_seconds
             ),
         )
 
-        task = asyncio.create_task(
-            worker.run(),
+        operational_task = asyncio.create_task(
+            operational_worker.run(),
             name="operational-monitor",
+        )
+
+    if settings.meta_whatsapp_delivery_worker_enabled:
+        meta_worker = MetaWhatsAppDeliveryWorker(
+            interval_seconds=(
+                settings.meta_whatsapp_delivery_worker_interval_seconds
+            ),
+            lease_seconds=(
+                settings.meta_whatsapp_delivery_worker_lease_seconds
+            ),
+            batch_size=(
+                settings.meta_whatsapp_delivery_worker_batch_size
+            ),
+        )
+
+        meta_task = asyncio.create_task(
+            meta_worker.run(),
+            name="meta-whatsapp-delivery",
         )
 
     try:
         yield
     finally:
-        if worker is not None:
-            worker.stop()
+        if operational_worker is not None:
+            operational_worker.stop()
 
-        if task is not None:
+        if meta_worker is not None:
+            meta_worker.stop()
+
+        if operational_task is not None:
             with suppress(asyncio.CancelledError):
-                await task
+                await operational_task
+
+        if meta_task is not None:
+            with suppress(asyncio.CancelledError):
+                await meta_task
 
 
 app = FastAPI(

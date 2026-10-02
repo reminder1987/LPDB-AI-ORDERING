@@ -11,6 +11,9 @@ from app.models.ingredient_availability_db import (
     IngredientAvailabilityDB,
 )
 from app.models.ingredient_db import IngredientDB
+from app.models.meta_whatsapp_delivery_db import (
+    MetaWhatsAppDeliveryDB,
+)
 from app.models.order_db import OrderDB
 from app.models.order_item_db import OrderItemDB
 from app.models.order_item_combo_db import OrderItemComboDB
@@ -40,6 +43,7 @@ __all__ = [
     "IngredientCategoryDB",
     "ProductCategoryDB",
     "IngredientDB",
+    "MetaWhatsAppDeliveryDB",
     "OrderDB",
     "OrderItemDB",
     "OrderItemComboDB",

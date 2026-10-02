@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from app.services.meta_whatsapp_configuration import (
     MetaWhatsAppConfiguration,
 )
@@ -11,9 +13,11 @@ class FakeResponse:
         self,
         status_code: int,
         body: dict,
+        headers: dict | None = None,
     ) -> None:
         self.status_code = status_code
         self.body = body
+        self.headers = headers or {}
 
     def json(self):
         return self.body
@@ -186,6 +190,11 @@ def test_send_text_message_handles_http_error():
         "success": False,
         "message_id": None,
         "error": "Invalid recipient",
+        "metadata": {
+            "error_type": "http_error",
+            "retryable": False,
+            "status_code": 400,
+        },
     }
 
 
@@ -242,3 +251,269 @@ def test_send_text_message_requires_message_id():
             "a message id."
         ),
     }
+def test_send_text_message_marks_timeout_as_retryable():
+    client = FakeHttpClient(
+        error=TimeoutError(
+            "request timed out"
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result == {
+        "success": False,
+        "message_id": None,
+        "error": "request timed out",
+        "metadata": {
+            "error_type": "timeout",
+            "retryable": True,
+        },
+    }
+
+def test_send_text_message_marks_connection_error_as_retryable():
+    client = FakeHttpClient(
+        error=ConnectionError(
+            "connection unavailable"
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result == {
+        "success": False,
+        "message_id": None,
+        "error": "connection unavailable",
+        "metadata": {
+            "error_type": "connection_error",
+            "retryable": True,
+        },
+    }
+
+def test_send_text_message_marks_rate_limit_as_retryable():
+    client = FakeHttpClient(
+        response=FakeResponse(
+            status_code=429,
+            body={
+                "error": {
+                    "message": "Too many requests",
+                }
+            },
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result == {
+        "success": False,
+        "message_id": None,
+        "error": "Too many requests",
+        "metadata": {
+            "error_type": "rate_limited",
+            "retryable": True,
+            "status_code": 429,
+        },
+    }
+
+def test_send_text_message_marks_server_error_as_retryable():
+    client = FakeHttpClient(
+        response=FakeResponse(
+            status_code=503,
+            body={
+                "error": {
+                    "message": "Service unavailable",
+                }
+            },
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result == {
+        "success": False,
+        "message_id": None,
+        "error": "Service unavailable",
+        "metadata": {
+            "error_type": "server_error",
+            "retryable": True,
+            "status_code": 503,
+        },
+    }
+
+def test_send_text_message_marks_http_timeout_as_retryable():
+    client = FakeHttpClient(
+        response=FakeResponse(
+            status_code=408,
+            body={
+                "error": {
+                    "message": "Request timeout",
+                }
+            },
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result == {
+        "success": False,
+        "message_id": None,
+        "error": "Request timeout",
+        "metadata": {
+            "error_type": "timeout",
+            "retryable": True,
+            "status_code": 408,
+        },
+    }
+
+def test_send_text_message_exposes_retry_after_for_rate_limit():
+    client = FakeHttpClient(
+        response=FakeResponse(
+            status_code=429,
+            body={
+                "error": {
+                    "message": "Too many requests",
+                }
+            },
+            headers={
+                "Retry-After": "45",
+            },
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    result = transport.send_text_message(
+        recipient="573001234567",
+        message="Hola",
+    )
+
+    assert result["metadata"] == {
+        "error_type": "rate_limited",
+        "retryable": True,
+        "status_code": 429,
+        "retry_after_seconds": 45,
+    }
+
+
+def test_send_text_message_records_retryable_rate_limit_metric():
+    client = FakeHttpClient(
+        response=FakeResponse(
+            status_code=429,
+            body={
+                "error": {
+                    "message": "Too many requests",
+                }
+            },
+        )
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    with patch(
+        "app.services.meta_whatsapp_http_transport."
+        "record_provider_request"
+    ) as record_metric:
+        transport.send_text_message(
+            recipient="573001234567",
+            message="Hola",
+        )
+
+    record_metric.assert_called_once()
+    assert record_metric.call_args.kwargs[
+        "retryable"
+    ] is True
+
+
+def test_send_text_message_records_retryable_timeout_metric():
+    client = FakeHttpClient(
+        error=TimeoutError("Meta timed out"),
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    with patch(
+        "app.services.meta_whatsapp_http_transport."
+        "record_provider_request"
+    ) as record_metric:
+        transport.send_text_message(
+            recipient="573001234567",
+            message="Hola",
+        )
+
+    record_metric.assert_called_once()
+    assert record_metric.call_args.kwargs[
+        "retryable"
+    ] is True
+
+
+def test_send_text_message_records_retryable_connection_error_metric():
+    client = FakeHttpClient(
+        error=ConnectionError("Meta connection failed"),
+    )
+
+    transport = MetaWhatsAppHttpTransport(
+        configuration=build_configuration(),
+        http_client=client,
+    )
+
+    with patch(
+        "app.services.meta_whatsapp_http_transport."
+        "record_provider_request"
+    ) as record_metric:
+        transport.send_text_message(
+            recipient="573001234567",
+            message="Hola",
+        )
+
+    record_metric.assert_called_once()
+    assert record_metric.call_args.kwargs[
+        "retryable"
+    ] is True

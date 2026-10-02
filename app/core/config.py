@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     operational_monitor_interval_seconds: float = 30.0
 
     # ============================================================
+    # META WHATSAPP DELIVERY WORKER
+    # ============================================================
+
+    meta_whatsapp_delivery_worker_enabled: bool = True
+    meta_whatsapp_delivery_worker_interval_seconds: float = 5.0
+    meta_whatsapp_delivery_worker_lease_seconds: int = 120
+    meta_whatsapp_delivery_worker_batch_size: int = 10
+
+    # ============================================================
     # DATABASE
     # ============================================================
 

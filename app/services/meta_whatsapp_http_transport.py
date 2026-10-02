@@ -76,6 +76,48 @@ class MetaWhatsAppHttpTransport:
                 json=payload,
                 timeout=self.configuration.timeout,
             )
+        except TimeoutError as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="timeout",
+                retryable=True,
+            )
+            record_whatsapp_message(
+                outcome="failure",
+                error_type="timeout",
+            )
+            return {
+                "success": False,
+                "message_id": None,
+                "error": str(exc),
+                "metadata": {
+                    "error_type": "timeout",
+                    "retryable": True,
+                },
+            }
+
+        except ConnectionError as exc:
+            self._record_request_metric(
+                started_at=started_at,
+                outcome="failure",
+                error_type="connection_error",
+                retryable=True,
+            )
+            record_whatsapp_message(
+                outcome="failure",
+                error_type="connection_error",
+            )
+            return {
+                "success": False,
+                "message_id": None,
+                "error": str(exc),
+                "metadata": {
+                    "error_type": "connection_error",
+                    "retryable": True,
+                },
+            }
+
         except Exception as exc:
             self._record_request_metric(
                 started_at=started_at,
@@ -98,21 +140,45 @@ class MetaWhatsAppHttpTransport:
             response_body = {}
 
         if not 200 <= response.status_code < 300:
+            if response.status_code == 408:
+                error_type = "timeout"
+                retryable = True
+            elif response.status_code == 429:
+                error_type = "rate_limited"
+                retryable = True
+            elif 500 <= response.status_code < 600:
+                error_type = "server_error"
+                retryable = True
+            else:
+                error_type = "http_error"
+                retryable = False
+
             self._record_request_metric(
                 started_at=started_at,
                 outcome="failure",
-                error_type="http_error",
+                error_type=error_type,
                 status_code=response.status_code,
+                retryable=retryable,
             )
             record_whatsapp_message(
                 outcome="failure",
-                error_type="http_error",
+                error_type=error_type,
             )
             return {
                 "success": False,
                 "message_id": None,
                 "error": self._extract_error(
                     response_body
+                ),
+                "metadata": self._build_error_metadata(
+                    error_type=error_type,
+                    retryable=retryable,
+                    status_code=response.status_code,
+                    retry_after_seconds=(
+                        self._extract_retry_after_seconds(response)
+                        if response.status_code == 429
+                        else None
+                    ),
                 ),
             }
 
@@ -162,6 +228,7 @@ class MetaWhatsAppHttpTransport:
         outcome: str,
         error_type: str | None = None,
         status_code: int | None = None,
+        retryable: bool = False,
     ) -> None:
         duration_ms = max(
             0.0,
@@ -175,8 +242,54 @@ class MetaWhatsAppHttpTransport:
             duration_ms=duration_ms,
             error_type=error_type,
             status_code=status_code,
-            retryable=False,
+            retryable=retryable,
         )
+
+    @staticmethod
+    def _build_error_metadata(
+        *,
+        error_type: str,
+        retryable: bool,
+        status_code: int,
+        retry_after_seconds: int | None = None,
+    ) -> dict:
+        metadata = {
+            "error_type": error_type,
+            "retryable": retryable,
+            "status_code": status_code,
+        }
+
+        if retry_after_seconds is not None:
+            metadata["retry_after_seconds"] = retry_after_seconds
+
+        return metadata
+
+    @staticmethod
+    def _extract_retry_after_seconds(
+        response,
+    ) -> int | None:
+        headers = getattr(response, "headers", None)
+
+        if headers is None:
+            return None
+
+        try:
+            value = headers.get("Retry-After")
+        except Exception:
+            return None
+
+        if value is None:
+            return None
+
+        try:
+            seconds = int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+        if seconds < 0:
+            return None
+
+        return seconds
 
     @staticmethod
     def _extract_message_id(

@@ -292,13 +292,8 @@ def test_meta_webhook_processes_signed_message():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-            return_value={
-                "success": True,
-                "message_id": "wamid.outbound-123",
-                "error": None,
-            },
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
     ):
         response = client.post(
             META_WEBHOOK_URL,
@@ -322,9 +317,11 @@ def test_meta_webhook_processes_signed_message():
 
     assert process_message.call_count == 1
 
-    send_text_response.assert_called_once_with(
-        configuration=resolved_integration.configuration,
+    enqueue_delivery.assert_called_once_with(
+        tenant_id=1,
+        phone_number_id="123456789",
         recipient="573001234567",
+        source_message_id="wamid.test-message",
         message="Claro, te ayudo con tu pedido.",
     )
 
@@ -410,8 +407,8 @@ def test_meta_webhook_ignores_duplicate_message():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
     ):
         response = client.post(
             META_WEBHOOK_URL,
@@ -434,7 +431,7 @@ def test_meta_webhook_ignores_duplicate_message():
     )
 
     process_message.assert_not_called()
-    send_text_response.assert_not_called()
+    enqueue_delivery.assert_not_called()
 
     assert response.json() == {"status": "received"}
 
@@ -580,8 +577,8 @@ def test_meta_webhook_acknowledges_status_event():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
     ):
         response = client.post(
             META_WEBHOOK_URL,
@@ -594,7 +591,7 @@ def test_meta_webhook_acknowledges_status_event():
 
     assert response.status_code == 200
     process_message.assert_not_called()
-    send_text_response.assert_not_called()
+    enqueue_delivery.assert_not_called()
 
 
 def test_meta_webhook_rejects_status_event_with_invalid_signature():
@@ -654,8 +651,8 @@ def test_meta_webhook_rejects_status_event_with_invalid_signature():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
     ):
         response = client.post(
             META_WEBHOOK_URL,
@@ -670,4 +667,4 @@ def test_meta_webhook_rejects_status_event_with_invalid_signature():
 
     assert response.status_code == 401
     process_message.assert_not_called()
-    send_text_response.assert_not_called()
+    enqueue_delivery.assert_not_called()

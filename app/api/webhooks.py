@@ -31,8 +31,8 @@ from app.services.meta_whatsapp_configuration_service import (
 from app.services.meta_whatsapp_integration_service import (
     meta_whatsapp_integration_service,
 )
-from app.services.meta_whatsapp_delivery_service import (
-    meta_whatsapp_delivery_service,
+from app.services.meta_whatsapp_outbox_service import (
+    meta_whatsapp_outbox_service,
 )
 from app.services.meta_whatsapp_service import (
     MetaWhatsAppPayloadError,
@@ -435,9 +435,11 @@ async def process_meta_whatsapp_webhook(
         tenant=tenant,
     )
 
-    meta_whatsapp_delivery_service.send_text_response(
-        configuration=meta_integration.configuration,
+    meta_whatsapp_outbox_service.enqueue(
+        tenant_id=tenant.tenant_id,
+        phone_number_id=phone_number_id,
         recipient=meta_message.external_id,
+        source_message_id=meta_message.message_id,
         message=channel_response.message,
     )
 

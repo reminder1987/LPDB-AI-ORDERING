@@ -37,6 +37,9 @@ from app.models.location_db import (
     LocationDB,
     LocationHourDB,
 )
+from app.models.meta_whatsapp_delivery_db import (
+    MetaWhatsAppDeliveryDB,
+)
 from app.models.operational_incident_db import (
     OperationalIncidentDB,
 )

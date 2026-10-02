@@ -91,3 +91,59 @@ def test_database_pool_can_be_loaded_from_environment(
     assert settings.database_pool_size == 8
     assert settings.database_max_overflow == 16
     assert settings.database_pool_recycle_seconds == 900
+
+
+
+def test_meta_whatsapp_delivery_worker_has_safe_defaults():
+    settings = _settings()
+
+    assert settings.meta_whatsapp_delivery_worker_enabled is True
+    assert (
+        settings.meta_whatsapp_delivery_worker_interval_seconds
+        == 5.0
+    )
+    assert (
+        settings.meta_whatsapp_delivery_worker_lease_seconds
+        == 120
+    )
+    assert (
+        settings.meta_whatsapp_delivery_worker_batch_size
+        == 10
+    )
+
+
+def test_meta_whatsapp_delivery_worker_can_be_loaded_from_environment(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "META_WHATSAPP_DELIVERY_WORKER_ENABLED",
+        "false",
+    )
+    monkeypatch.setenv(
+        "META_WHATSAPP_DELIVERY_WORKER_INTERVAL_SECONDS",
+        "15",
+    )
+    monkeypatch.setenv(
+        "META_WHATSAPP_DELIVERY_WORKER_LEASE_SECONDS",
+        "180",
+    )
+    monkeypatch.setenv(
+        "META_WHATSAPP_DELIVERY_WORKER_BATCH_SIZE",
+        "25",
+    )
+
+    settings = _settings()
+
+    assert settings.meta_whatsapp_delivery_worker_enabled is False
+    assert (
+        settings.meta_whatsapp_delivery_worker_interval_seconds
+        == 15.0
+    )
+    assert (
+        settings.meta_whatsapp_delivery_worker_lease_seconds
+        == 180
+    )
+    assert (
+        settings.meta_whatsapp_delivery_worker_batch_size
+        == 25
+    )

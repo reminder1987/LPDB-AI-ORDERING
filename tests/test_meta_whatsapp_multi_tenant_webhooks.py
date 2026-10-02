@@ -177,13 +177,8 @@ def test_tenant_a_webhook_uses_tenant_a_configuration():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-            return_value={
-                "success": True,
-                "message_id": "wamid.outbound-test",
-                "error": None,
-            },
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
 
     ):
         response = client.post(
@@ -215,9 +210,11 @@ def test_tenant_a_webhook_uses_tenant_a_configuration():
         is tenant_a
     )
 
-    send_text_response.assert_called_once_with(
-        configuration=integration_a.configuration,
+    enqueue_delivery.assert_called_once_with(
+        tenant_id=1,
+        phone_number_id=PHONE_NUMBER_A,
         recipient="573001111111",
+        source_message_id=f"wamid-{PHONE_NUMBER_A}",
         message="Respuesta del agente",
     )
 
@@ -277,13 +274,8 @@ def test_tenant_b_webhook_uses_tenant_b_configuration():
         ) as process_message,
         patch(
             "app.api.webhooks."
-            "meta_whatsapp_delivery_service.send_text_response",
-            return_value={
-                "success": True,
-                "message_id": "wamid.outbound-test",
-                "error": None,
-            },
-        ) as send_text_response,
+            "meta_whatsapp_outbox_service.enqueue",
+        ) as enqueue_delivery,
     ):
         response = client.post(
             (
@@ -314,9 +306,11 @@ def test_tenant_b_webhook_uses_tenant_b_configuration():
         is tenant_b
     )
 
-    send_text_response.assert_called_once_with(
-        configuration=integration_b.configuration,
+    enqueue_delivery.assert_called_once_with(
+        tenant_id=2,
+        phone_number_id=PHONE_NUMBER_B,
         recipient="573002222222",
+        source_message_id=f"wamid-{PHONE_NUMBER_B}",
         message="Respuesta del agente",
     )
 
