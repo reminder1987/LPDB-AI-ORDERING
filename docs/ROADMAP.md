@@ -1707,3 +1707,50 @@ El siguiente trabajo comienza siempre desde el último checkpoint confirmado en 
 **Resultado:** health, readiness y monitor operacional endurecidos y validados contra el runtime, PostgreSQL y esquema reales de produccion.
 
 **Punto exacto de reanudacion:** 21.8 - Webhooks + Meta/WhatsApp productivos.
+
+
+---
+
+# CHECKPOINT DE CONTINUIDAD — 2026-10-08 — FASE 21.8 META WHATSAPP
+
+> Registro de avance posterior a las secciones históricas de este documento. Este checkpoint no sustituye el mapa de 22 fases ni certifica el cierre de la Fase 21.
+
+## Fuente y versión
+
+- Repositorio: `reminder1987/LPDB-AI-ORDERING`.
+- Rama: `master`.
+- Último commit de código confirmado y publicado: `9821a42` — `test: validate Meta WhatsApp provisioning CLI and tenant isolation`.
+- El presente cambio documental crea un checkpoint adicional; el commit de documentación será posterior a `9821a42`.
+
+## Estado verificado en la sesión
+
+- Fase general activa: **21 — Producción** (según mapa de 22 fases).
+- Frente de trabajo actual: **21.8 — Aprovisionamiento Meta WhatsApp**.
+- Servicio de aprovisionamiento y CLI administrativo implementados.
+- CLI comprobado en modalidad **dry-run**, limitado a PostgreSQL local `lpdb_test`.
+- Pruebas de aislamiento entre tenants, referencias inválidas, ausencia de escritura en dry-run y concurrencia: **5 passed, 0 failed** con `python -m pytest -c pytest.postgres.ini -v`.
+- Resultado adicional: **22 DeprecationWarning** relacionadas con `datetime.utcnow()`; no bloquean estas pruebas, pero requieren seguimiento.
+- Se validó un conflicto cross-tenant mediante ejecución real del CLI de prueba.
+- No se ha confirmado un aprovisionamiento real de WhatsApp en producción ni una validación E2E productiva.
+
+## Trabajo pendiente para cerrar 21.8
+
+1. Ampliar pruebas para tenants inactivos, integraciones parciales y configuraciones incompatibles.
+2. Verificar que el CLI rechace destinos de base de datos no autorizados y conexiones remotas; mantener barreras contra operaciones productivas accidentales.
+3. Revisar cobertura de limpieza de fixtures y posibles datos temporales residuales en `lpdb_test`.
+4. Diseñar y validar por separado un modo explícito de aplicación real, con confirmaciones y protecciones; no asumir que `--apply` ya existe.
+5. Validar referencias de secretos, configuración y permisos reales de Meta en entorno controlado.
+6. Probar integración real con Meta WhatsApp y manejo de errores, sin activar producción antes de las aprobaciones correspondientes.
+7. Ejecutar regresión integral y documentar procedimiento operativo y recuperación.
+
+## Pendiente para cerrar la Fase 21 completa
+
+Conservar el alcance original de **FASE 21 — Producción**: deploy productivo, HTTPS, dominio, variables, base de datos productiva, backups, monitoring, webhooks productivos, WhatsApp, Toast, smoke tests y flujo real conversación → pedido → pago → POS/KDS. **No marcar Fase 21 como completada** hasta validar los criterios de cierre. Revisar la definición y estado de las subfases anteriores de la fase 21 frente al historial y código, sin inventar porcentajes ni estados.
+
+## Reanudación exacta
+
+**Próximo paso de trabajo: Paso 116.** Primero confirmar que el árbol local está sincronizado con `origin/master` tras este commit documental; después agregar y ejecutar pruebas de seguridad del CLI para tenant inactivo y base de datos no autorizada, trabajando un comando PowerShell por turno. No tocar la base productiva. Antes de cualquier nuevo commit, ejecutar las pruebas relevantes y revisar secretos.
+
+## Regla documental
+
+Las cabeceras históricas de este roadmap contienen estados anteriores de Fases 19/20; no reinterpretarlas como estado actual sin cotejar los checkpoints. El mapa de 22 fases se mantiene intacto y este checkpoint registra el estado más reciente verificado de la Fase 21.8.
