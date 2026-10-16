@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from uuid import uuid4
 
-from sqlalchemy import create_engine, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.database import database_url
+from app.models.tenant_db import TenantDB
+from postgres_tests.meta_whatsapp_safety import (
+    test_engine as safe_engine, cli_environment, cleanup_fixtures,
+)
 from app.models.channel_integration_db import ChannelIntegrationDB
 from app.models.provider_integration_db import ProviderIntegrationDB
 
@@ -16,9 +21,21 @@ def test_cli_dry_run_does_not_write():
 
     assert url.host in {"localhost", "127.0.0.1", "::1"}
 
-    engine = create_engine(url)
+    engine = safe_engine(url)
+
+    unique = uuid4().hex
+    tenant_slug = f"test-cli-dry-{unique}"
+    phone_id = f"TEST_CLI_DRY_{unique}"
+    tenants = []
 
     try:
+        with Session(engine) as session:
+            tenant = TenantDB(slug=tenant_slug, name="CLI dry run", active=True)
+            session.add(tenant)
+            session.flush()
+            tenants.append((tenant.id, tenant_slug))
+            session.commit()
+
         with Session(engine) as session:
             assert session.scalar(
                 text("SELECT current_database()")
@@ -44,9 +61,9 @@ def test_cli_dry_run_does_not_write():
                 "--database",
                 "lpdb_test",
                 "--tenant-slug",
-                "lpdb",
+                tenant_slug,
                 "--phone-number-id",
-                "TEST_META_PHONE_001",
+                phone_id,
                 "--api-version",
                 "v23.0",
                 "--access-token-ref",
@@ -56,6 +73,7 @@ def test_cli_dry_run_does_not_write():
                 "--verify-token-ref",
                 "TEST_META_VERIFY_TOKEN",
             ],
+            env=cli_environment(engine.url),
             capture_output=True,
             text=True,
             timeout=20,
@@ -82,10 +100,20 @@ def test_cli_dry_run_does_not_write():
         assert after_providers == before_providers
 
     finally:
-        engine.dispose()
+        try:
+            cleanup_fixtures(engine, tenants, phone_id)
+        finally:
+            engine.dispose()
 
 
 def test_cli_rejects_invalid_secret_reference():
+    engine = safe_engine(database_url.set(database="lpdb_test"))
+    try:
+        with engine.connect():
+            env = cli_environment(engine.url)
+    finally:
+        engine.dispose()
+
     result = subprocess.run(
         [
             sys.executable,
@@ -106,6 +134,7 @@ def test_cli_rejects_invalid_secret_reference():
             "--verify-token-ref",
             "TEST_META_VERIFY_TOKEN",
         ],
+        env=env,
         capture_output=True,
         text=True,
         timeout=20,
@@ -117,13 +146,12 @@ def test_cli_rejects_invalid_secret_reference():
 def test_cli_rejects_phone_assigned_to_another_tenant():
     import uuid
 
-    from sqlalchemy import event
     from app.models.tenant_db import TenantDB
 
     url = database_url.set(database="lpdb_test")
     assert url.host in {"localhost", "127.0.0.1", "::1"}
 
-    engine = create_engine(url)
+    engine = safe_engine(url)
 
     try:
         with engine.connect() as connection:
@@ -219,7 +247,7 @@ def test_cli_rejects_cross_tenant_conflict():
     url = database_url.set(database="lpdb_test")
     assert url.host in {"localhost", "127.0.0.1", "::1"}
 
-    engine = create_engine(url)
+    engine = safe_engine(url)
 
     unique = uuid.uuid4().hex[:12]
     phone_id = f"TEST_CLI_CONFLICT_{unique}"
@@ -310,6 +338,7 @@ def test_cli_rejects_cross_tenant_conflict():
                 "--verify-token-ref",
                 "TEST_META_VERIFY_TOKEN",
             ],
+            env=cli_environment(engine.url),
             capture_output=True,
             text=True,
             timeout=20,
@@ -319,24 +348,7 @@ def test_cli_rejects_cross_tenant_conflict():
         assert "El numero pertenece a otro restaurante" in result.stdout
 
     finally:
-        if tenant_ids:
-            with Session(engine) as session:
-                try:
-                    session.query(ChannelIntegrationDB).filter(
-                        ChannelIntegrationDB.tenant_id.in_(tenant_ids)
-                    ).delete(synchronize_session=False)
-
-                    session.query(ProviderIntegrationDB).filter(
-                        ProviderIntegrationDB.tenant_id.in_(tenant_ids)
-                    ).delete(synchronize_session=False)
-
-                    session.query(TenantDB).filter(
-                        TenantDB.id.in_(tenant_ids)
-                    ).delete(synchronize_session=False)
-
-                    session.commit()
-                except Exception:
-                    session.rollback()
-                    raise
-
-        engine.dispose()
+        try:
+            cleanup_fixtures(engine, list(zip(tenant_ids, [tenant_a_slug, tenant_b_slug])), phone_id)
+        finally:
+            engine.dispose()

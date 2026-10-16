@@ -1,11 +1,12 @@
-﻿import threading
+import threading
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
 from app.core.database import database_url
+from postgres_tests.meta_whatsapp_safety import test_engine as safe_engine, cleanup_fixtures
 from app.services.meta_whatsapp_provisioning_service import (
     MetaWhatsAppProvisioningError,
     MetaWhatsAppProvisioningService,
@@ -15,16 +16,7 @@ from app.services.meta_whatsapp_provisioning_service import (
 def test_concurrent_meta_whatsapp_provisioning():
     url = database_url.set(database="lpdb_test")
 
-    assert url.get_backend_name() == "postgresql"
-    assert url.database == "lpdb_test"
-    assert url.host in ("localhost", "127.0.0.1", "::1")
-
-    engine = create_engine(
-        url,
-        connect_args={
-            "options": "-c lock_timeout=5000 -c statement_timeout=15000"
-        },
-    )
+    engine = safe_engine(url)
 
     suffix = uuid4().hex[:12]
     phone_id = f"test-race-{suffix}"
@@ -179,42 +171,24 @@ def test_concurrent_meta_whatsapp_provisioning():
         assert channels[0] == created[0][1]
 
     finally:
+        # Also handle a partial Thread.start() failure or an interrupted join.
+        barrier.abort()
+        for thread in threads:
+            if thread.ident is not None:
+                thread.join(timeout=20)
         if all(not thread.is_alive() for thread in threads):
             try:
-                with engine.begin() as connection:
-                    assert connection.execute(
-                        text("SELECT current_database()")
-                    ).scalar_one() == "lpdb_test"
-
-                    connection.execute(
-                        text("""
-                            DELETE FROM provider_integrations
-                            WHERE external_id = :phone_id
-                        """),
-                        {"phone_id": phone_id},
-                    )
-
-                    connection.execute(
-                        text("""
-                            DELETE FROM channel_integrations
-                            WHERE external_id = :phone_id
-                        """),
-                        {"phone_id": phone_id},
-                    )
-
-                    if tenant_ids:
-                        connection.execute(
-                            text("""
-                                DELETE FROM tenants
-                                WHERE id = ANY(:tenant_ids)
-                            """),
-                            {"tenant_ids": tenant_ids},
-                        )
+                cleanup_fixtures(
+                    engine,
+                    [(tenant_id, f"race-{number}-{suffix}")
+                     for number, tenant_id in enumerate(tenant_ids, start=1)],
+                    phone_id,
+                )
             finally:
                 engine.dispose()
         else:
             engine.dispose()
             pytest.fail(
                 "Una transaccion sigue activa. "
-                "Se omitio la limpieza para evitar conflictos."
+                f"Se omitio la limpieza para evitar conflictos. Fixture: {suffix}; tenants: {tenant_ids}"
             )
