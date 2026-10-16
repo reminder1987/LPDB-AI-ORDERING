@@ -1754,3 +1754,37 @@ Conservar el alcance original de **FASE 21 — Producción**: deploy productivo,
 ## Regla documental
 
 Las cabeceras históricas de este roadmap contienen estados anteriores de Fases 19/20; no reinterpretarlas como estado actual sin cotejar los checkpoints. El mapa de 22 fases se mantiene intacto y este checkpoint registra el estado más reciente verificado de la Fase 21.8.
+
+
+---
+
+# CHECKPOINT 2026-10-16 - FASE 21.8 - SEGURIDAD META WHATSAPP
+
+## Estado confirmado
+
+- Rama: master.
+- Commit publicado en GitHub: `3fc6ad9`.
+- Archivo incorporado: `postgres_tests/test_meta_whatsapp_provisioning_cli_security.py`.
+- Cobertura nueva: 27 casos de prueba automatizados con mocks.
+- Suite PostgreSQL completa: **32 passed, 0 failed**, ejecutada con `python -m pytest -c pytest.postgres.ini -v -p no:cacheprovider`.
+- Advertencias: 22 relacionadas con `datetime.utcnow()`.
+- PostgreSQL local `lpdb_test` verificado; conexion local IPv6 `::1/128`.
+- Pruebas de seguridad: tenant inactivo, bases no autorizadas, hosts remotos, integraciones incompletas o inactivas, configuraciones y referencias de credenciales diferentes.
+- CLI conservado en modalidad dry-run, sin aprovisionamiento real.
+- No se ejecutaron migraciones ni operaciones sobre la base productiva.
+- El commit fue publicado en GitHub; despliegue automatico de Railway no verificado.
+
+## Pendientes para cerrar la subfase 21.8
+
+1. Revisar limpieza de fixtures y posibles datos residuales en `lpdb_test`.
+2. Revisar protecciones de conexiones y credenciales en escenarios reales.
+3. Disenar un modo de aprovisionamiento real con autorizacion explicita y controles de seguridad.
+4. Validar secretos, permisos y configuracion Meta en un entorno controlado.
+5. Validar webhooks y flujo real de WhatsApp.
+6. Ejecutar regresion integral y documentar operacion, incidentes y recuperacion.
+7. Revisar las 22 advertencias deprecadas como deuda tecnica.
+
+## Proxima reanudacion
+
+Continuar con auditoria de fixtures y limpieza de datos de prueba de la Fase 21.8.
+No marcar la Fase 21 como completada.
