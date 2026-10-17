@@ -1,6 +1,9 @@
 from collections.abc import Mapping
 from typing import Any
 
+from app.services.integration_administration_service import (
+    IntegrationAdministrationService,
+)
 from app.services.integration_secret_service import (
     IntegrationSecretService,
     integration_secret_service,
@@ -51,6 +54,19 @@ class MetaWhatsAppConfigurationService:
             "Meta integration credentials are invalid.",
         )
 
+        normalized_configuration = (
+            IntegrationAdministrationService._normalize_mapping_keys(
+                dict(configuration),
+                field_name="configuracion",
+            )
+        )
+        normalized_credentials = (
+            IntegrationAdministrationService._normalize_mapping_keys(
+                dict(credentials),
+                field_name="credencial",
+            )
+        )
+
         phone_number_id = self._require_string(
             getattr(
                 integration,
@@ -61,32 +77,32 @@ class MetaWhatsAppConfigurationService:
         )
 
         api_version = self._require_string(
-            configuration.get("api_version"),
+            normalized_configuration.get("api_version"),
             "Meta api_version is required.",
         )
 
-        base_url = configuration.get(
+        base_url = normalized_configuration.get(
             "base_url",
             DEFAULT_META_BASE_URL,
         )
 
-        timeout = configuration.get(
+        timeout = normalized_configuration.get(
             "timeout",
             DEFAULT_META_TIMEOUT,
         )
 
         access_token_reference = self._require_string(
-            credentials.get("access_token"),
+            normalized_credentials.get("access_token"),
             "Meta access_token reference is required.",
         )
 
         app_secret_reference = self._require_string(
-            credentials.get("app_secret"),
+            normalized_credentials.get("app_secret"),
             "Meta app_secret reference is required.",
         )
 
         verify_token_reference = self._require_string(
-            credentials.get("verify_token"),
+            normalized_credentials.get("verify_token"),
             "Meta verify_token reference is required.",
         )
 

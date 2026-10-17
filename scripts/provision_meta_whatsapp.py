@@ -16,9 +16,23 @@ from app.models.tenant_db import TenantDB
 from app.services.integration_administration_service import (
     IntegrationAdministrationService,
 )
+from app.services.meta_whatsapp_provisioning_service import (
+    MetaWhatsAppProvisioningError,
+    MetaWhatsAppProvisioningService,
+)
 
 TEST_DATABASE = "lpdb_test"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+APPLY_CONFIRMATION = "CONFIRM_LOCAL_LPDB_TEST"
+
+
+def _validate_local_test_database() -> None:
+    if database_url.host not in LOCAL_HOSTS:
+        raise ValueError("solo se permite PostgreSQL local.")
+
+    configured_database = getattr(database_url, "database", None)
+    if configured_database is not None and configured_database != TEST_DATABASE:
+        raise ValueError("La conexion no corresponde a lpdb_test.")
 
 
 def main() -> int:
@@ -36,10 +50,21 @@ def main() -> int:
         required=True,
         choices=[TEST_DATABASE],
     )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Aplica la integracion Meta/WhatsApp en lpdb_test local.",
+    )
+    parser.add_argument(
+        "--confirm-apply",
+        default=None,
+        help="Requiere el valor exacto CONFIRM_LOCAL_LPDB_TEST para --apply.",
+    )
 
     args = parser.parse_args()
 
-    # Primera version: nunca permite operaciones de escritura.
+    # El CLI permanece en dry-run por defecto; el modo --apply requiere
+    # confirmacion explicita y validaciones adicionales de seguridad.
     if database_url.host not in LOCAL_HOSTS:
         print("ERROR: solo se permite PostgreSQL local.")
         return 1
@@ -49,6 +74,13 @@ def main() -> int:
         return 1
 
     try:
+        if args.apply and (
+            args.confirm_apply != APPLY_CONFIRMATION
+        ):
+            raise ValueError(
+                "La confirmacion para --apply es obligatoria."
+            )
+
         credentials = (
             IntegrationAdministrationService._normalize_credentials(
                 {
@@ -89,7 +121,6 @@ def main() -> int:
                         "La conexion no corresponde a lpdb_test."
                     )
 
-                # La IP puede ser NULL en conexiones por socket.
                 if actual_host not in {
                     None,
                     "127.0.0.1",
@@ -132,6 +163,32 @@ def main() -> int:
                     )
                 )
 
+                if args.apply:
+                    try:
+                        integration = MetaWhatsAppProvisioningService().provision(
+                            session=session,
+                            tenant_id=tenant.id,
+                            phone_number_id=phone_number_id,
+                            api_version=api_version,
+                            access_token_reference=args.access_token_ref,
+                            app_secret_reference=args.app_secret_ref,
+                            verify_token_reference=args.verify_token_ref,
+                        )
+                    except (MetaWhatsAppProvisioningError, ValueError):
+                        session.rollback()
+                        raise
+
+                    print("META WHATSAPP - APPLY")
+                    print(f"Base de datos: {actual_database}")
+                    print(f"Restaurante: {tenant.name}")
+                    print(f"Tenant ID: {tenant.id}")
+                    print(f"Phone Number ID: {phone_number_id}")
+                    print(f"API version: {api_version}")
+                    print("Credenciales: referencias validadas")
+                    print(f"Resultado: INTEGRACION APLICADA (ID {integration.id})")
+                    print("Cambios guardados: APLICADO")
+                    return 0
+
                 if channel is not None or provider is not None:
                     if channel is None or provider is None:
                         raise ValueError(
@@ -151,10 +208,23 @@ def main() -> int:
                             "La integracion existente esta inactiva."
                         )
 
+                    normalized_configuration = (
+                        IntegrationAdministrationService._normalize_mapping_keys(
+                            provider.configuration or {},
+                            field_name="configuracion",
+                        )
+                    )
+                    normalized_credentials = (
+                        IntegrationAdministrationService._normalize_mapping_keys(
+                            provider.credentials or {},
+                            field_name="credencial",
+                        )
+                    )
+
                     if (
-                        provider.configuration
+                        normalized_configuration
                         != {"api_version": api_version}
-                        or provider.credentials != credentials
+                        or normalized_credentials != credentials
                     ):
                         raise ValueError(
                             "La configuracion existente es diferente."

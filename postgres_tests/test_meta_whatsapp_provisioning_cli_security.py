@@ -74,10 +74,10 @@ def cli_context(monkeypatch):
     connection.commit.assert_not_called()
 
 
-def assert_rejected(context, capsys, message):
+def assert_rejected(context, capsys, message, *, exc_type="ValueError"):
     assert context.cli.main() == 1
     output = capsys.readouterr()
-    assert output.out.strip() == f"ERROR: ValueError: {message}"
+    assert output.out.strip() == f"ERROR: {exc_type}: {message}"
     assert output.err == ""
     context.engine_factory.return_value.dispose.assert_called_once_with()
     context.session_factory.return_value.__exit__.assert_called_once()
@@ -200,3 +200,115 @@ def test_cli_accepts_matching_configuration_without_writes(cli_context, capsys):
     assert "Cambios guardados: NINGUNO" in output
     cli_context.session.rollback.assert_called_once_with()
     cli_context.engine_factory.return_value.dispose.assert_called_once_with()
+
+
+def test_cli_accepts_equivalent_credentials_and_configuration_with_case_variants(
+    cli_context, capsys,
+):
+    cli_context.provider.configuration = {"Api_Version": "v23.0"}
+    cli_context.provider.credentials = {
+        "Access_Token": "TEST_META_ACCESS_TOKEN",
+        "App_Secret": "TEST_META_APP_SECRET",
+        "Verify_Token": "TEST_META_VERIFY_TOKEN",
+    }
+
+    assert cli_context.cli.main() == 0
+
+    output = capsys.readouterr().out
+    assert "INTEGRACION EXISTENTE - SIN CAMBIOS" in output
+    assert "Cambios guardados: NINGUNO" in output
+
+
+def test_cli_rejects_duplicate_normalized_credentials(cli_context, capsys):
+    cli_context.provider.credentials = {
+        " access_token ": "TEST_META_ACCESS_TOKEN",
+        "ACCESS_TOKEN": "TEST_META_ACCESS_TOKEN",
+        "app_secret": "TEST_META_APP_SECRET",
+        "verify_token": "TEST_META_VERIFY_TOKEN",
+    }
+
+    assert_rejected(
+        cli_context,
+        capsys,
+        "El nombre de la credencial esta duplicado.",
+        exc_type="IntegrationAdministrationValidationError",
+    )
+
+
+def test_cli_rejects_incompatible_configuration_keys_after_normalization(
+    cli_context, capsys,
+):
+    cli_context.provider.configuration = {
+        "api_version": "v23.0",
+        "Api_Version": "v24.0",
+    }
+
+    assert_rejected(
+        cli_context,
+        capsys,
+        "El nombre de la configuracion esta duplicado.",
+        exc_type="IntegrationAdministrationValidationError",
+    )
+
+
+def test_cli_apply_requires_explicit_confirmation(cli_context, capsys):
+    cli_context.argv.extend(["--apply"])
+
+    assert cli_context.cli.main() == 1
+    output = capsys.readouterr()
+    assert output.out.strip() == (
+        "ERROR: ValueError: La confirmacion para --apply es obligatoria."
+    )
+    assert output.err == ""
+    cli_context.engine_factory.assert_not_called()
+    cli_context.session_factory.assert_not_called()
+
+
+def test_cli_apply_calls_service_with_explicit_confirmation(
+    cli_context, capsys, monkeypatch,
+):
+    cli_context.argv.extend([
+        "--apply",
+        "--confirm-apply",
+        "CONFIRM_LOCAL_LPDB_TEST",
+    ])
+
+    fake_service = MagicMock()
+    fake_service.provision.return_value = SimpleNamespace(id=321)
+    monkeypatch.setattr(
+        cli_context.cli,
+        "MetaWhatsAppProvisioningService",
+        MagicMock(return_value=fake_service),
+    )
+
+    assert cli_context.cli.main() == 0
+
+    output = capsys.readouterr().out
+    assert "META WHATSAPP - APPLY" in output
+    assert "Cambios guardados: APLICADO" in output
+    fake_service.provision.assert_called_once()
+
+
+def test_cli_apply_rolls_back_on_service_failure(
+    cli_context, capsys, monkeypatch,
+):
+    cli_context.argv.extend([
+        "--apply",
+        "--confirm-apply",
+        "CONFIRM_LOCAL_LPDB_TEST",
+    ])
+
+    fake_service = MagicMock()
+    fake_service.provision.side_effect = ValueError("fallo de aplicacion")
+    monkeypatch.setattr(
+        cli_context.cli,
+        "MetaWhatsAppProvisioningService",
+        MagicMock(return_value=fake_service),
+    )
+
+    assert_rejected(
+        cli_context,
+        capsys,
+        "fallo de aplicacion",
+    )
+    cli_context.session.rollback.assert_called_once_with()

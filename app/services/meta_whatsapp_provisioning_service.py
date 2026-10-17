@@ -90,10 +90,23 @@ class MetaWhatsAppProvisioningService:
                         "La integracion Meta existente esta inactiva."
                     )
 
+                normalized_existing_configuration = (
+                    IntegrationAdministrationService._normalize_mapping_keys(
+                        existing_provider.configuration or {},
+                        field_name="configuracion",
+                    )
+                )
+                normalized_existing_credentials = (
+                    IntegrationAdministrationService._normalize_mapping_keys(
+                        existing_provider.credentials or {},
+                        field_name="credencial",
+                    )
+                )
+
                 if (
-                    existing_provider.configuration
+                    normalized_existing_configuration
                     != {"api_version": api_version}
-                    or existing_provider.credentials != credentials
+                    or normalized_existing_credentials != credentials
                 ):
                     raise MetaWhatsAppProvisioningError(
                         "La configuracion Meta existente es diferente."

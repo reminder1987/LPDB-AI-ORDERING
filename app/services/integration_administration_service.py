@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 
 from sqlalchemy import select
@@ -236,26 +237,51 @@ class IntegrationAdministrationService:
         return normalized
 
     @staticmethod
+    def _normalize_mapping_keys(
+        mapping: Mapping,
+        *,
+        field_name: str,
+    ) -> dict[str, object]:
+        if not isinstance(mapping, Mapping):
+            raise IntegrationAdministrationValidationError(
+                f"{field_name} debe ser un objeto."
+            )
+
+        normalized_mapping: dict[str, object] = {}
+
+        for raw_key, value in mapping.items():
+            normalized_key = str(raw_key).strip()
+
+            if not normalized_key:
+                raise IntegrationAdministrationValidationError(
+                    f"El nombre de la {field_name} es obligatorio."
+                )
+
+            canonical_key = normalized_key.lower()
+
+            if canonical_key in normalized_mapping:
+                raise IntegrationAdministrationValidationError(
+                    f"El nombre de la {field_name} esta duplicado."
+                )
+
+            normalized_mapping[canonical_key] = value
+
+        return normalized_mapping
+
+    @staticmethod
     def _normalize_credentials(
         credentials: dict,
     ) -> dict[str, str]:
-        if not isinstance(credentials, dict):
-            raise IntegrationAdministrationValidationError(
-                "credentials debe ser un objeto."
+        normalized_credentials = (
+            IntegrationAdministrationService._normalize_mapping_keys(
+                credentials,
+                field_name="credencial",
             )
+        )
 
-        normalized_credentials: dict[str, str] = {}
+        resolved_credentials: dict[str, str] = {}
 
-        for credential_name, reference in credentials.items():
-            normalized_name = str(
-                credential_name
-            ).strip()
-
-            if not normalized_name:
-                raise IntegrationAdministrationValidationError(
-                    "El nombre de la credencial es obligatorio."
-                )
-
+        for credential_name, reference in normalized_credentials.items():
             try:
                 normalized_reference = (
                     IntegrationSecretService._normalize_reference(
@@ -267,11 +293,9 @@ class IntegrationAdministrationService:
                     str(exc)
                 ) from exc
 
-            normalized_credentials[
-                normalized_name
-            ] = normalized_reference
+            resolved_credentials[credential_name] = normalized_reference
 
-        return normalized_credentials
+        return resolved_credentials
 
     @staticmethod
     def _normalize_optional(

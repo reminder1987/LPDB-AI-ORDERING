@@ -1788,3 +1788,36 @@ Las cabeceras históricas de este roadmap contienen estados anteriores de Fases 
 
 Continuar con auditoria de fixtures y limpieza de datos de prueba de la Fase 21.8.
 No marcar la Fase 21 como completada.
+
+## CHECKPOINT 2026-10-16 — FASE 21.8
+
+Estado: EN PROGRESO. No declarar completada.
+
+Trabajo realizado:
+- Normalización y validación de credenciales Meta WhatsApp.
+- Rechazo de claves duplicadas después de normalización.
+- Implementación de --apply con confirmación explícita.
+- Dry-run conservado como comportamiento predeterminado.
+- 33 pruebas de seguridad CLI aprobadas.
+- 40 pruebas de regresión aprobadas antes de implementar --apply.
+- Prueba de concurrencia PostgreSQL aprobada antes de los últimos cambios.
+- Restricciones únicas verificadas en modelos y migraciones Alembic.
+
+Pendientes para retomar:
+1. Auditar completamente las protecciones de --apply.
+2. Verificar las restricciones únicas en PostgreSQL local lpdb_test.
+3. Ejecutar regresiones y concurrencia después de los últimos cambios.
+4. Verificar idempotencia, rollback y ausencia de registros parciales.
+5. Autorizar y ejecutar una prueba controlada en lpdb_test local.
+6. Completar configuración real de Meta WhatsApp y webhooks.
+7. Realizar pruebas end-to-end y actualizar el roadmap.
+
+Restricciones:
+- No ejecutar --apply sin autorización explícita.
+- No modificar Railway ni producción.
+- No utilizar credenciales reales en pruebas locales.
+- No declarar cerrada la Fase 21.8 sin las verificaciones pendientes.
+
+PUNTO DE REINICIO:
+Continuar desde la auditoría de las restricciones PostgreSQL
+y la validación final del modo --apply de Meta WhatsApp.
